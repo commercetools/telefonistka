@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
+	repoapiclient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
 	"github.com/argoproj/argo-cd/v2/util/errors"
 	argoio "github.com/argoproj/argo-cd/v2/util/io"
 )
@@ -120,30 +122,30 @@ import (
 // }
 
 // DifferenceOption struct to store diff options
-// type DifferenceOption struct {
-// local                  string
-// localRepoRoot          string
-// revision               string
-// cluster                *argoappv1.Cluster
-// res                    *repoapiclient.ManifestResponse
-// serversideRes          *repoapiclient.ManifestResponse
-// revisionSourceMappings *map[int64]string
-// }
-//
-// func createArgoCdClient(token string) (apiclient.Client, error) {
-// opts := &apiclient.ClientOptions{
-// ServerAddr: "localhost:8080",
-// Insecure:   true,
-// AuthToken:  token,
-// PlainText:  true,
-// }
-//
-// clientset, err := apiclient.NewClient(opts)
-// if err != nil {
-// return nil, err
-// }
-// return clientset, nil
-// }
+type DifferenceOption struct {
+	local                  string
+	localRepoRoot          string
+	revision               string
+	cluster                *argoappv1.Cluster
+	res                    *repoapiclient.ManifestResponse
+	serversideRes          *repoapiclient.ManifestResponse
+	revisionSourceMappings *map[int64]string
+}
+
+func createArgoCdClient(token string) (apiclient.Client, error) {
+	opts := &apiclient.ClientOptions{
+		ServerAddr: "localhost:8080",
+		Insecure:   true,
+		AuthToken:  token,
+		PlainText:  true,
+	}
+
+	clientset, err := apiclient.NewClient(opts)
+	if err != nil {
+		return nil, err
+	}
+	return clientset, nil
+}
 
 // Play ArgoCD API
 func Play(token string) {
@@ -166,7 +168,7 @@ func Play(token string) {
 	})
 	errors.CheckError(err)
 	fmt.Printf("app: %v", app)
-	resources, err := appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &appName, AppNamespace: &appNs})
+	_, err = appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &appName, AppNamespace: &appNs})
 	errors.CheckError(err)
 	diffOption := &DifferenceOption{}
 
@@ -180,7 +182,7 @@ func Play(token string) {
 	diffOption.res = res
 	diffOption.revision = revision
 
-	conn, projIf, err := client.NewProjectClient()
+	conn, _, err = client.NewProjectClient()
 	errors.CheckError(err)
 	defer argoio.Close(conn)
 
