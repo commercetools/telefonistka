@@ -1,9 +1,6 @@
 package telefonistka
 
 import (
-	"os"
-
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
 )
@@ -34,11 +31,11 @@ func playWithArgo() {
 
 }
 
-func getCrucialEnv(key string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	log.Fatalf("%s environment variable is required", key)
-	os.Exit(3)
-	return ""
-}
+// func getCrucialEnv(key string) string {
+// if value, ok := os.LookupEnv(key); ok {
+// return value
+// }
+// log.Fatalf("%s environment variable is required", key)
+// os.Exit(3)
+// return ""
+// }
