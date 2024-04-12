@@ -2,124 +2,180 @@ package argocd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
+	"github.com/argoproj/argo-cd/v2/controller"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
+	"github.com/argoproj/argo-cd/v2/util/argo"
+	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
+	"github.com/argoproj/argo-cd/v2/util/cli"
 	"github.com/argoproj/argo-cd/v2/util/errors"
 	argoio "github.com/argoproj/argo-cd/v2/util/io"
+	"github.com/argoproj/gitops-engine/pkg/sync/hook"
+	"github.com/argoproj/gitops-engine/pkg/sync/ignore"
+	"github.com/argoproj/gitops-engine/pkg/utils/kube"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// type objKeyLiveTarget struct {
-// key    kube.ResourceKey
-// live   *unstructured.Unstructured
-// target *unstructured.Unstructured
-// }
+type resourceInfoProvider struct {
+	namespacedByGk map[schema.GroupKind]bool
+}
 
-// func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructured.Unstructured, appNamespace string) map[kube.ResourceKey]*unstructured.Unstructured {
-// namespacedByGk := make(map[schema.GroupKind]bool)
-// for i := range liveObjs {
-// if liveObjs[i] != nil {
-// key := kube.GetResourceKey(liveObjs[i])
-// namespacedByGk[schema.GroupKind{Group: key.Group, Kind: key.Kind}] = key.Namespace != ""
-// }
-// }
-// localObs, _, err := controller.DeduplicateTargetObjects(appNamespace, localObs, &resourceInfoProvider{namespacedByGk: namespacedByGk})
-// errors.CheckError(err)
-// objByKey := make(map[kube.ResourceKey]*unstructured.Unstructured)
-// for i := range localObs {
-// obj := localObs[i]
-// if !(hook.IsHook(obj) || ignore.Ignore(obj)) {
-// objByKey[kube.GetResourceKey(obj)] = obj
-// }
-// }
-// return objByKey
-// }
-//
-// func findandPrintDiff(ctx context.Context, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) bool {
-// var foundDiffs bool
-// liveObjs, err := cmdutil.LiveObjects(resources.Items)
-// errors.CheckError(err)
-// items := make([]objKeyLiveTarget, 0)
-// if diffOptions.local != "" {
-// localObjs := groupObjsByKey(getLocalObjects(ctx, app, proj, diffOptions.local, diffOptions.localRepoRoot, argoSettings.AppLabelKey, diffOptions.cluster.Info.ServerVersion, diffOptions.cluster.Info.APIVersions, argoSettings.KustomizeOptions, argoSettings.TrackingMethod), liveObjs, app.Spec.Destination.Namespace)
-// items = groupObjsForDiff(resources, localObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
-// } else if diffOptions.revision != "" || (diffOptions.revisionSourceMappings != nil) {
-// var unstructureds []*unstructured.Unstructured
-// for _, mfst := range diffOptions.res.Manifests {
-// obj, err := argoappv1.UnmarshalToUnstructured(mfst)
-// errors.CheckError(err)
-// unstructureds = append(unstructureds, obj)
-// }
-// groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
-// items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
-// } else if diffOptions.serversideRes != nil {
-// var unstructureds []*unstructured.Unstructured
-// for _, mfst := range diffOptions.serversideRes.Manifests {
-// obj, err := argoappv1.UnmarshalToUnstructured(mfst)
-// errors.CheckError(err)
-// unstructureds = append(unstructureds, obj)
-// }
-// groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
-// items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
-// } else {
-// for i := range resources.Items {
-// res := resources.Items[i]
-// var live = &unstructured.Unstructured{}
-// err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
-// errors.CheckError(err)
-//
-// var target = &unstructured.Unstructured{}
-// err = json.Unmarshal([]byte(res.TargetState), &target)
-// errors.CheckError(err)
-//
-// items = append(items, objKeyLiveTarget{kube.NewResourceKey(res.Group, res.Kind, res.Namespace, res.Name), live, target})
-// }
-// }
-//
-// for _, item := range items {
-// if item.target != nil && hook.IsHook(item.target) || item.live != nil && hook.IsHook(item.live) {
-// continue
-// }
-// overrides := make(map[string]argoappv1.ResourceOverride)
-// for k := range argoSettings.ResourceOverrides {
-// val := argoSettings.ResourceOverrides[k]
-// overrides[k] = *val
-// }
-//
-// ignoreAggregatedRoles := false
-// diffConfig, err := argodiff.NewDiffConfigBuilder().
-// WithDiffSettings(app.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles).
-// WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
-// WithNoCache().
-// Build()
-// errors.CheckError(err)
-// diffRes, err := argodiff.StateDiff(item.live, item.target, diffConfig)
-// errors.CheckError(err)
-//
-// if diffRes.Modified || item.target == nil || item.live == nil {
-// fmt.Printf("\n===== %s/%s %s/%s ======\n", item.key.Group, item.key.Kind, item.key.Namespace, item.key.Name)
-// var live *unstructured.Unstructured
-// var target *unstructured.Unstructured
-// if item.target != nil && item.live != nil {
-// target = &unstructured.Unstructured{}
-// live = item.live
-// err = json.Unmarshal(diffRes.PredictedLive, target)
-// errors.CheckError(err)
-// } else {
-// live = item.live
-// target = item.target
-// }
-// if !foundDiffs {
-// foundDiffs = true
-// }
-// _ = cli.PrintDiff(item.key.Name, live, target)
-// }
-// }
-// return foundDiffs
-// }
+// Infer if obj is namespaced or not from corresponding live objects list. If corresponding live object has namespace then target object is also namespaced.
+// If live object is missing then it does not matter if target is namespaced or not.
+func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
+	return p.namespacedByGk[gk], nil
+}
+
+type objKeyLiveTarget struct {
+	key    kube.ResourceKey
+	live   *unstructured.Unstructured
+	target *unstructured.Unstructured
+}
+
+func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructured.Unstructured, appNamespace string) map[kube.ResourceKey]*unstructured.Unstructured {
+	namespacedByGk := make(map[schema.GroupKind]bool)
+	for i := range liveObjs {
+		if liveObjs[i] != nil {
+			key := kube.GetResourceKey(liveObjs[i])
+			namespacedByGk[schema.GroupKind{Group: key.Group, Kind: key.Kind}] = key.Namespace != ""
+		}
+	}
+	localObs, _, err := controller.DeduplicateTargetObjects(appNamespace, localObs, &resourceInfoProvider{namespacedByGk: namespacedByGk})
+	errors.CheckError(err)
+	objByKey := make(map[kube.ResourceKey]*unstructured.Unstructured)
+	for i := range localObs {
+		obj := localObs[i]
+		if !(hook.IsHook(obj) || ignore.Ignore(obj)) {
+			objByKey[kube.GetResourceKey(obj)] = obj
+		}
+	}
+	return objByKey
+}
+
+func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[kube.ResourceKey]*unstructured.Unstructured, items []objKeyLiveTarget, argoSettings *settings.Settings, appName, namespace string) []objKeyLiveTarget {
+	resourceTracking := argo.NewResourceTracking()
+	for _, res := range resources.Items {
+		var live = &unstructured.Unstructured{}
+		err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
+		errors.CheckError(err)
+
+		key := kube.ResourceKey{Name: res.Name, Namespace: res.Namespace, Group: res.Group, Kind: res.Kind}
+		if key.Kind == kube.SecretKind && key.Group == "" {
+			// Don't bother comparing secrets, argo-cd doesn't have access to k8s secret data
+			delete(objs, key)
+			continue
+		}
+		if local, ok := objs[key]; ok || live != nil {
+			if local != nil && !kube.IsCRD(local) {
+				err = resourceTracking.SetAppInstance(local, argoSettings.AppLabelKey, appName, namespace, argoappv1.TrackingMethod(argoSettings.GetTrackingMethod()))
+				errors.CheckError(err)
+			}
+
+			items = append(items, objKeyLiveTarget{key, live, local})
+			delete(objs, key)
+		}
+	}
+	for key, local := range objs {
+		if key.Kind == kube.SecretKind && key.Group == "" {
+			// Don't bother comparing secrets, argo-cd doesn't have access to k8s secret data
+			delete(objs, key)
+			continue
+		}
+		items = append(items, objKeyLiveTarget{key, nil, local})
+	}
+	return items
+}
+
+func findandPrintDiff(ctx context.Context, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) bool {
+	var foundDiffs bool
+	liveObjs, err := cmdutil.LiveObjects(resources.Items)
+	errors.CheckError(err)
+	items := make([]objKeyLiveTarget, 0)
+	if diffOptions.local != "" {
+		localObjs := groupObjsByKey(getLocalObjects(ctx, app, proj, diffOptions.local, diffOptions.localRepoRoot, argoSettings.AppLabelKey, diffOptions.cluster.Info.ServerVersion, diffOptions.cluster.Info.APIVersions, argoSettings.KustomizeOptions, argoSettings.TrackingMethod), liveObjs, app.Spec.Destination.Namespace)
+		items = groupObjsForDiff(resources, localObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
+	} else if diffOptions.revision != "" || (diffOptions.revisionSourceMappings != nil) {
+		var unstructureds []*unstructured.Unstructured
+		for _, mfst := range diffOptions.res.Manifests {
+			obj, err := argoappv1.UnmarshalToUnstructured(mfst)
+			errors.CheckError(err)
+			unstructureds = append(unstructureds, obj)
+		}
+		groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
+		items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
+	} else if diffOptions.serversideRes != nil {
+		var unstructureds []*unstructured.Unstructured
+		for _, mfst := range diffOptions.serversideRes.Manifests {
+			obj, err := argoappv1.UnmarshalToUnstructured(mfst)
+			errors.CheckError(err)
+			unstructureds = append(unstructureds, obj)
+		}
+		groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
+		items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
+	} else {
+		for i := range resources.Items {
+			res := resources.Items[i]
+			var live = &unstructured.Unstructured{}
+			err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
+			errors.CheckError(err)
+
+			var target = &unstructured.Unstructured{}
+			err = json.Unmarshal([]byte(res.TargetState), &target)
+			errors.CheckError(err)
+
+			items = append(items, objKeyLiveTarget{kube.NewResourceKey(res.Group, res.Kind, res.Namespace, res.Name), live, target})
+		}
+	}
+
+	for _, item := range items {
+		if item.target != nil && hook.IsHook(item.target) || item.live != nil && hook.IsHook(item.live) {
+			continue
+		}
+		overrides := make(map[string]argoappv1.ResourceOverride)
+		for k := range argoSettings.ResourceOverrides {
+			val := argoSettings.ResourceOverrides[k]
+			overrides[k] = *val
+		}
+
+		ignoreAggregatedRoles := false
+		diffConfig, err := argodiff.NewDiffConfigBuilder().
+			WithDiffSettings(app.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles).
+			WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
+			WithNoCache().
+			Build()
+		errors.CheckError(err)
+		diffRes, err := argodiff.StateDiff(item.live, item.target, diffConfig)
+		errors.CheckError(err)
+
+		if diffRes.Modified || item.target == nil || item.live == nil {
+			fmt.Printf("\n===== %s/%s %s/%s ======\n", item.key.Group, item.key.Kind, item.key.Namespace, item.key.Name)
+			var live *unstructured.Unstructured
+			var target *unstructured.Unstructured
+			if item.target != nil && item.live != nil {
+				target = &unstructured.Unstructured{}
+				live = item.live
+				err = json.Unmarshal(diffRes.PredictedLive, target)
+				errors.CheckError(err)
+			} else {
+				live = item.live
+				target = item.target
+			}
+			if !foundDiffs {
+				foundDiffs = true
+			}
+			_ = cli.PrintDiff(item.key.Name, live, target)
+		}
+	}
+	return foundDiffs
+}
 
 // DifferenceOption struct to store diff options
 type DifferenceOption struct {

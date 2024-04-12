@@ -7,6 +7,7 @@ toolchain go1.22.1
 require (
 	github.com/alexliesenfeld/health v0.8.0
 	github.com/argoproj/argo-cd/v2 v2.11.0-rc1
+	github.com/argoproj/gitops-engine v0.7.1-0.20240411122334-1ade3a199867
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
 	github.com/go-test/deep v1.1.0
 	github.com/google/go-github/v52 v52.0.0
@@ -20,6 +21,7 @@ require (
 	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8
 	golang.org/x/oauth2 v0.19.0
 	gopkg.in/yaml.v2 v2.4.0
+	k8s.io/apimachinery v0.26.11
 )
 
 require (
@@ -31,7 +33,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/ProtonMail/go-crypto v1.0.0 // indirect
-	github.com/argoproj/gitops-engine v0.7.1-0.20240411122334-1ade3a199867 // indirect
 	github.com/argoproj/pkg v0.13.7-0.20230626144333-d56162821bd1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
@@ -86,6 +87,8 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.4 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/itchyny/gojq v0.12.13 // indirect
+	github.com/itchyny/timefmt-go v0.1.5 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -127,6 +130,7 @@ require (
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
+	github.com/yuin/gopher-lua v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.50.0 // indirect
 	go.opentelemetry.io/otel v1.25.0 // indirect
 	go.opentelemetry.io/otel/metric v1.25.0 // indirect
@@ -151,7 +155,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.26.11 // indirect
 	k8s.io/apiextensions-apiserver v0.26.10 // indirect
-	k8s.io/apimachinery v0.26.11 // indirect
 	k8s.io/apiserver v0.26.11 // indirect
 	k8s.io/cli-runtime v0.26.11 // indirect
 	k8s.io/client-go v0.26.11 // indirect
@@ -163,7 +166,9 @@ require (
 	k8s.io/kubectl v0.26.4 // indirect
 	k8s.io/kubernetes v1.26.11 // indirect
 	k8s.io/utils v0.0.0-20240310230437-4693a0247e57 // indirect
+	layeh.com/gopher-json v0.0.0-20190114024228-97fed8db8427 // indirect
 	oras.land/oras-go/v2 v2.5.0 // indirect
+	sigs.k8s.io/controller-runtime v0.14.7 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.1 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.0 // indirect
