@@ -9,6 +9,7 @@ import (
 	"github.com/argoproj/argo-cd/v2/controller"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
+	projectpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/project"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
@@ -99,10 +100,7 @@ func findandPrintDiff(ctx context.Context, app *argoappv1.Application, proj *arg
 	liveObjs, err := cmdutil.LiveObjects(resources.Items)
 	errors.CheckError(err)
 	items := make([]objKeyLiveTarget, 0)
-	if diffOptions.local != "" {
-		localObjs := groupObjsByKey(getLocalObjects(ctx, app, proj, diffOptions.local, diffOptions.localRepoRoot, argoSettings.AppLabelKey, diffOptions.cluster.Info.ServerVersion, diffOptions.cluster.Info.APIVersions, argoSettings.KustomizeOptions, argoSettings.TrackingMethod), liveObjs, app.Spec.Destination.Namespace)
-		items = groupObjsForDiff(resources, localObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
-	} else if diffOptions.revision != "" || (diffOptions.revisionSourceMappings != nil) {
+	if diffOptions.revision != "" || (diffOptions.revisionSourceMappings != nil) {
 		var unstructureds []*unstructured.Unstructured
 		for _, mfst := range diffOptions.res.Manifests {
 			obj, err := argoappv1.UnmarshalToUnstructured(mfst)
@@ -224,7 +222,7 @@ func Play(token string) {
 	})
 	errors.CheckError(err)
 	fmt.Printf("app: %v", app)
-	_, err = appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &appName, AppNamespace: &appNs})
+	resources, err := appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &appName, AppNamespace: &appNs})
 	errors.CheckError(err)
 	diffOption := &DifferenceOption{}
 
@@ -238,12 +236,18 @@ func Play(token string) {
 	diffOption.res = res
 	diffOption.revision = revision
 
-	conn, _, err = client.NewProjectClient()
+	conn, projIf, err := client.NewProjectClient()
 	errors.CheckError(err)
 	defer argoio.Close(conn)
+	detailedProject, err := projIf.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
 
-	// detailedProject, err := projIf.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
-	// errors.CheckError(err)
-	// b := findandPrintDiff(ctx, app, detailedProject, resources, appIf, diffOption)
+	conn, settingsIf := client.NewSettingsClientOrDie()
+	defer argoio.Close(conn)
+	argoSettings, err := settingsIf.Get(ctx, &settings.SettingsQuery{})
+	errors.CheckError(err)
+
+	errors.CheckError(err)
+	b := findandPrintDiff(ctx, app, detailedProject.Project, resources, argoSettings, diffOption)
+	fmt.Printf("b: %v", b)
 
 }
