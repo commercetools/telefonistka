@@ -109,24 +109,14 @@ func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath strin
 	return componentConfig, nil
 }
 
-func GeneratePromotionPlan(ghPrClientDetails GhPrClientDetails, config *cfg.Config, configBranch string) (map[string]PromotionInstance, error) {
-	promotions := make(map[string]PromotionInstance)
+func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, config *cfg.Config) map[relevantComponent]bool {
+	relevantComponents := map[relevantComponent]bool{}
 
 	prFiles, resp, err := ghPrClientDetails.GhClientPair.v3Client.PullRequests.ListFiles(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, ghPrClientDetails.PrNumber, &github.ListOptions{})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("could not get file list from GH API: err=%s\nresponse=%v", err, resp)
-		return promotions, err
 	}
-
-	//first we build a **unique** list of relevant directories
-	//
-	type relevantComponent struct {
-		SourcePath    string
-		ComponentName string
-		AutoMerge     bool
-	}
-	relevantComponents := map[relevantComponent]bool{}
 
 	for _, changedFile := range prFiles {
 		for _, promotionPathConfig := range config.PromotionPaths {
@@ -154,6 +144,30 @@ func GeneratePromotionPlan(ghPrClientDetails GhPrClientDetails, config *cfg.Conf
 			}
 		}
 	}
+	return relevantComponents
+}
+
+type relevantComponent struct {
+	SourcePath    string
+	ComponentName string
+	AutoMerge     bool
+}
+
+func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, config *cfg.Config) []string {
+	changedComponentPaths := []string{}
+	relevantComponents := generateListOfRelevantComponents(ghPrClientDetails, config)
+	for component := range relevantComponents {
+		changedComponentPaths = append(changedComponentPaths, component.SourcePath+component.ComponentName)
+	}
+	return changedComponentPaths
+}
+
+func GeneratePromotionPlan(ghPrClientDetails GhPrClientDetails, config *cfg.Config, configBranch string) (map[string]PromotionInstance, error) {
+	promotions := make(map[string]PromotionInstance)
+
+	//first we build a **unique** list of relevant directories
+	//
+	relevantComponents := generateListOfRelevantComponents(ghPrClientDetails, config)
 
 	// then we iterate over the list of relevant directories and generate a plan based on the configuration
 	for componentToPromote := range relevantComponents {
