@@ -78,7 +78,7 @@ func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructu
 func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[kube.ResourceKey]*unstructured.Unstructured, items []objKeyLiveTarget, argoSettings *settings.Settings, appName, namespace string) []objKeyLiveTarget {
 	resourceTracking := argo.NewResourceTracking()
 	for _, res := range resources.Items {
-		var live = &unstructured.Unstructured{}
+		live := &unstructured.Unstructured{}
 		err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
 		errors.CheckError(err)
 
@@ -142,13 +142,13 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 	} else {
 		for i := range resources.Items {
 			res := resources.Items[i]
-			var live = &unstructured.Unstructured{}
+			live := &unstructured.Unstructured{}
 			err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
 			if err != nil {
 				return false, nil, err
 			}
 
-			var target = &unstructured.Unstructured{}
+			target := &unstructured.Unstructured{}
 			err = json.Unmarshal([]byte(res.TargetState), &target)
 			if err != nil {
 				return false, nil, err
