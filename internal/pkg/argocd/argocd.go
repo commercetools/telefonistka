@@ -259,12 +259,18 @@ type DifferenceOption struct {
 	revisionSourceMappings *map[int64]string
 }
 
-func createArgoCdClient(token string) (apiclient.Client, error) {
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+func createArgoCdClient() (apiclient.Client, error) {
+	argoCdClientConfigPath := getEnv("ARGOCD_CLIENT_CONFIG_PATH", "argocd-client-config.yaml")
+
 	opts := &apiclient.ClientOptions{
-		ServerAddr: "localhost:8080",
-		Insecure:   true,
-		AuthToken:  token,
-		PlainText:  true,
+		ConfigPath: argoCdClientConfigPath,
 	}
 
 	clientset, err := apiclient.NewClient(opts)
@@ -291,6 +297,11 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		Repo:     &repo,
 	}
 	foundApps, _ := appIf.List(ctx, &appLabelQuery)
+
+	if len(foundApps.Items) == 0 {
+		currentDiffResult.DiffError = fmt.Errorf("No ArgoCD application found for component path %s(repo %s), used this label selector: %s", componentPath, repo, labelSelector)
+		return currentDiffResult
+	}
 
 	refreshType := string(argoappv1.RefreshTypeHard)
 	appNameQuery := application.ApplicationQuery{
@@ -350,8 +361,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 
 	var diffResults []DiffResult
 	// env var should be centralized
-	token, _ := os.LookupEnv("ARGOCD_TOKEN")
-	client, err := createArgoCdClient(token)
+	client, err := createArgoCdClient()
 	if err != nil {
 		return false, nil, err
 	}

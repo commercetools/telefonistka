@@ -21,6 +21,13 @@ Diff of ArgoCD applications:
 {{- else }}
 No diff 🤷
 {{- end}}
+{{if $appDiffResult.DiffError }}
+⚠️ ⚠️ ⚠️
+``` 
+{{ $appDiffResult.DiffError }}
+
+```
+{{- end }}
 
 {{- end }}
 {{- end }}
