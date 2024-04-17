@@ -2,7 +2,7 @@ package argocd
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -232,7 +232,6 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 			diffs = dmp.DiffCleanupSemantic(diffs)
 			patch := dmp.PatchToText(dmp.PatchMake(diffs))
 			diffElement.Diff = patch
-
 		}
 		diffElements = append(diffElements, diffElement)
 	}
@@ -250,10 +249,7 @@ type DiffElement struct {
 
 // DifferenceOption struct to store diff options
 type DifferenceOption struct {
-	local                  string
-	localRepoRoot          string
 	revision               string
-	cluster                *argoappv1.Cluster
 	res                    *repoapiclient.ManifestResponse
 	serversideRes          *repoapiclient.ManifestResponse
 	revisionSourceMappings *map[int64]string
@@ -281,13 +277,12 @@ func createArgoCdClient() (apiclient.Client, error) {
 }
 
 func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appIf application.ApplicationServiceClient, projIf projectpkg.ProjectServiceClient, argoSettings *settings.Settings) DiffResult {
-
 	currentDiffResult := DiffResult{
 		ComponentPath: componentPath,
 	}
 
 	cPathBa := []byte(componentPath)
-	hasher := sha1.New()
+	hasher := sha1.New() //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	hasher.Write(cPathBa)
 	componentPathSha1 := hex.EncodeToString(hasher.Sum(nil))
 
@@ -356,9 +351,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 
 // GenerateDiffOfChangedComponents generates diff of changed components
 func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []string, prBranch string, repo string) (bool, []DiffResult, error) {
-
 	noDiffsAndErrors := true
-
 	var diffResults []DiffResult
 	// env var should be centralized
 	client, err := createArgoCdClient()
@@ -389,13 +382,11 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 	}
 
 	for _, componentPath := range componentPathList {
-
 		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appIf, projIf, argoSettings)
-		if currentDiffResult.DiffError != nil || currentDiffResult.HasDiff == true {
+		if currentDiffResult.DiffError != nil || currentDiffResult.HasDiff {
 			noDiffsAndErrors = false
 		}
 		diffResults = append(diffResults, currentDiffResult)
-
 	}
 
 	return noDiffsAndErrors, diffResults, err
