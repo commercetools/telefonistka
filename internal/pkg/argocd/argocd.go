@@ -346,7 +346,6 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	}
 
 	return currentDiffResult
-
 }
 
 // GenerateDiffOfChangedComponents generates diff of changed components
@@ -390,5 +389,4 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 	}
 
 	return noDiffsAndErrors, diffResults, err
-
 }
