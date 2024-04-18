@@ -110,15 +110,19 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 			if err != nil {
 				prHandleError = err
 				ghPrClientDetails.PrLogger.Errorf("Failed to get ArgoCD diff information: err=%s\n", err)
-			} else if noDiffsAndErrorsPR {
-				prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *eventPayload.PullRequest.Number, []string{"noop"})
-				prom.InstrumentGhCall(resp)
-				if err != nil {
-					ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
-				} else {
-					ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", *eventPayload.PullRequest.Number, prLables)
+			} else {
+				ghPrClientDetails.PrLogger.Debugf("Successfully got ArgoCD diff\n")
+				if noDiffsAndErrorsPR {
+					ghPrClientDetails.PrLogger.Debugf("ArgoCD diff is empty, this PR will not change cluster state\n")
+					prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *eventPayload.PullRequest.Number, []string{"noop"})
+					prom.InstrumentGhCall(resp)
+					if err != nil {
+						ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
+					} else {
+						ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", *eventPayload.PullRequest.Number, prLables)
+					}
+					// TODO Auto-merge PRs with no changes(optional)
 				}
-				// TODO Auto-merge PRs with no changes(optional)
 			}
 
 			err, templateOutput := executeTemplate(ghPrClientDetails.PrLogger, "argoCdDiff", "argoCD-diff-pr-comment.gotmpl", diffOfChangedComponents)

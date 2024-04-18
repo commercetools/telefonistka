@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 
 	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
 	"github.com/argoproj/argo-cd/v2/controller"
@@ -263,10 +264,14 @@ func getEnv(key, fallback string) string {
 }
 
 func createArgoCdClient() (apiclient.Client, error) {
-	argoCdClientConfigPath := getEnv("ARGOCD_CLIENT_CONFIG_PATH", "argocd-client-config.yaml")
+	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
+	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
 
 	opts := &apiclient.ClientOptions{
-		ConfigPath: argoCdClientConfigPath,
+		ServerAddr: getEnv("ARGOCD_SERVER_ADDR", "localhost:8080"),
+		AuthToken:  getEnv("ARGOCD_TOKEN", ""),
+		PlainText:  plaintext,
+		Insecure:   insecure,
 	}
 
 	clientset, err := apiclient.NewClient(opts)
