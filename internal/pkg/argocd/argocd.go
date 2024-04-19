@@ -111,6 +111,8 @@ func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[
 }
 
 func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (bool, []DiffElement, error) {
+	// Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
+	// But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
 	var foundDiffs bool
 	liveObjs, err := cmdutil.LiveObjects(resources.Items)
 	if err != nil {
@@ -178,35 +180,45 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 				foundDiffs = true
 			}
 
-			liveData := []byte("")
-			if live != nil {
-				liveData, err = yaml.Marshal(live)
-				if err != nil {
-					return false, nil, err
-				}
+			diffElement.Diff, err = diffLiveVsTargetObject(live, target)
+			if err != nil {
+				return false, nil, err
 			}
-			targetData := []byte("")
-			if target != nil {
-				targetData, err = yaml.Marshal(target)
-				if err != nil {
-					return false, nil, err
-				}
-			}
-
-			dmp := diffmatchpatch.New()
-
-			// some effort to get line by line outdput: https://github.com/sergi/go-diff/issues/69#issuecomment-688602689
-			// TODO document this or make it more readable
-			fileAdmp, fileBdmp, dmpStrings := dmp.DiffLinesToChars(string(liveData), string(targetData))
-			diffs := dmp.DiffMain(fileAdmp, fileBdmp, false)
-			diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
-			diffs = dmp.DiffCleanupSemantic(diffs)
-			patch := dmp.PatchToText(dmp.PatchMake(diffs))
-			diffElement.Diff = patch
 		}
 		diffElements = append(diffElements, diffElement)
 	}
 	return foundDiffs, diffElements, nil
+}
+
+// diffLiveVsTargetObject diffs the live and target objects, should return output that is compatible with github markdown diff highlighting format
+func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, error) {
+	var err error
+	// Diff the live and target objects
+	liveData := []byte("")
+	if live != nil {
+		liveData, err = yaml.Marshal(live)
+		if err != nil {
+			return "", err
+		}
+	}
+	targetData := []byte("")
+	if target != nil {
+		targetData, err = yaml.Marshal(target)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	dmp := diffmatchpatch.New()
+
+	// some effort to get line by line outdput: https://github.com/sergi/go-diff/issues/69#issuecomment-688602689
+	// TODO document this or make it more readable
+	fileAdmp, fileBdmp, dmpStrings := dmp.DiffLinesToChars(string(liveData), string(targetData))
+	diffs := dmp.DiffMain(fileAdmp, fileBdmp, false)
+	diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
+	diffs = dmp.DiffCleanupSemantic(diffs)
+	patch := dmp.PatchToText(dmp.PatchMake(diffs))
+	return patch, nil
 }
 
 // DiffElement struct to store diff element details, this represents a single k8s object
@@ -256,11 +268,14 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		ComponentPath: componentPath,
 	}
 
+	// Calculate sha1 of component path to use in a label selector
 	cPathBa := []byte(componentPath)
 	hasher := sha1.New() //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	hasher.Write(cPathBa)
 	componentPathSha1 := hex.EncodeToString(hasher.Sum(nil))
 
+	// Find ArgoCD application by the path SHA1 label selector and repo name
+	// That label is assumed to be pupulated by the ApplicationSet controller(or apps of apps  or similar).
 	labelSelector := fmt.Sprintf("telefonistka.io/component-path-sha1=%s", componentPathSha1)
 	appLabelQuery := application.ApplicationQuery{
 		Selector: &labelSelector,
@@ -271,18 +286,17 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		currentDiffResult.DiffError = err
 		return currentDiffResult
 	}
-
 	if len(foundApps.Items) == 0 {
 		currentDiffResult.DiffError = fmt.Errorf("No ArgoCD application found for component path %s(repo %s), used this label selector: %s", componentPath, repo, labelSelector)
 		return currentDiffResult
 	}
 
+	// Get the application and its resources, resources are the live state of the application objects.
 	refreshType := string(argoappv1.RefreshTypeHard)
 	appNameQuery := application.ApplicationQuery{
 		Name:    &foundApps.Items[0].Name, // we expect only one app with this label and repo selectors
 		Refresh: &refreshType,
 	}
-
 	app, err := appIf.Get(ctx, &appNameQuery)
 	if err != nil {
 		currentDiffResult.DiffError = err
@@ -290,13 +304,13 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	}
 	currentDiffResult.ArgoCdAppName = app.Name
 	currentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
-
 	resources, err := appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
 	if err != nil {
 		currentDiffResult.DiffError = err
 		return currentDiffResult
 	}
 
+	// Get the application manifests, these are the target state of the application objects, taken from the git repo, specificly from the PR branch.
 	diffOption := &DifferenceOption{}
 
 	manifestQuery := application.ApplicationManifestQuery{
@@ -309,10 +323,10 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		currentDiffResult.DiffError = err
 		return currentDiffResult
 	}
-
 	diffOption.res = manifests
 	diffOption.revision = prBranch
 
+	// Now we diff the live state(resources) and target state of the application objects(diffOption.res)
 	detailedProject, err := projIf.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
 	if err != nil {
 		currentDiffResult.DiffError = err
