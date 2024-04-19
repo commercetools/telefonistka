@@ -110,6 +110,12 @@ This is how this warning looks in the PR:
 <img src="https://user-images.githubusercontent.com/1616153/219383563-8b833c17-7701-45b6-9471-d937d03142f4.png"  width="50%" height="50%">
 <!-- markdownlint-enable MD033 -->
 
+### ArgoCD integration
+
+Telefonistka can compare manifests in PR brances to live objects in the clusters and comment the difference in PRs <!-- TODO: add image -->
+
+It can also automtically merge PRs that would not incure any change to cluster.
+
 ### Artifact version bumping from CLI
 
 If your IaC repo deploys software you maintain internally you probably want to automate artifact version bumping.

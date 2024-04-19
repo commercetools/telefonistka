@@ -110,6 +110,7 @@ func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath strin
 }
 
 func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, config *cfg.Config) map[relevantComponent]bool {
+	// This function generates a list of "components" that where changed in the PR and are relevant for promotion)
 	relevantComponents := map[relevantComponent]bool{}
 
 	prFiles, resp, err := ghPrClientDetails.GhClientPair.v3Client.PullRequests.ListFiles(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, ghPrClientDetails.PrNumber, &github.ListOptions{})
@@ -154,6 +155,7 @@ type relevantComponent struct {
 }
 
 func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, config *cfg.Config) []string {
+	// Turns the map with struct keys into a list of strings
 	changedComponentPaths := []string{}
 	relevantComponents := generateListOfRelevantComponents(ghPrClientDetails, config)
 	for component := range relevantComponents {
@@ -162,14 +164,11 @@ func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, co
 	return changedComponentPaths
 }
 
-func GeneratePromotionPlan(ghPrClientDetails GhPrClientDetails, config *cfg.Config, configBranch string) (map[string]PromotionInstance, error) {
+func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, config *cfg.Config, relevantComponents map[relevantComponent]bool, configBranch string) (map[string]PromotionInstance, error) {
+	// This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
+
 	promotions := make(map[string]PromotionInstance)
-
-	//first we build a **unique** list of relevant directories
-	//
-	relevantComponents := generateListOfRelevantComponents(ghPrClientDetails, config)
-
-	// then we iterate over the list of relevant directories and generate a plan based on the configuration
+	// Iterate over the list of relevant directories and generate a plan based on the configuration
 	for componentToPromote := range relevantComponents {
 		componentConfig, err := getComponentConfig(ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
 		if err != nil {
@@ -236,6 +235,12 @@ func GeneratePromotionPlan(ghPrClientDetails GhPrClientDetails, config *cfg.Conf
 			}
 		}
 	}
-
 	return promotions, nil
+}
+
+func GeneratePromotionPlan(ghPrClientDetails GhPrClientDetails, config *cfg.Config, configBranch string) (map[string]PromotionInstance, error) {
+	// TODO refactor tests to use the two functions below instead of this one
+	relevantComponents := generateListOfRelevantComponents(ghPrClientDetails, config)
+	promotions, err := generatePlanBasedOnChangeddComponent(ghPrClientDetails, config, relevantComponents, configBranch)
+	return promotions, err
 }
