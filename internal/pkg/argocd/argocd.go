@@ -10,24 +10,17 @@ import (
 	"strconv"
 
 	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
-	"github.com/argoproj/argo-cd/v2/controller"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
 	projectpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/project"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
-	repoapiclient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
-	"github.com/argoproj/argo-cd/v2/util/argo"
 	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
-	"github.com/argoproj/argo-cd/v2/util/errors"
 	argoio "github.com/argoproj/argo-cd/v2/util/io"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
-	"github.com/argoproj/gitops-engine/pkg/sync/ignore"
-	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // DiffResult struct to store diff result
@@ -40,79 +33,9 @@ type DiffResult struct {
 	DiffError     error
 }
 
-type resourceInfoProvider struct {
-	namespacedByGk map[schema.GroupKind]bool
-}
-
-// Infer if obj is namespaced or not from corresponding live objects list. If corresponding live object has namespace then target object is also namespaced.
-// If live object is missing then it does not matter if target is namespaced or not.
-func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
-	return p.namespacedByGk[gk], nil
-}
-
-type objKeyLiveTarget struct {
-	key    kube.ResourceKey
-	live   *unstructured.Unstructured
-	target *unstructured.Unstructured
-}
-
-func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructured.Unstructured, appNamespace string) map[kube.ResourceKey]*unstructured.Unstructured {
-	namespacedByGk := make(map[schema.GroupKind]bool)
-	for i := range liveObjs {
-		if liveObjs[i] != nil {
-			key := kube.GetResourceKey(liveObjs[i])
-			namespacedByGk[schema.GroupKind{Group: key.Group, Kind: key.Kind}] = key.Namespace != ""
-		}
-	}
-	localObs, _, err := controller.DeduplicateTargetObjects(appNamespace, localObs, &resourceInfoProvider{namespacedByGk: namespacedByGk})
-	errors.CheckError(err)
-	objByKey := make(map[kube.ResourceKey]*unstructured.Unstructured)
-	for i := range localObs {
-		obj := localObs[i]
-		if !(hook.IsHook(obj) || ignore.Ignore(obj)) {
-			objByKey[kube.GetResourceKey(obj)] = obj
-		}
-	}
-	return objByKey
-}
-
-func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[kube.ResourceKey]*unstructured.Unstructured, items []objKeyLiveTarget, argoSettings *settings.Settings, appName, namespace string) []objKeyLiveTarget {
-	resourceTracking := argo.NewResourceTracking()
-	for _, res := range resources.Items {
-		live := &unstructured.Unstructured{}
-		err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
-		errors.CheckError(err)
-
-		key := kube.ResourceKey{Name: res.Name, Namespace: res.Namespace, Group: res.Group, Kind: res.Kind}
-		if key.Kind == kube.SecretKind && key.Group == "" {
-			// Don't bother comparing secrets, argo-cd doesn't have access to k8s secret data
-			delete(objs, key)
-			continue
-		}
-		if local, ok := objs[key]; ok || live != nil {
-			if local != nil && !kube.IsCRD(local) {
-				err = resourceTracking.SetAppInstance(local, argoSettings.AppLabelKey, appName, namespace, argoappv1.TrackingMethod(argoSettings.GetTrackingMethod()))
-				errors.CheckError(err)
-			}
-
-			items = append(items, objKeyLiveTarget{key, live, local})
-			delete(objs, key)
-		}
-	}
-	for key, local := range objs {
-		if key.Kind == kube.SecretKind && key.Group == "" {
-			// Don't bother comparing secrets, argo-cd doesn't have access to k8s secret data
-			delete(objs, key)
-			continue
-		}
-		items = append(items, objKeyLiveTarget{key, nil, local})
-	}
-	return items
-}
-
+// Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
+// But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
 func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (bool, []DiffElement, error) {
-	// Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
-	// But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
 	var foundDiffs bool
 	liveObjs, err := cmdutil.LiveObjects(resources.Items)
 	if err != nil {
@@ -228,14 +151,6 @@ type DiffElement struct {
 	ObjectKind      string
 	ObjectNamespace string
 	Diff            string
-}
-
-// DifferenceOption struct to store diff options
-type DifferenceOption struct {
-	revision               string
-	res                    *repoapiclient.ManifestResponse
-	serversideRes          *repoapiclient.ManifestResponse
-	revisionSourceMappings *map[int64]string
 }
 
 func getEnv(key, fallback string) string {
