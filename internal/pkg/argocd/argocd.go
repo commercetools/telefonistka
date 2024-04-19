@@ -23,6 +23,15 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// DiffElement struct to store diff element details, this represents a single k8s object
+type DiffElement struct {
+	ObjectGroup     string
+	ObjectName      string
+	ObjectKind      string
+	ObjectNamespace string
+	Diff            string
+}
+
 // DiffResult struct to store diff result
 type DiffResult struct {
 	ComponentPath string
@@ -142,15 +151,6 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, er
 	diffs = dmp.DiffCleanupSemantic(diffs)
 	patch := dmp.PatchToText(dmp.PatchMake(diffs))
 	return patch, nil
-}
-
-// DiffElement struct to store diff element details, this represents a single k8s object
-type DiffElement struct {
-	ObjectGroup     string
-	ObjectName      string
-	ObjectKind      string
-	ObjectNamespace string
-	Diff            string
 }
 
 func getEnv(key, fallback string) string {

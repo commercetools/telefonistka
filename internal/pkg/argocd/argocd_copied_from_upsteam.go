@@ -33,16 +33,16 @@ type resourceInfoProvider struct {
 	namespacedByGk map[schema.GroupKind]bool
 }
 
-// Infer if obj is namespaced or not from corresponding live objects list. If corresponding live object has namespace then target object is also namespaced.
-// If live object is missing then it does not matter if target is namespaced or not.
-func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
-	return p.namespacedByGk[gk], nil
-}
-
 type objKeyLiveTarget struct {
 	key    kube.ResourceKey
 	live   *unstructured.Unstructured
 	target *unstructured.Unstructured
+}
+
+// Infer if obj is namespaced or not from corresponding live objects list. If corresponding live object has namespace then target object is also namespaced.
+// If live object is missing then it does not matter if target is namespaced or not.
+func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
+	return p.namespacedByGk[gk], nil
 }
 
 // copied from https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1091-L1109
