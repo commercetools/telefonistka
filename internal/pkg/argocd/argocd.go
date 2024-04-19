@@ -118,46 +118,16 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 	}
 
 	items := make([]objKeyLiveTarget, 0)
-	if diffOptions.revision != "" || (diffOptions.revisionSourceMappings != nil) {
-		var unstructureds []*unstructured.Unstructured
-		for _, mfst := range diffOptions.res.Manifests {
-			obj, err := argoappv1.UnmarshalToUnstructured(mfst)
-			if err != nil {
-				return false, nil, err
-			}
-			unstructureds = append(unstructureds, obj)
+	var unstructureds []*unstructured.Unstructured
+	for _, mfst := range diffOptions.res.Manifests {
+		obj, err := argoappv1.UnmarshalToUnstructured(mfst)
+		if err != nil {
+			return false, nil, err
 		}
-		groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
-		items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
-	} else if diffOptions.serversideRes != nil {
-		var unstructureds []*unstructured.Unstructured
-		for _, mfst := range diffOptions.serversideRes.Manifests {
-			obj, err := argoappv1.UnmarshalToUnstructured(mfst)
-			if err != nil {
-				return false, nil, err
-			}
-			unstructureds = append(unstructureds, obj)
-		}
-		groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
-		items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
-	} else {
-		for i := range resources.Items {
-			res := resources.Items[i]
-			live := &unstructured.Unstructured{}
-			err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
-			if err != nil {
-				return false, nil, err
-			}
-
-			target := &unstructured.Unstructured{}
-			err = json.Unmarshal([]byte(res.TargetState), &target)
-			if err != nil {
-				return false, nil, err
-			}
-
-			items = append(items, objKeyLiveTarget{kube.NewResourceKey(res.Group, res.Kind, res.Namespace, res.Name), live, target})
-		}
+		unstructureds = append(unstructureds, obj)
 	}
+	groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
+	items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
 
 	var diffElements []DiffElement
 	for _, item := range items {
@@ -296,7 +266,11 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		Selector: &labelSelector,
 		Repo:     &repo,
 	}
-	foundApps, _ := appIf.List(ctx, &appLabelQuery)
+	foundApps, err := appIf.List(ctx, &appLabelQuery)
+	if err != nil {
+		currentDiffResult.DiffError = err
+		return currentDiffResult
+	}
 
 	if len(foundApps.Items) == 0 {
 		currentDiffResult.DiffError = fmt.Errorf("No ArgoCD application found for component path %s(repo %s), used this label selector: %s", componentPath, repo, labelSelector)

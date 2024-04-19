@@ -2,8 +2,16 @@
 Diff of ArgoCD applications:
 {{ range $appDiffResult := . }}
 
-<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/> **[{{ $appDiffResult.ArgoCdAppName }}]({{ $appDiffResult.ArgoCdAppURL }})** @ `{{ $appDiffResult.ComponentPath }}`
 
+{{if $appDiffResult.DiffError }}
+⚠️ ⚠️ **Error getting diff from ArgoCD** (`{{ $appDiffResult.ComponentPath }}`) ⚠️ ⚠️ 
+``` 
+{{ $appDiffResult.DiffError }}
+
+```
+
+{{- else }}
+<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/> **[{{ $appDiffResult.ArgoCdAppName }}]({{ $appDiffResult.ArgoCdAppURL }})** @ `{{ $appDiffResult.ComponentPath }}`
 {{if $appDiffResult.HasDiff }}
 
 <details><summary>ArgoCD Diff(Click to expand):</summary>
@@ -21,12 +29,6 @@ Diff of ArgoCD applications:
 {{- else }}
 No diff 🤷
 {{- end}}
-{{if $appDiffResult.DiffError }}
-⚠️ ⚠️ ⚠️
-``` 
-{{ $appDiffResult.DiffError }}
-
-```
 {{- end }}
 
 {{- end }}
