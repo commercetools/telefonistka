@@ -18,8 +18,7 @@ import (
 	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
 	argoio "github.com/argoproj/argo-cd/v2/util/io"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
-	"github.com/sergi/go-diff/diffmatchpatch"
-	"gopkg.in/yaml.v2"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -124,32 +123,33 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 
 // diffLiveVsTargetObject diffs the live and target objects, should return output that is compatible with github markdown diff highlighting format
 func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, error) {
-	var err error
+	// var err error
 	// Diff the live and target objects
-	liveData := []byte("")
-	if live != nil {
-		liveData, err = yaml.Marshal(live)
-		if err != nil {
-			return "", err
-		}
-	}
-	targetData := []byte("")
-	if target != nil {
-		targetData, err = yaml.Marshal(target)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	dmp := diffmatchpatch.New()
-
+	// liveData := []byte("")
+	// if live != nil {
+	// liveData, err = yaml.Marshal(live)
+	// if err != nil {
+	// return "", err
+	// }
+	// }
+	// targetData := []byte("")
+	// if target != nil {
+	// targetData, err = yaml.Marshal(target)
+	// if err != nil {
+	// return "", err
+	// }
+	// }
+	//
+	// dmp := diffmatchpatch.New()
+	//
 	// some effort to get line by line outdput: https://github.com/sergi/go-diff/issues/69#issuecomment-688602689
 	// TODO document this or make it more readable
-	fileAdmp, fileBdmp, dmpStrings := dmp.DiffLinesToChars(string(liveData), string(targetData))
-	diffs := dmp.DiffMain(fileAdmp, fileBdmp, false)
-	diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
-	diffs = dmp.DiffCleanupSemantic(diffs)
-	patch := dmp.PatchToText(dmp.PatchMake(diffs))
+	// fileAdmp, fileBdmp, dmpStrings := dmp.DiffLinesToChars(string(liveData), string(targetData))
+	// diffs := dmp.DiffMain(fileAdmp, fileBdmp, false)
+	// diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
+	// diffs = dmp.DiffCleanupSemantic(diffs)
+	// patch := dmp.PatchToText(dmp.PatchMake(diffs))
+	patch := cmp.Diff(live, target)
 	return patch, nil
 }
 
