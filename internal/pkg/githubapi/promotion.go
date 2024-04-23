@@ -168,7 +168,6 @@ func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, co
 
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
 func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, config *cfg.Config, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
-
 	promotions = make(map[string]PromotionInstance)
 	for componentToPromote := range relevantComponents {
 		componentConfig, err := getComponentConfig(ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
