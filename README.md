@@ -114,7 +114,9 @@ This is how this warning looks in the PR:
 
 Telefonistka can compare manifests in PR brances to live objects in the clusters and comment the difference in PRs
 
+<!-- markdownlint-disable MD033 -->
 <img width="50%" alt="image" src="https://github.com/commercetools/telefonistka/assets/1616153/fe38dc7a-2dea-4461-a0bf-3b07531135a9">
+<!-- markdownlint-enable MD033 -->
 
 ### Artifact version bumping from CLI
 
