@@ -17,16 +17,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// @Title
-// @Description
-// @Author
-// @Update
 // DifferenceOption struct to store diff options
 type DifferenceOption struct {
 	revision string
 	res      *repoapiclient.ManifestResponse
-	// serversideRes          *repoapiclient.ManifestResponse
-	// revisionSourceMappings *map[int64]string
 }
 
 type resourceInfoProvider struct {

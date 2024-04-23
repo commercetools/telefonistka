@@ -109,10 +109,9 @@ func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath strin
 	return componentConfig, nil
 }
 
-func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, config *cfg.Config) map[relevantComponent]bool {
-	// This function generates a list of "components" that where changed in the PR and are relevant for promotion)
-	relevantComponents := map[relevantComponent]bool{}
-
+// This function generates a list of "components" that where changed in the PR and are relevant for promotion)
+func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (relevantComponents map[relevantComponent]struct{}) {
+	relevantComponents = make(map[relevantComponent]struct{})
 	prFiles, resp, err := ghPrClientDetails.GhClientPair.v3Client.PullRequests.ListFiles(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, ghPrClientDetails.PrNumber, &github.ListOptions{})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
@@ -140,7 +139,7 @@ func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, confi
 					ComponentName: componentName,
 					AutoMerge:     promotionPathConfig.Conditions.AutoMerge,
 				}
-				relevantComponents[relevantComponentsElement] = true
+				relevantComponents[relevantComponentsElement] = struct{}{}
 				break // a file can only be a single "source dir"
 			}
 		}
@@ -164,7 +163,7 @@ func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, co
 	return changedComponentPaths
 }
 
-func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, config *cfg.Config, relevantComponents map[relevantComponent]bool, configBranch string) (map[string]PromotionInstance, error) {
+func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, config *cfg.Config, relevantComponents map[relevantComponent]struct{}, configBranch string) (map[string]PromotionInstance, error) {
 	// This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
 
 	promotions := make(map[string]PromotionInstance)

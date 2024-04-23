@@ -190,15 +190,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-// replace k8s.io/api => k8s.io/api v0.25.15
-// replace k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.25.15
-// replace k8s.io/apimachinery => k8s.io/apimachinery v0.25.15
-// replace k8s.io/cli-runtime => k8s.io/cli-runtime v0.25.15
-// replace k8s.io/client-go => k8s.io/client-go v0.25.15
-// replace k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.25.15
-// replace k8s.io/kubectl => k8s.io/kubectl v0.25.15
-// replace k8s.io/kubernetes => k8s.io/kubernetes v1.25.15
-
 replace sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.12.1
 
 replace sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.13.9

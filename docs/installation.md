@@ -91,9 +91,9 @@ Environment variables for the webhook process:
 
 `ARGOCD_TOKEN` ArgoCD authentication token.
 
-`ARGOCD_PLAINTEXT` Allows disabeling TLS on ArgoCD API calls.
+`ARGOCD_PLAINTEXT` Allows disabeling TLS on ArgoCD API calls. (default: `false`)
 
-`ARGOCD_INSECURE` Allow disabeling server certificate validation.
+`ARGOCD_INSECURE` Allow disabeling server certificate validation. (default: `false`)
 
 Behavior of the bot is configured by YAML files **in the target repo**:
 

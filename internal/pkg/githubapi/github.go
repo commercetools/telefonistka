@@ -106,13 +106,13 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 		if config.CommentArgocdDiffonPR {
 			componentPathList := generateListOfChangedComponentPaths(ghPrClientDetails, config)
 			// TODO handle error
-			noDiffsAndErrorsPR, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentPathList, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL)
+			hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentPathList, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL)
 			if err != nil {
 				prHandleError = err
 				ghPrClientDetails.PrLogger.Errorf("Failed to get ArgoCD diff information: err=%s\n", err)
 			} else {
 				ghPrClientDetails.PrLogger.Debugf("Successfully got ArgoCD diff\n")
-				if noDiffsAndErrorsPR {
+				if !hasComponentDiffErrors && !hasComponentDiff {
 					ghPrClientDetails.PrLogger.Debugf("ArgoCD diff is empty, this PR will not change cluster state\n")
 					prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *eventPayload.PullRequest.Number, []string{"noop"})
 					prom.InstrumentGhCall(resp)

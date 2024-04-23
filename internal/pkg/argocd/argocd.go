@@ -43,8 +43,7 @@ type DiffResult struct {
 
 // Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
 // But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
-func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (bool, []DiffElement, error) {
-	var foundDiffs bool
+func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (foundDiffs bool, diffElements []DiffElement, err error) {
 	liveObjs, err := cmdutil.LiveObjects(resources.Items)
 	if err != nil {
 		return false, nil, err
@@ -62,7 +61,6 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 	groupedObjs := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
 	items = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
 
-	var diffElements []DiffElement
 	for _, item := range items {
 		var diffElement DiffElement
 		if item.target != nil && hook.IsHook(item.target) || item.live != nil && hook.IsHook(item.live) {
@@ -121,34 +119,8 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 	return foundDiffs, diffElements, nil
 }
 
-// diffLiveVsTargetObject diffs the live and target objects, should return output that is compatible with github markdown diff highlighting format
+// Should return output that is compatible with github markdown diff highlighting format
 func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, error) {
-	// var err error
-	// Diff the live and target objects
-	// liveData := []byte("")
-	// if live != nil {
-	// liveData, err = yaml.Marshal(live)
-	// if err != nil {
-	// return "", err
-	// }
-	// }
-	// targetData := []byte("")
-	// if target != nil {
-	// targetData, err = yaml.Marshal(target)
-	// if err != nil {
-	// return "", err
-	// }
-	// }
-	//
-	// dmp := diffmatchpatch.New()
-	//
-	// some effort to get line by line outdput: https://github.com/sergi/go-diff/issues/69#issuecomment-688602689
-	// TODO document this or make it more readable
-	// fileAdmp, fileBdmp, dmpStrings := dmp.DiffLinesToChars(string(liveData), string(targetData))
-	// diffs := dmp.DiffMain(fileAdmp, fileBdmp, false)
-	// diffs = dmp.DiffCharsToLines(diffs, dmpStrings)
-	// diffs = dmp.DiffCleanupSemantic(diffs)
-	// patch := dmp.PatchToText(dmp.PatchMake(diffs))
 	patch := cmp.Diff(live, target)
 	return patch, nil
 }
@@ -178,10 +150,8 @@ func createArgoCdClient() (apiclient.Client, error) {
 	return clientset, nil
 }
 
-func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appIf application.ApplicationServiceClient, projIf projectpkg.ProjectServiceClient, argoSettings *settings.Settings) DiffResult {
-	currentDiffResult := DiffResult{
-		ComponentPath: componentPath,
-	}
+func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appIf application.ApplicationServiceClient, projIf projectpkg.ProjectServiceClient, argoSettings *settings.Settings) (componentDiffResult DiffResult) {
+	componentDiffResult.ComponentPath = componentPath
 
 	// Calculate sha1 of component path to use in a label selector
 	cPathBa := []byte(componentPath)
@@ -198,12 +168,12 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	}
 	foundApps, err := appIf.List(ctx, &appLabelQuery)
 	if err != nil {
-		currentDiffResult.DiffError = err
-		return currentDiffResult
+		componentDiffResult.DiffError = err
+		return componentDiffResult
 	}
 	if len(foundApps.Items) == 0 {
-		currentDiffResult.DiffError = fmt.Errorf("No ArgoCD application found for component path %s(repo %s), used this label selector: %s", componentPath, repo, labelSelector)
-		return currentDiffResult
+		componentDiffResult.DiffError = fmt.Errorf("No ArgoCD application found for component path %s(repo %s), used this label selector: %s", componentPath, repo, labelSelector)
+		return componentDiffResult
 	}
 
 	// Get the application and its resources, resources are the live state of the application objects.
@@ -214,15 +184,15 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	}
 	app, err := appIf.Get(ctx, &appNameQuery)
 	if err != nil {
-		currentDiffResult.DiffError = err
-		return currentDiffResult
+		componentDiffResult.DiffError = err
+		return componentDiffResult
 	}
-	currentDiffResult.ArgoCdAppName = app.Name
-	currentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
+	componentDiffResult.ArgoCdAppName = app.Name
+	componentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
 	resources, err := appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
 	if err != nil {
-		currentDiffResult.DiffError = err
-		return currentDiffResult
+		componentDiffResult.DiffError = err
+		return componentDiffResult
 	}
 
 	// Get the application manifests, these are the target state of the application objects, taken from the git repo, specificly from the PR branch.
@@ -235,8 +205,8 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	}
 	manifests, err := appIf.GetManifests(ctx, &manifestQuery)
 	if err != nil {
-		currentDiffResult.DiffError = err
-		return currentDiffResult
+		componentDiffResult.DiffError = err
+		return componentDiffResult
 	}
 	diffOption.res = manifests
 	diffOption.revision = prBranch
@@ -244,57 +214,60 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	// Now we diff the live state(resources) and target state of the application objects(diffOption.res)
 	detailedProject, err := projIf.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
 	if err != nil {
-		currentDiffResult.DiffError = err
-		return currentDiffResult
+		componentDiffResult.DiffError = err
+		return componentDiffResult
 	}
 
-	currentDiffResult.HasDiff, currentDiffResult.DiffElements, err = generateArgocdAppDiff(ctx, app, detailedProject.Project, resources, argoSettings, diffOption)
+	componentDiffResult.HasDiff, componentDiffResult.DiffElements, err = generateArgocdAppDiff(ctx, app, detailedProject.Project, resources, argoSettings, diffOption)
 	if err != nil {
-		currentDiffResult.DiffError = err
+		componentDiffResult.DiffError = err
 	}
 
-	return currentDiffResult
+	return componentDiffResult
 }
 
 // GenerateDiffOfChangedComponents generates diff of changed components
-func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []string, prBranch string, repo string) (bool, []DiffResult, error) {
-	noDiffsAndErrors := true
-	var diffResults []DiffResult
+func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []string, prBranch string, repo string) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+	hasComponentDiff = false
+	hasComponentDiffErrors = false
 	// env var should be centralized
 	client, err := createArgoCdClient()
 	if err != nil {
-		return false, nil, err
+		return false, true, nil, err
 	}
 
 	conn, appIf, err := client.NewApplicationClient()
 	if err != nil {
-		return false, nil, err
+		return false, true, nil, err
 	}
 	defer argoio.Close(conn)
 
 	conn, projIf, err := client.NewProjectClient()
 	if err != nil {
-		return false, nil, err
+		return false, true, nil, err
 	}
 	defer argoio.Close(conn)
 
 	conn, settingsIf, err := client.NewSettingsClient()
 	if err != nil {
-		return false, nil, err
+		return false, true, nil, err
 	}
 	defer argoio.Close(conn)
 	argoSettings, err := settingsIf.Get(ctx, &settings.SettingsQuery{})
 	if err != nil {
-		return false, nil, err
+		return false, true, nil, err
 	}
 
 	for _, componentPath := range componentPathList {
 		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appIf, projIf, argoSettings)
-		if currentDiffResult.DiffError != nil || currentDiffResult.HasDiff {
-			noDiffsAndErrors = false
+		if currentDiffResult.DiffError != nil {
+			hasComponentDiffErrors = true
+		}
+		if currentDiffResult.HasDiff {
+			hasComponentDiff = true
 		}
 		diffResults = append(diffResults, currentDiffResult)
 	}
 
-	return noDiffsAndErrors, diffResults, err
+	return hasComponentDiff, hasComponentDiffErrors, diffResults, err
 }
