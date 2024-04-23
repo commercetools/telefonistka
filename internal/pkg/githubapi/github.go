@@ -104,8 +104,11 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 			ghPrClientDetails.PrLogger.Errorf("Failed to minimize stale comments: err=%s\n", err)
 		}
 		if config.CommentArgocdDiffonPR {
-			componentPathList := generateListOfChangedComponentPaths(ghPrClientDetails, config)
-			// TODO handle error
+			componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+			if err != nil {
+				prHandleError = err
+				ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
+			}
 			hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentPathList, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL)
 			if err != nil {
 				prHandleError = err
