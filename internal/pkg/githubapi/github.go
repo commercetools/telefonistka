@@ -125,7 +125,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 						ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", *eventPayload.PullRequest.Number, prLables)
 					}
 					if DoesPrHasLabel(*eventPayload, "promotion") && config.AutoMergeNoDiffPRs {
-						ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff)PR %d", *eventPayload.PullRequest.Number)
+						ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff) PR %d", *eventPayload.PullRequest.Number)
 						err := MergePr(ghPrClientDetails, eventPayload.PullRequest.Number)
 						if err != nil {
 							prHandleError = err
