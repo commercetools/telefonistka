@@ -192,6 +192,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		log.Errorf("Error getting app %s: %v", foundApps.Items[0].Name, err)
 		return componentDiffResult
 	}
+	log.Debugf("Got ArgoCD app %s", app.Name)
 	componentDiffResult.ArgoCdAppName = app.Name
 	componentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
 	resources, err := appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
@@ -200,6 +201,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		log.Errorf("Error getting (live)resources for app %s: %v", app.Name, err)
 		return componentDiffResult
 	}
+	log.Debugf("Got (live)resources for app %s", app.Name)
 
 	// Get the application manifests, these are the target state of the application objects, taken from the git repo, specificly from the PR branch.
 	diffOption := &DifferenceOption{}
@@ -215,6 +217,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		log.Errorf("Error getting manifests for app %s, revision %s: %v", app.Name, prBranch, err)
 		return componentDiffResult
 	}
+	log.Debugf("Got manifests for app %s, revision %s", app.Name, prBranch)
 	diffOption.res = manifests
 	diffOption.revision = prBranch
 
