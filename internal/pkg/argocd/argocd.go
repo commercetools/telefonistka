@@ -163,12 +163,14 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	// Find ArgoCD application by the path SHA1 label selector and repo name
 	// That label is assumed to be pupulated by the ApplicationSet controller(or apps of apps  or similar).
 	labelSelector := fmt.Sprintf("telefonistka.io/component-path-sha1=%s", componentPathSha1)
+	log.Debugf("Using label selector: %s", labelSelector)
 	appLabelQuery := application.ApplicationQuery{
 		Selector: &labelSelector,
 		Repo:     &repo,
 	}
 	foundApps, err := appIf.List(ctx, &appLabelQuery)
 	if err != nil {
+		log.Errorf("Error listing ArgoCD applications: %v", err)
 		componentDiffResult.DiffError = err
 		return componentDiffResult
 	}
@@ -177,6 +179,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		return componentDiffResult
 	}
 
+	log.Debugf("Found ArgoCD application: %s", foundApps.Items[0].Name)
 	// Get the application and its resources, resources are the live state of the application objects.
 	refreshType := string(argoappv1.RefreshTypeHard)
 	appNameQuery := application.ApplicationQuery{
@@ -268,7 +271,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 		return false, true, nil, err
 	}
 
-	log.Debugf("Checking diff for components: %v", componentPathList)
+	log.Debugf("Checking ArgoCD diff for components: %v", componentPathList)
 	for _, componentPath := range componentPathList {
 		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appIf, projIf, argoSettings)
 		if currentDiffResult.DiffError != nil {
