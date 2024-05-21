@@ -19,6 +19,7 @@ import (
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
 	cfg "github.com/wayfair-incubator/telefonistka/internal/pkg/configuration"
 	prom "github.com/wayfair-incubator/telefonistka/internal/pkg/prometheus"
+	"golang.org/x/exp/maps"
 )
 
 type promotionInstanceMetaData struct {
@@ -46,6 +47,7 @@ type GhPrClientDetails struct {
 type prMetadata struct {
 	OriginalPrAuthor          string                            `json:"originalPrAuthor"`
 	OriginalPrNumber          int                               `json:"originalPrNumber"`
+	PromotedPaths             []string                          `json:"promotedPaths"`
 	PreviousPromotionMetadata map[int]promotionInstanceMetaData `json:"previousPromotionPaths"`
 }
 
@@ -104,11 +106,20 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 			ghPrClientDetails.PrLogger.Errorf("Failed to minimize stale comments: err=%s\n", err)
 		}
 		if config.CommentArgocdDiffonPR {
-			componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
-			if err != nil {
-				prHandleError = err
-				ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
+			var componentPathList []string
+
+			// Promotion PR have the list of paths to promote in the PR metadata
+			// For non promotion PR, we will generate the list of changed components based the PR changed files and the telefonistka configuration(sourcePath)
+			if DoesPrHasLabel(*eventPayload, "promotion") {
+				componentPathList = ghPrClientDetails.PrMetadata.PromotedPaths
+			} else {
+				componentPathList, err = generateListOfChangedComponentPaths(ghPrClientDetails, config)
+				if err != nil {
+					prHandleError = err
+					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
+				}
 			}
+
 			hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentPathList, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL)
 			if err != nil {
 				prHandleError = err
@@ -811,6 +822,8 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 	}
 	// newPrMetadata.PreviousPromotionMetadata[ghPrClientDetails.PrNumber].TargetPaths = targetPaths
 	// newPrMetadata.PreviousPromotionMetadata[ghPrClientDetails.PrNumber].SourcePath = sourcePath
+
+	newPrMetadata.PromotedPaths = maps.Keys(promotion.ComputedSyncPaths)
 
 	newPrBody = fmt.Sprintf("Promotion path(%s):\n\n", components)
 
