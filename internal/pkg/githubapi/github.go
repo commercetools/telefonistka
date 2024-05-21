@@ -135,7 +135,9 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 					} else {
 						ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", *eventPayload.PullRequest.Number, prLables)
 					}
-					if DoesPrHasLabel(*eventPayload, "promotion") && config.AutoMergeNoDiffPRs {
+					// If the PR is a promotion PR and the diff is empty, we can auto-merge it
+					// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
+					if DoesPrHasLabel(*eventPayload, "promotion") && config.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
 						ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff) PR %d", *eventPayload.PullRequest.Number)
 						err := MergePr(ghPrClientDetails, eventPayload.PullRequest.Number)
 						if err != nil {
