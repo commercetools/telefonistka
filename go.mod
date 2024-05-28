@@ -6,8 +6,8 @@ toolchain go1.22.1
 
 require (
 	github.com/alexliesenfeld/health v0.8.0
-	github.com/argoproj/argo-cd/v2 v2.11.0-rc1
-	github.com/argoproj/gitops-engine v0.7.1-0.20240411122334-1ade3a199867
+	github.com/argoproj/argo-cd/v2 v2.11.2
+	github.com/argoproj/gitops-engine v0.7.1-0.20240416142647-fbecbb86e412
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
 	github.com/go-test/deep v1.1.0
 	github.com/google/go-github/v52 v52.0.0
@@ -77,6 +77,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/gnostic v0.7.0 // indirect

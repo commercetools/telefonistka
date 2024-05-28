@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
@@ -151,17 +153,14 @@ func createArgoCdClient() (apiclient.Client, error) {
 	return clientset, nil
 }
 
-func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appIf application.ApplicationServiceClient, projIf projectpkg.ProjectServiceClient, argoSettings *settings.Settings) (componentDiffResult DiffResult) {
-	componentDiffResult.ComponentPath = componentPath
-
+// This function is used to find an ArgoCD application by the SHA1 label of the component path its supposed to avoid perfromance issues with the "manifest-generate-paths" annotation method with requires pulling all ArgoCD applications(!) on every PR event.
+// The SHA1 label is assumed to be populated by the ApplicationSet controller(or apps of apps  or similar).
+func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
 	// Calculate sha1 of component path to use in a label selector
 	cPathBa := []byte(componentPath)
 	hasher := sha1.New() //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	hasher.Write(cPathBa)
 	componentPathSha1 := hex.EncodeToString(hasher.Sum(nil))
-
-	// Find ArgoCD application by the path SHA1 label selector and repo name
-	// That label is assumed to be pupulated by the ApplicationSet controller(or apps of apps  or similar).
 	labelSelector := fmt.Sprintf("telefonistka.io/component-path-sha1=%s", componentPathSha1)
 	appLabelQuery := application.ApplicationQuery{
 		Selector: &labelSelector,
@@ -169,24 +168,87 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	}
 	foundApps, err := appIf.List(ctx, &appLabelQuery)
 	if err != nil {
-		componentDiffResult.DiffError = err
-		return componentDiffResult
+		return nil, err
 	}
 	if len(foundApps.Items) == 0 {
-		componentDiffResult.DiffError = fmt.Errorf("No ArgoCD application found for component path %s(repo %s), used this label selector: %s", componentPath, repo, labelSelector)
+		return nil, fmt.Errorf("No ArgoCD application found for component path sha1 %s(repo %s), used this label selector: %s", componentPathSha1, repo, labelSelector)
+	}
+
+	// we expect only one app with this label and repo selectors
+	return &foundApps.Items[0], nil
+}
+
+// This is the default method to find an ArgoCD application by the manifest-generate-paths annotation.
+// It assume the ArgoCD (optional) manifest-generate-paths annotation is set on all relevent apps.
+// Notice that this method include a full list all ArgoCD applications in the repo, this could be a performance issue if there are many apps in the repo.
+func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
+	//argocd.argoproj.io/manifest-generate-paths
+	appQuery := application.ApplicationQuery{
+		Repo: &repo,
+	}
+	// TODO Instrument this, we might have a lot of apps in a repo, performance might be an issue
+	allRepoApps, err := appIf.List(ctx, &appQuery)
+	if err != nil {
+		return nil, err
+	}
+	for _, app := range allRepoApps.Items {
+		// Check if the app has the annotation
+		// https://argo-cd.readthedocs.io/en/stable/operator-manual/high_availability/#manifest-paths-annotation
+		// Consider the annotation content can a semi-colon separated list of paths, an absolute path or a relative path(start with a ".")  and the manifest-paths-annotation could be a subpath of componentPath.
+		// We need to check if the annotation is a subpath of componentPath
+
+		appManifestPathsAnnotation := app.Annotations["argocd.argoproj.io/manifest-generate-paths"]
+
+		for _, manifetsPathElement := range strings.Split(appManifestPathsAnnotation, ";") {
+			// if `manifest-generate-paths` element starts with a "." it is a relative path(relative to repo root), we need to join it with the app source path
+			if strings.HasPrefix(manifetsPathElement, ".") {
+				manifetsPathElement = filepath.Join(app.Spec.Source.Path, manifetsPathElement)
+			}
+
+			// Checking is componentPath is a subpath of the manifetsPathElement
+			// Using filepath.Rel solves all kinds of path issues, like double slashes, etc.
+			rel, err := filepath.Rel(manifetsPathElement, componentPath)
+			if !strings.HasPrefix(rel, "..") && err == nil {
+				log.Debugf("Found app %s with manifest-generate-paths(\"%s\") annotation that matches %s", app.Name, appManifestPathsAnnotation, componentPath)
+				return &app, nil
+			}
+
+		}
+
+	}
+	return nil, fmt.Errorf("No ArgoCD application found with manifest-generate-paths annotation that matches %s(looked at repo %s, checked %v apps)	", componentPath, repo, len(allRepoApps.Items))
+}
+
+func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appIf application.ApplicationServiceClient, projIf projectpkg.ProjectServiceClient, argoSettings *settings.Settings, usaSHALabelForArgoDicovery bool) (componentDiffResult DiffResult) {
+	componentDiffResult.ComponentPath = componentPath
+
+	// Find ArgoCD application by the path SHA1 label selector and repo name
+	// At the moment we assume one to one mapping between Telefonistka components and ArgoCD application
+
+	var foundApp *argoappv1.Application
+	var err error
+	if usaSHALabelForArgoDicovery {
+		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, appIf)
+	} else {
+		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appIf)
+
+	}
+	if err != nil {
+		componentDiffResult.DiffError = err
 		return componentDiffResult
 	}
 
 	// Get the application and its resources, resources are the live state of the application objects.
+	// The 2nd "app fetch" is needed for the "refreshTypeHArd", we don't want to do that to non-relevant apps"
 	refreshType := string(argoappv1.RefreshTypeHard)
 	appNameQuery := application.ApplicationQuery{
-		Name:    &foundApps.Items[0].Name, // we expect only one app with this label and repo selectors
+		Name:    &foundApp.Name, // we expect only one app with this label and repo selectors
 		Refresh: &refreshType,
 	}
 	app, err := appIf.Get(ctx, &appNameQuery)
 	if err != nil {
 		componentDiffResult.DiffError = err
-		log.Errorf("Error getting app %s: %v", foundApps.Items[0].Name, err)
+		log.Errorf("Error getting app %s: %v", foundApp.Name, err)
 		return componentDiffResult
 	}
 	componentDiffResult.ArgoCdAppName = app.Name
@@ -232,7 +294,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 }
 
 // GenerateDiffOfChangedComponents generates diff of changed components
-func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []string, prBranch string, repo string) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []string, prBranch string, repo string, usaSHALabelForArgoDicovery bool) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 	// env var should be centralized
@@ -264,7 +326,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 	}
 
 	for _, componentPath := range componentPathList {
-		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appIf, projIf, argoSettings)
+		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appIf, projIf, argoSettings, usaSHALabelForArgoDicovery)
 		if currentDiffResult.DiffError != nil {
 			hasComponentDiffErrors = true
 			err = currentDiffResult.DiffError

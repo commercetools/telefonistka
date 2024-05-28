@@ -35,13 +35,14 @@ type Config struct {
 	PromotionPaths []PromotionPath `yaml:"promotionPaths"`
 
 	// Generic configuration
-	PromtionPrLables        []string               `yaml:"promtionPRlables"`
-	DryRunMode              bool                   `yaml:"dryRunMode"`
-	AutoApprovePromotionPrs bool                   `yaml:"autoApprovePromotionPrs"`
-	ToggleCommitStatus      map[string]string      `yaml:"toggleCommitStatus"`
-	WebhookEndpointRegexs   []WebhookEndpointRegex `yaml:"webhookEndpointRegexs"`
-	CommentArgocdDiffonPR   bool                   `yaml:"commentArgocdDiffonPR"`
-	AutoMergeNoDiffPRs      bool                   `yaml:"autoMergeNoDiffPRs"`
+	PromtionPrLables           []string               `yaml:"promtionPRlables"`
+	DryRunMode                 bool                   `yaml:"dryRunMode"`
+	AutoApprovePromotionPrs    bool                   `yaml:"autoApprovePromotionPrs"`
+	ToggleCommitStatus         map[string]string      `yaml:"toggleCommitStatus"`
+	WebhookEndpointRegexs      []WebhookEndpointRegex `yaml:"webhookEndpointRegexs"`
+	CommentArgocdDiffonPR      bool                   `yaml:"commentArgocdDiffonPR"`
+	AutoMergeNoDiffPRs         bool                   `yaml:"autoMergeNoDiffPRs"`
+	UsaSHALabelForArgoDicovery bool                   `yaml:"usaSHALabelForArgoDicovery"`
 }
 
 func ParseConfigFromYaml(y string) (*Config, error) {
