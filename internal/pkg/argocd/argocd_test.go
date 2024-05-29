@@ -11,7 +11,7 @@ import (
 
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	"github.com/golang/mock/gomock"
-	argo_app_mock "github.com/wayfair-incubator/telefonistka/mocks/argocd"
+	"github.com/wayfair-incubator/telefonistka/internal/pkg/mocks"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -21,7 +21,7 @@ func TestFindArgocdAppBySHA1Label(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockApplicationClient := argo_app_mock.NewMockApplicationServiceClient(ctrl)
+	mockApplicationClient := mocks.NewMockApplicationServiceClient(ctrl)
 	expectedResponse := &argoappv1.ApplicationList{
 		Items: []argoappv1.Application{
 			{
@@ -51,7 +51,7 @@ func TestFindArgocdAppByPathAnnotation(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockApplicationClient := argo_app_mock.NewMockApplicationServiceClient(ctrl)
+	mockApplicationClient := mocks.NewMockApplicationServiceClient(ctrl)
 	expectedResponse := &argoappv1.ApplicationList{
 		Items: []argoappv1.Application{
 			{
@@ -89,7 +89,7 @@ func TestFindArgocdAppByPathAnnotationSemiColon(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockApplicationClient := argo_app_mock.NewMockApplicationServiceClient(ctrl)
+	mockApplicationClient := mocks.NewMockApplicationServiceClient(ctrl)
 	expectedResponse := &argoappv1.ApplicationList{
 		Items: []argoappv1.Application{
 			{
@@ -129,7 +129,7 @@ func TestFindArgocdAppByPathAnnotationRelative(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockApplicationClient := argo_app_mock.NewMockApplicationServiceClient(ctrl)
+	mockApplicationClient := mocks.NewMockApplicationServiceClient(ctrl)
 	expectedResponse := &argoappv1.ApplicationList{
 		Items: []argoappv1.Application{
 			{
@@ -165,7 +165,7 @@ func TestFindArgocdAppByPathAnnotationRelative2(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockApplicationClient := argo_app_mock.NewMockApplicationServiceClient(ctrl)
+	mockApplicationClient := mocks.NewMockApplicationServiceClient(ctrl)
 	expectedResponse := &argoappv1.ApplicationList{
 		Items: []argoappv1.Application{
 			{
