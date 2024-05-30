@@ -193,7 +193,7 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 	// I'll just manually log the time it takes to get the apps for now
 	getAppsStart := time.Now()
 	allRepoApps, err := appIf.List(ctx, &appQuery)
-	getAppsDuration := time.Since(getAppsStart).Milliseconds
+	getAppsDuration := time.Since(getAppsStart).Milliseconds()
 	log.Infof("Got %v ArgoCD applications for repo %s in %v ms", len(allRepoApps.Items), repo, getAppsDuration)
 	if err != nil {
 		return nil, err
