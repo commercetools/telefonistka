@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
@@ -18,6 +19,7 @@ import (
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
+	"github.com/argoproj/argo-cd/v2/util/argo/normalizers"
 	argoio "github.com/argoproj/argo-cd/v2/util/io"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
 	"github.com/google/go-cmp/cmp"
@@ -76,8 +78,9 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 		}
 
 		ignoreAggregatedRoles := false
+		ignoreNormalizerOpts := normalizers.IgnoreNormalizerOpts{}
 		diffConfig, err := argodiff.NewDiffConfigBuilder().
-			WithDiffSettings(app.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles).
+			WithDiffSettings(app.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles, ignoreNormalizerOpts).
 			WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
 			WithNoCache().
 			Build()
@@ -186,8 +189,12 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 	appQuery := application.ApplicationQuery{
 		Repo: &repo,
 	}
-	// TODO Instrument this, we might have a lot of apps in a repo, performance might be an issue
+	// AFAIKT I can't use standard grpc instrumentation here, since the argocd client abstracts to much (including the choice between Grpc and Grpc-web)
+	// I'll just manually log the time it takes to get the apps for now
+	getAppsStart := time.Now()
 	allRepoApps, err := appIf.List(ctx, &appQuery)
+	getAppsDuration := time.Since(getAppsStart).Milliseconds
+	log.Infof("Got %v ArgoCD applications for repo %s in %v ms", len(allRepoApps.Items), repo, getAppsDuration)
 	if err != nil {
 		return nil, err
 	}
