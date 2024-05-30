@@ -80,7 +80,6 @@ func TestFindArgocdAppByPathAnnotation(t *testing.T) {
 		t.Errorf("Error: %v", err)
 	}
 	t.Logf("apps: %v", apps)
-
 }
 
 // Here I'm testing a ";" delimted path annotation
@@ -120,7 +119,6 @@ func TestFindArgocdAppByPathAnnotationSemiColon(t *testing.T) {
 	if app.Name != "right-app" {
 		t.Errorf("App name is not right-app")
 	}
-
 }
 
 // Here I'm testing a "." path annotation - this is a special case where the path is relative to the repo root specified in the application .spec
@@ -156,7 +154,6 @@ func TestFindArgocdAppByPathAnnotationRelative(t *testing.T) {
 	} else if app.Name != "right-app" {
 		t.Errorf("App name is not right-app")
 	}
-
 }
 
 // Here I'm testing a "." path annotation - this is a special case where the path is relative to the repo root specified in the application .spec
@@ -192,5 +189,4 @@ func TestFindArgocdAppByPathAnnotationRelative2(t *testing.T) {
 	} else if app.Name != "right-app" {
 		t.Errorf("App name is not right-app")
 	}
-
 }

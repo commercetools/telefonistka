@@ -156,7 +156,7 @@ func createArgoCdClient() (apiclient.Client, error) {
 	return clientset, nil
 }
 
-// This function is used to find an ArgoCD application by the SHA1 label of the component path its supposed to avoid perfromance issues with the "manifest-generate-paths" annotation method with requires pulling all ArgoCD applications(!) on every PR event.
+// This function is used to find an ArgoCD application by the SHA1 label of the component path its supposed to avoid performance issues with the "manifest-generate-paths" annotation method with requires pulling all ArgoCD applications(!) on every PR event.
 // The SHA1 label is assumed to be populated by the ApplicationSet controller(or apps of apps  or similar).
 func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
 	// Calculate sha1 of component path to use in a label selector
@@ -182,10 +182,10 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 }
 
 // This is the default method to find an ArgoCD application by the manifest-generate-paths annotation.
-// It assume the ArgoCD (optional) manifest-generate-paths annotation is set on all relevent apps.
+// It assume the ArgoCD (optional) manifest-generate-paths annotation is set on all relevant apps.
 // Notice that this method include a full list all ArgoCD applications in the repo, this could be a performance issue if there are many apps in the repo.
 func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
-	//argocd.argoproj.io/manifest-generate-paths
+	// argocd.argoproj.io/manifest-generate-paths
 	appQuery := application.ApplicationQuery{
 		Repo: &repo,
 	}
@@ -219,9 +219,7 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 				log.Debugf("Found app %s with manifest-generate-paths(\"%s\") annotation that matches %s", app.Name, appManifestPathsAnnotation, componentPath)
 				return &app, nil
 			}
-
 		}
-
 	}
 	return nil, fmt.Errorf("No ArgoCD application found with manifest-generate-paths annotation that matches %s(looked at repo %s, checked %v apps)	", componentPath, repo, len(allRepoApps.Items))
 }
@@ -238,7 +236,6 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, appIf)
 	} else {
 		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appIf)
-
 	}
 	if err != nil {
 		componentDiffResult.DiffError = err
