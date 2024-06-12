@@ -121,7 +121,7 @@ func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, confi
 		prom.InstrumentGhCall(resp)
 		if err != nil {
 			ghPrClientDetails.PrLogger.Errorf("could not get file list from GH API: err=%s\nstatus code=%v", err, resp.Response.Status)
-			return promotions, err
+			return nil, err
 		}
 		prFiles = append(prFiles, perPagePrFiles...)
 		if resp.NextPage == 0 {
