@@ -172,9 +172,8 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 	}
 	foundApps, err := appIf.List(ctx, &appLabelQuery)
 	if err != nil {
-		log.Errorf("Error listing ArgoCD applications: %v", err)
-		componentDiffResult.DiffError = err
-		return componentDiffResult
+		return nil, fmt.Errorf("Error listing ArgoCD applications: %v", err)
+
 	}
 	if len(foundApps.Items) == 0 {
 		return nil, fmt.Errorf("No ArgoCD application found for component path sha1 %s(repo %s), used this label selector: %s", componentPathSha1, repo, labelSelector)
@@ -245,7 +244,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		return componentDiffResult
 	}
 
-	log.Debugf("Found ArgoCD application: %s", foundApps.Items[0].Name)
+	log.Debugf("Found ArgoCD application: %s", foundApp.Name)
 	// Get the application and its resources, resources are the live state of the application objects.
 	// The 2nd "app fetch" is needed for the "refreshTypeHArd", we don't want to do that to non-relevant apps"
 	refreshType := string(argoappv1.RefreshTypeHard)
