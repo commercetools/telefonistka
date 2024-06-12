@@ -42,7 +42,7 @@ type Config struct {
 	WebhookEndpointRegexs      []WebhookEndpointRegex `yaml:"webhookEndpointRegexs"`
 	CommentArgocdDiffonPR      bool                   `yaml:"commentArgocdDiffonPR"`
 	AutoMergeNoDiffPRs         bool                   `yaml:"autoMergeNoDiffPRs"`
-	UsaSHALabelForArgoDicovery bool                   `yaml:"usaSHALabelForArgoDicovery"`
+	UseSHALabelForArgoDicovery bool                   `yaml:"useSHALabelForArgoDicovery"`
 }
 
 func ParseConfigFromYaml(y string) (*Config, error) {
