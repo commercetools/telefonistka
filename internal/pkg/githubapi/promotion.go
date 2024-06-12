@@ -109,12 +109,11 @@ func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath strin
 	return componentConfig, nil
 }
 
-<<<<<<< HEAD
 // This function generates a list of "components" that where changed in the PR and are relevant for promotion)
 func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (relevantComponents map[relevantComponent]struct{}, err error) {
 	relevantComponents = make(map[relevantComponent]struct{})
-	//prFiles, resp, err := ghPrClientDetails.GhClientPair.v3Client.PullRequests.ListFiles(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, ghPrClientDetails.PrNumber, &github.ListOptions{})
 
+	// Get the list of files in the PR, with pagination
 	opts := &github.ListOptions{}
 	prFiles := []*github.CommitFile{}
 	for {
