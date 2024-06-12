@@ -9,10 +9,11 @@ require (
 	github.com/argoproj/argo-cd/v2 v2.11.2
 	github.com/argoproj/gitops-engine v0.7.1-0.20240416142647-fbecbb86e412
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/go-test/deep v1.1.0
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
-	github.com/google/go-github/v52 v52.0.0
+	github.com/google/go-github/v62 v62.0.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/migueleliasweb/go-github-mock v0.0.22
