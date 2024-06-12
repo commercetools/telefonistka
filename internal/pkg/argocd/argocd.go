@@ -156,7 +156,7 @@ func createArgoCdClient() (apiclient.Client, error) {
 	return clientset, nil
 }
 
-// This function is used to find an ArgoCD application by the SHA1 label of the component path its supposed to avoid performance issues with the "manifest-generate-paths" annotation method with requires pulling all ArgoCD applications(!) on every PR event.
+// findArgocdAppBySHA1Label finds an ArgoCD application by the SHA1 label of the component path it's supposed to avoid performance issues with the "manifest-generate-paths" annotation method which requires pulling all ArgoCD applications(!) on every PR event.
 // The SHA1 label is assumed to be populated by the ApplicationSet controller(or apps of apps  or similar).
 func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
 	// Calculate sha1 of component path to use in a label selector
@@ -183,15 +183,15 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 	return &foundApps.Items[0], nil
 }
 
-// This is the default method to find an ArgoCD application by the manifest-generate-paths annotation.
-// It assume the ArgoCD (optional) manifest-generate-paths annotation is set on all relevant apps.
-// Notice that this method include a full list all ArgoCD applications in the repo, this could be a performance issue if there are many apps in the repo.
+// findArgocdAppByManifestPathAnnotation is the default method to find an ArgoCD application by the manifest-generate-paths annotation.
+// It assumes the ArgoCD (optional) manifest-generate-paths annotation is set on all relevant apps.
+// Notice that this method includes a full list of all ArgoCD applications in the repo, this could be a performance issue if there are many apps in the repo.
 func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
 	// argocd.argoproj.io/manifest-generate-paths
 	appQuery := application.ApplicationQuery{
 		Repo: &repo,
 	}
-	// AFAIKT I can't use standard grpc instrumentation here, since the argocd client abstracts to much (including the choice between Grpc and Grpc-web)
+	// AFAIKT I can't use standard grpc instrumentation here, since the argocd client abstracts too much (including the choice between Grpc and Grpc-web)
 	// I'll just manually log the time it takes to get the apps for now
 	getAppsStart := time.Now()
 	allRepoApps, err := appIf.List(ctx, &appQuery)
