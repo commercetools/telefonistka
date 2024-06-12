@@ -158,7 +158,7 @@ func createArgoCdClient() (apiclient.Client, error) {
 
 // findArgocdAppBySHA1Label finds an ArgoCD application by the SHA1 label of the component path it's supposed to avoid performance issues with the "manifest-generate-paths" annotation method which requires pulling all ArgoCD applications(!) on every PR event.
 // The SHA1 label is assumed to be populated by the ApplicationSet controller(or apps of apps  or similar).
-func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
+func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
 	// Calculate sha1 of component path to use in a label selector
 	cPathBa := []byte(componentPath)
 	hasher := sha1.New() //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
@@ -170,10 +170,9 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 		Selector: &labelSelector,
 		Repo:     &repo,
 	}
-	foundApps, err := appIf.List(ctx, &appLabelQuery)
+	foundApps, err := appClient.List(ctx, &appLabelQuery)
 	if err != nil {
 		return nil, fmt.Errorf("Error listing ArgoCD applications: %v", err)
-
 	}
 	if len(foundApps.Items) == 0 {
 		return nil, fmt.Errorf("No ArgoCD application found for component path sha1 %s(repo %s), used this label selector: %s", componentPathSha1, repo, labelSelector)
@@ -186,7 +185,7 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 // findArgocdAppByManifestPathAnnotation is the default method to find an ArgoCD application by the manifest-generate-paths annotation.
 // It assumes the ArgoCD (optional) manifest-generate-paths annotation is set on all relevant apps.
 // Notice that this method includes a full list of all ArgoCD applications in the repo, this could be a performance issue if there are many apps in the repo.
-func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath string, repo string, appIf application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
+func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
 	// argocd.argoproj.io/manifest-generate-paths
 	appQuery := application.ApplicationQuery{
 		Repo: &repo,
@@ -194,7 +193,7 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 	// AFAIKT I can't use standard grpc instrumentation here, since the argocd client abstracts too much (including the choice between Grpc and Grpc-web)
 	// I'll just manually log the time it takes to get the apps for now
 	getAppsStart := time.Now()
-	allRepoApps, err := appIf.List(ctx, &appQuery)
+	allRepoApps, err := appClient.List(ctx, &appQuery)
 	getAppsDuration := time.Since(getAppsStart).Milliseconds()
 	log.Infof("Got %v ArgoCD applications for repo %s in %v ms", len(allRepoApps.Items), repo, getAppsDuration)
 	if err != nil {
@@ -226,7 +225,7 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 	return nil, fmt.Errorf("No ArgoCD application found with manifest-generate-paths annotation that matches %s(looked at repo %s, checked %v apps)	", componentPath, repo, len(allRepoApps.Items))
 }
 
-func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appIf application.ApplicationServiceClient, projIf projectpkg.ProjectServiceClient, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool) (componentDiffResult DiffResult) {
+func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appClient application.ApplicationServiceClient, projClient projectpkg.ProjectServiceClient, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool) (componentDiffResult DiffResult) {
 	componentDiffResult.ComponentPath = componentPath
 
 	// Find ArgoCD application by the path SHA1 label selector and repo name
@@ -235,9 +234,9 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	var foundApp *argoappv1.Application
 	var err error
 	if useSHALabelForArgoDicovery {
-		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, appIf)
+		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, appClient)
 	} else {
-		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appIf)
+		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appClient)
 	}
 	if err != nil {
 		componentDiffResult.DiffError = err
@@ -252,7 +251,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		Name:    &foundApp.Name, // we expect only one app with this label and repo selectors
 		Refresh: &refreshType,
 	}
-	app, err := appIf.Get(ctx, &appNameQuery)
+	app, err := appClient.Get(ctx, &appNameQuery)
 	if err != nil {
 		componentDiffResult.DiffError = err
 		log.Errorf("Error getting app %s: %v", foundApp.Name, err)
@@ -261,7 +260,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	log.Debugf("Got ArgoCD app %s", app.Name)
 	componentDiffResult.ArgoCdAppName = app.Name
 	componentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
-	resources, err := appIf.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
+	resources, err := appClient.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
 	if err != nil {
 		componentDiffResult.DiffError = err
 		log.Errorf("Error getting (live)resources for app %s: %v", app.Name, err)
@@ -277,7 +276,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		Revision:     &prBranch,
 		AppNamespace: &app.Namespace,
 	}
-	manifests, err := appIf.GetManifests(ctx, &manifestQuery)
+	manifests, err := appClient.GetManifests(ctx, &manifestQuery)
 	if err != nil {
 		componentDiffResult.DiffError = err
 		log.Errorf("Error getting manifests for app %s, revision %s: %v", app.Name, prBranch, err)
@@ -288,7 +287,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	diffOption.revision = prBranch
 
 	// Now we diff the live state(resources) and target state of the application objects(diffOption.res)
-	detailedProject, err := projIf.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
+	detailedProject, err := projClient.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
 	if err != nil {
 		componentDiffResult.DiffError = err
 		log.Errorf("Error getting project %s: %v", app.Spec.Project, err)
@@ -314,27 +313,27 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 		return false, true, nil, err
 	}
 
-	conn, appIf, err := client.NewApplicationClient()
+	conn, appClient, err := client.NewApplicationClient()
 	if err != nil {
 		log.Errorf("Error creating ArgoCD app client: %v", err)
 		return false, true, nil, err
 	}
 	defer argoio.Close(conn)
 
-	conn, projIf, err := client.NewProjectClient()
+	conn, projClient, err := client.NewProjectClient()
 	if err != nil {
 		log.Errorf("Error creating ArgoCD project client: %v", err)
 		return false, true, nil, err
 	}
 	defer argoio.Close(conn)
 
-	conn, settingsIf, err := client.NewSettingsClient()
+	conn, settingClient, err := client.NewSettingsClient()
 	if err != nil {
 		log.Errorf("Error creating ArgoCD settings client: %v", err)
 		return false, true, nil, err
 	}
 	defer argoio.Close(conn)
-	argoSettings, err := settingsIf.Get(ctx, &settings.SettingsQuery{})
+	argoSettings, err := settingClient.Get(ctx, &settings.SettingsQuery{})
 	if err != nil {
 		log.Errorf("Error getting ArgoCD settings: %v", err)
 		return false, true, nil, err
@@ -342,7 +341,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 
 	log.Debugf("Checking ArgoCD diff for components: %v", componentPathList)
 	for _, componentPath := range componentPathList {
-		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appIf, projIf, argoSettings, useSHALabelForArgoDicovery)
+		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appClient, projClient, argoSettings, useSHALabelForArgoDicovery)
 		if currentDiffResult.DiffError != nil {
 			log.Errorf("Error generating diff for component %s: %v", componentPath, currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
