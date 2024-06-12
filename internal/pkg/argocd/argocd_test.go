@@ -1,10 +1,5 @@
 package argocd
 
-// @Title
-// @Description
-// @Author
-// @Update
-
 import (
 	"context"
 	"testing"
