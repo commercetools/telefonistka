@@ -39,7 +39,7 @@ func init() { //nolint:gochecknoinits
 
 func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[string, githubapi.GhClientPair], prApproverGhClientCache *lru.Cache[string, githubapi.GhClientPair]) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 		defer cancel()
 		githubapi.HandleEvent(r, ctx, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret)
 	}
@@ -63,8 +63,8 @@ func serve() {
 	srv := &http.Server{
 		Handler:      mux,
 		Addr:         ":8080",
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  120 * time.Second,
+		WriteTimeout: 120 * time.Second,
 	}
 
 	log.Infoln("server started")
