@@ -40,7 +40,7 @@ func init() { //nolint:gochecknoinits
 func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[string, githubapi.GhClientPair], prApproverGhClientCache *lru.Cache[string, githubapi.GhClientPair]) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
-		defer cancel()
+		// defer cancel()
 		githubapi.HandleEvent(r, ctx, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret)
 	}
 }
