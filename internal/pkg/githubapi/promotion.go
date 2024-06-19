@@ -110,7 +110,6 @@ func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath strin
 	return componentConfig, nil
 }
 
-
 // This function generates a list of "components" that where changed in the PR and are relevant for promotion)
 func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (relevantComponents map[relevantComponent]struct{}, err error) {
 	relevantComponents = make(map[relevantComponent]struct{})
