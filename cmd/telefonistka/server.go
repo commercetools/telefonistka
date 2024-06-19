@@ -39,8 +39,10 @@ func init() { //nolint:gochecknoinits
 
 func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[string, githubapi.GhClientPair], prApproverGhClientCache *lru.Cache[string, githubapi.GhClientPair]) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, _ := context.WithTimeout(context.Background(), 120*time.Second)
-		// defer cancel()
+		// We don't use the request context as it might have a short deadline and we don't want to stop event handling based on that
+		// But we do want to stop the event handling after a certain point, so:
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
 		githubapi.HandleEvent(r, ctx, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret)
 	}
 }
