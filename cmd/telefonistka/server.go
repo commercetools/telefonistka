@@ -65,8 +65,8 @@ func serve() {
 	srv := &http.Server{
 		Handler:      mux,
 		Addr:         ":8080",
-		ReadTimeout:  120 * time.Second,
-		WriteTimeout: 120 * time.Second,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
 	log.Infoln("server started")
