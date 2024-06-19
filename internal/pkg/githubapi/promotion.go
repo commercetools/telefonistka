@@ -21,6 +21,7 @@ type PromotionInstance struct {
 type PromotionInstanceMetaData struct {
 	SourcePath                     string
 	TargetPaths                    []string
+	TargetDescription              string
 	PerComponentSkippedTargetPaths map[string][]string // ComponentName is the key,
 	ComponentNames                 []string
 	AutoMerge                      bool
@@ -109,6 +110,7 @@ func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath strin
 	return componentConfig, nil
 }
 
+
 // This function generates a list of "components" that where changed in the PR and are relevant for promotion)
 func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (relevantComponents map[relevantComponent]struct{}, err error) {
 	relevantComponents = make(map[relevantComponent]struct{})
@@ -121,6 +123,7 @@ func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, confi
 		prom.InstrumentGhCall(resp)
 		if err != nil {
 			ghPrClientDetails.PrLogger.Errorf("could not get file list from GH API: err=%s\nstatus code=%v", err, resp.Response.Status)
+
 			return nil, err
 		}
 		prFiles = append(prFiles, perPagePrFiles...)
@@ -208,9 +211,13 @@ func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, c
 					mapKey := configPromotionPath.SourcePath + ">" + strings.Join(ppr.TargetPaths, "|") // This key is used to aggregate the PR based on source and target combination
 					if entry, ok := promotions[mapKey]; !ok {
 						ghPrClientDetails.PrLogger.Debugf("Adding key %s", mapKey)
+						if ppr.TargetDescription == "" {
+							ppr.TargetDescription = strings.Join(ppr.TargetPaths, " ")
+						}
 						promotions[mapKey] = PromotionInstance{
 							Metadata: PromotionInstanceMetaData{
 								TargetPaths:                    ppr.TargetPaths,
+								TargetDescription:              ppr.TargetDescription,
 								SourcePath:                     componentToPromote.SourcePath,
 								ComponentNames:                 []string{componentToPromote.ComponentName},
 								PerComponentSkippedTargetPaths: map[string][]string{},
