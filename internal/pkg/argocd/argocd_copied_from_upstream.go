@@ -85,7 +85,7 @@ func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[
 			if local != nil && !kube.IsCRD(local) {
 				err = resourceTracking.SetAppInstance(local, argoSettings.AppLabelKey, appName, namespace, argoappv1.TrackingMethod(argoSettings.GetTrackingMethod()))
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("Failed to set app instance label: %v", err)
 				}
 			}
 
