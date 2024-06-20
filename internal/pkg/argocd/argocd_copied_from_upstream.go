@@ -2,6 +2,7 @@ package argocd
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/argoproj/argo-cd/v2/controller"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
@@ -51,7 +52,7 @@ func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructu
 	}
 	localObs, _, err := controller.DeduplicateTargetObjects(appNamespace, localObs, &resourceInfoProvider{namespacedByGk: namespacedByGk})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Failed to DeDuplicate target objects: %v", err)
 	}
 	objByKey := make(map[kube.ResourceKey]*unstructured.Unstructured)
 	for i := range localObs {
@@ -71,7 +72,7 @@ func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[
 		live := &unstructured.Unstructured{}
 		err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Failed to unmarshal live object(%v): %v", res.Name, err)
 		}
 
 		key := kube.ResourceKey{Name: res.Name, Namespace: res.Namespace, Group: res.Group, Kind: res.Kind}
