@@ -1008,7 +1008,7 @@ func ApprovePr(approverClient *github.Client, ghPrClientDetails GhPrClientDetail
 }
 
 func GetInRepoConfig(ghPrClientDetails GhPrClientDetails, defaultBranch string) (*cfg.Config, error) {
-	inRepoConfigFileContentString, err, _ := GetFileContent(ghPrClientDetails, defaultBranch, "telefonistka.yaml")
+	inRepoConfigFileContentString, _, err := GetFileContent(ghPrClientDetails, defaultBranch, "telefonistka.yaml")
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Could not get in-repo configuration: err=%s\n", err)
 		return nil, err
@@ -1020,18 +1020,23 @@ func GetInRepoConfig(ghPrClientDetails GhPrClientDetails, defaultBranch string) 
 	return c, err
 }
 
-func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath string) (string, error, int) {
+func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath string) (string, int, error) {
 	rGetContentOps := github.RepositoryContentGetOptions{Ref: branch}
 	fileContent, _, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, filePath, &rGetContentOps)
-	prom.InstrumentGhCall(resp)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Fail to get file:%s\n%v\n", err, resp)
-		return "", err, resp.StatusCode
+		if resp == nil {
+			return "", 0, err
+		}
+		prom.InstrumentGhCall(resp)
+		return "", resp.StatusCode, err
+	} else {
+		prom.InstrumentGhCall(resp)
 	}
 	fileContentString, err := fileContent.GetContent()
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Fail to serlize file:%s\n", err)
-		return "", err, resp.StatusCode
+		return "", resp.StatusCode, err
 	}
-	return fileContentString, nil, resp.StatusCode
+	return fileContentString, resp.StatusCode, nil
 }
