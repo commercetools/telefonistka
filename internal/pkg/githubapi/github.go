@@ -188,6 +188,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 	}
 }
 
+// ReciveEventFile this one is similar to ReciveWebhook but it's used for CLI triggering, i  simulates a webhook event to use the same code path as the webhook handler.
 func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair]) {
 	log.Infof("Event type: %s", eventType)
 	log.Infof("Proccesing file: %s", eventFilePath)
@@ -202,13 +203,12 @@ func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *
 		prom.InstrumentWebhookHit("parsing_failed")
 		return
 	}
-	// This is a hack to simulate a webhook event so we can use the same code path
 	r, _ := http.NewRequest("POST", "", nil) //nolint:noctx
 	r.Body = io.NopCloser(bytes.NewReader(payload))
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("X-GitHub-Event", eventType)
 
-	HandleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, eventType)
+	handleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, eventType)
 }
 
 // ReciveWebhook is the main entry point for the webhook handling it starts parases the webhook payload and start a thread to handle the event success/failure are dependant on the payload parsing only
@@ -229,11 +229,11 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 	}
 	prom.InstrumentWebhookHit("successful")
 
-	go HandleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, eventType)
+	go handleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, eventType)
 	return nil
 }
 
-func HandleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte, eventType string) {
+func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte, eventType string) {
 	// We don't use the request context as it might have a short deadline and we don't want to stop event handling based on that
 	// But we do want to stop the event handling after a certain point, so:
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
