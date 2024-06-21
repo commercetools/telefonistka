@@ -8,12 +8,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"path"
 	"regexp"
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/go-github/v62/github"
@@ -185,12 +188,36 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 	}
 }
 
-func HandleEvent(r *http.Request, ctx context.Context, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) {
+func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair]) {
+	log.Infof("Event type: %s", eventType)
+	log.Infof("Proccesing file: %s", eventFilePath)
+
+	payload, err := os.ReadFile(eventFilePath)
+	if err != nil {
+		panic(err)
+	}
+	eventPayloadInterface, err := github.ParseWebHook(eventType, payload)
+	if err != nil {
+		log.Errorf("could not parse webhook: err=%s\n", err)
+		prom.InstrumentWebhookHit("parsing_failed")
+		return
+	}
+	// This is a hack to simulate a webhook event so we can use the same code path
+	r, _ := http.NewRequest("POST", "", nil) //nolint:noctx
+	r.Body = io.NopCloser(bytes.NewReader(payload))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-GitHub-Event", eventType)
+
+	HandleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, eventType)
+}
+
+// ReciveWebhook is the main entry point for the webhook handling it starts parases the webhook payload and start a thread to handle the event success/failure are dependant on the payload parsing only
+func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
 	payload, err := github.ValidatePayload(r, githubWebhookSecret)
 	if err != nil {
 		log.Errorf("error reading request body: err=%s\n", err)
 		prom.InstrumentWebhookHit("validation_failed")
-		return
+		return err
 	}
 	eventType := github.WebHookType(r)
 
@@ -198,9 +225,19 @@ func HandleEvent(r *http.Request, ctx context.Context, mainGhClientCache *lru.Ca
 	if err != nil {
 		log.Errorf("could not parse webhook: err=%s\n", err)
 		prom.InstrumentWebhookHit("parsing_failed")
-		return
+		return err
 	}
 	prom.InstrumentWebhookHit("successful")
+
+	go HandleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, eventType)
+	return nil
+}
+
+func HandleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte, eventType string) {
+	// We don't use the request context as it might have a short deadline and we don't want to stop event handling based on that
+	// But we do want to stop the event handling after a certain point, so:
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
 	var mainGithubClientPair GhClientPair
 	var approverGithubClientPair GhClientPair
 
