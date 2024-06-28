@@ -276,7 +276,6 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		Spec:         &foundApp.Spec,
 		AppNamespace: &foundApp.Namespace,
 	})
-
 	if err != nil {
 		return fmt.Errorf("Error setting app %s revision to  %s failed: %v", foundApp.Name, revision, err)
 	}
