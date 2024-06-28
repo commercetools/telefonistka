@@ -71,7 +71,6 @@ func (pm prMetadata) serialize() (string, error) {
 }
 
 func (ghPrClientDetails *GhPrClientDetails) getPrMetadata(prBody string) {
-
 	prMetadataRegex := regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
 	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
 	if len(serializedPrMetadata) == 2 {
@@ -83,11 +82,9 @@ func (ghPrClientDetails *GhPrClientDetails) getPrMetadata(prBody string) {
 			}
 		}
 	}
-
 }
 
 func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context) {
-
 	ghPrClientDetails.getPrMetadata(eventPayload.PullRequest.GetBody())
 	// wasCommitStatusSet and the placement of SetCommitStatus in the flow is used to ensure an API call is only made where it needed
 	wasCommitStatusSet := false
@@ -161,7 +158,6 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 			}
 
 			if len(diffOfChangedComponents) > 0 {
-
 				diffCommentData := struct {
 					diffOfChangedComponents []argocd.DiffResult
 					hasSyncableComponens    bool
@@ -414,7 +410,6 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 						ghPrClientDetails.PrLogger.Errorf("Failed to sync ArgoCD app from branch: err=%s\n", err)
 					}
 				}
-
 			}
 		}
 	}

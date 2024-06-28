@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -146,8 +145,6 @@ func getEnv(key, fallback string) string {
 }
 
 func createArgoCdClients() (appClient application.ApplicationServiceClient, projClient projectpkg.ProjectServiceClient, settingClient settings.SettingsServiceClient, err error) {
-	var conn io.Closer
-
 	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
 	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
 
@@ -163,21 +160,23 @@ func createArgoCdClients() (appClient application.ApplicationServiceClient, proj
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD API client: %v", err)
 	}
 
-	conn, appClient, err = client.NewApplicationClient()
+	appClntConn, appClient, err := client.NewApplicationClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD app client: %v", err)
 	}
+	defer argoio.Close(appClntConn)
 
-	conn, projClient, err = client.NewProjectClient()
+	projClntConn, projClient, err := client.NewProjectClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD project client: %v", err)
 	}
+	defer argoio.Close(projClntConn)
 
-	conn, settingClient, err = client.NewSettingsClient()
+	setClntConn, settingClient, err := client.NewSettingsClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD settings client: %v", err)
 	}
-	defer argoio.Close(conn)
+	defer argoio.Close(setClntConn)
 	return
 }
 
@@ -254,10 +253,16 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 	var foundApp *argoappv1.Application
 	var err error
 	appClient, _, _, err := createArgoCdClients()
+	if err != nil {
+		return fmt.Errorf("Error creating ArgoCD clients: %v", err)
+	}
 	if useSHALabelForArgoDicovery {
 		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, appClient)
 	} else {
 		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appClient)
+	}
+	if err != nil {
+		return fmt.Errorf("Error finding ArgoCD application for component path %s: %v", componentPath, err)
 	}
 	if foundApp.Spec.Source.TargetRevision == revision {
 		log.Infof("App %s already has revision %s", foundApp.Name, revision)

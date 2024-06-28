@@ -82,7 +82,7 @@ foobar`
 		t.Error("Expected isCheckedNow to be true")
 	}
 	if wasCheckedBefore {
-		t.Errorf("Expected wasCheckedBeforeto be false, actaully got %t", wasCheckedBefore)
+		t.Errorf("Expected wasCheckedBeforeto be false, got %t", wasCheckedBefore)
 	}
 }
 
