@@ -322,7 +322,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			"repo":     *eventPayload.Repo.Owner.Login + "/" + *eventPayload.Repo.Name,
 			"prNumber": *eventPayload.Issue.Number,
 		})
-		if *eventPayload.Comment.User.Login != botIdentity {
+		if *eventPayload.Sender.Login != botIdentity {
 			ghPrClientDetails := GhPrClientDetails{
 				Ctx:          ctx,
 				GhClientPair: &mainGithubClientPair,
