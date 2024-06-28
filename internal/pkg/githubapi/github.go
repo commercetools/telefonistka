@@ -385,7 +385,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 	_, _ = ghPrClientDetails.GetSHA()
 
 	checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- telefonistka-argocd-branch-sync -->.*$`
-	checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Issue.Body, checkboxPattern)
+	checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxPattern)
 	if !checkboxWaschecked && checkboxIsChecked {
 		ghPrClientDetails.PrLogger.Infof("Sync Checkbox was checked")
 		if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
