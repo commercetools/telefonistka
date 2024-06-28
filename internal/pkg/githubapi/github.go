@@ -159,15 +159,15 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 
 			if len(diffOfChangedComponents) > 0 {
 				diffCommentData := struct {
-					diffOfChangedComponents []argocd.DiffResult
-					hasSyncableComponens    bool
+					DiffOfChangedComponents []argocd.DiffResult
+					HasSyncableComponens    bool
 				}{
-					diffOfChangedComponents: diffOfChangedComponents,
+					DiffOfChangedComponents: diffOfChangedComponents,
 				}
 
 				for _, componentPath := range componentPathList {
 					if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
-						diffCommentData.hasSyncableComponens = true
+						diffCommentData.HasSyncableComponens = true
 						break
 					}
 				}
