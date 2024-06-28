@@ -20,7 +20,6 @@ import (
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
 	"github.com/argoproj/argo-cd/v2/util/argo/normalizers"
-	argoio "github.com/argoproj/argo-cd/v2/util/io"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
@@ -160,23 +159,26 @@ func createArgoCdClients() (appClient application.ApplicationServiceClient, proj
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD API client: %v", err)
 	}
 
-	appClntConn, appClient, err := client.NewApplicationClient()
+	_, appClient, err = client.NewApplicationClient()
+	// appClntConn, appClient, err := client.NewApplicationClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD app client: %v", err)
 	}
-	defer argoio.Close(appClntConn)
+	// defer argoio.Close(appClntConn)
 
-	projClntConn, projClient, err := client.NewProjectClient()
+	_, projClient, err = client.NewProjectClient()
+	// projClntConn, projClient, err := client.NewProjectClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD project client: %v", err)
 	}
-	defer argoio.Close(projClntConn)
+	// defer argoio.Close(projClntConn)
 
-	setClntConn, settingClient, err := client.NewSettingsClient()
+	_, settingClient, err = client.NewSettingsClient()
+	// setClntConn, settingClient, err := client.NewSettingsClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD settings client: %v", err)
 	}
-	defer argoio.Close(setClntConn)
+	// defer argoio.Close(setClntConn)
 	return
 }
 
