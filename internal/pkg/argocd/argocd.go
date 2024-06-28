@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -144,7 +145,9 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func createArgoCdClient() (apiclient.Client, error) {
+func createArgoCdClients() (appClient application.ApplicationServiceClient, projClient projectpkg.ProjectServiceClient, settingClient settings.SettingsServiceClient, err error) {
+	var conn io.Closer
+
 	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
 	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
 
@@ -155,11 +158,27 @@ func createArgoCdClient() (apiclient.Client, error) {
 		Insecure:   insecure,
 	}
 
-	clientset, err := apiclient.NewClient(opts)
+	client, err := apiclient.NewClient(opts)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating ArgoCD API client: %v", err)
+		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD API client: %v", err)
 	}
-	return clientset, nil
+
+	conn, appClient, err = client.NewApplicationClient()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD app client: %v", err)
+	}
+
+	conn, projClient, err = client.NewProjectClient()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD project client: %v", err)
+	}
+
+	conn, settingClient, err = client.NewSettingsClient()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD settings client: %v", err)
+	}
+	defer argoio.Close(conn)
+	return
 }
 
 // findArgocdAppBySHA1Label finds an ArgoCD application by the SHA1 label of the component path it's supposed to avoid performance issues with the "manifest-generate-paths" annotation method which requires pulling all ArgoCD applications(!) on every PR event.
@@ -229,6 +248,35 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 		}
 	}
 	return nil, fmt.Errorf("No ArgoCD application found with manifest-generate-paths annotation that matches %s(looked at repo %s, checked %v apps)	", componentPath, repo, len(allRepoApps.Items))
+}
+
+func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool) error {
+	var foundApp *argoappv1.Application
+	var err error
+	appClient, _, _, err := createArgoCdClients()
+	if useSHALabelForArgoDicovery {
+		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, appClient)
+	} else {
+		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appClient)
+	}
+	if foundApp.Spec.Source.TargetRevision == revision {
+		log.Infof("App %s already has revision %s", foundApp.Name, revision)
+		return nil
+	}
+
+	foundApp.Spec.Source.TargetRevision = revision
+
+	_, err = appClient.UpdateSpec(ctx, &application.ApplicationUpdateSpecRequest{
+		Name:         &foundApp.Name,
+		Spec:         &foundApp.Spec,
+		AppNamespace: &foundApp.Namespace,
+	})
+
+	if err != nil {
+		return fmt.Errorf("Error setting app %s revision to  %s failed: %v", foundApp.Name, revision, err)
+	}
+
+	return nil
 }
 
 func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appClient application.ApplicationServiceClient, projClient projectpkg.ProjectServiceClient, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool) (componentDiffResult DiffResult) {
@@ -313,32 +361,12 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 	// env var should be centralized
-	client, err := createArgoCdClient()
+	appClient, projClient, settingClient, err := createArgoCdClients()
 	if err != nil {
-		log.Errorf("Error creating ArgoCD client: %v", err)
+		log.Errorf("Error creating ArgoCD clients: %v", err)
 		return false, true, nil, err
 	}
 
-	conn, appClient, err := client.NewApplicationClient()
-	if err != nil {
-		log.Errorf("Error creating ArgoCD app client: %v", err)
-		return false, true, nil, err
-	}
-	defer argoio.Close(conn)
-
-	conn, projClient, err := client.NewProjectClient()
-	if err != nil {
-		log.Errorf("Error creating ArgoCD project client: %v", err)
-		return false, true, nil, err
-	}
-	defer argoio.Close(conn)
-
-	conn, settingClient, err := client.NewSettingsClient()
-	if err != nil {
-		log.Errorf("Error creating ArgoCD settings client: %v", err)
-		return false, true, nil, err
-	}
-	defer argoio.Close(conn)
 	argoSettings, err := settingClient.Get(ctx, &settings.SettingsQuery{})
 	if err != nil {
 		log.Errorf("Error getting ArgoCD settings: %v", err)

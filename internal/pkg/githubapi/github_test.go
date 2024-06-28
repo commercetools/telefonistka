@@ -62,3 +62,90 @@ func TestGenerateSafePromotionBranchNameLongTargets(t *testing.T) {
 		t.Errorf("Expected branch name to be less than 250 characters, got %d", len(result))
 	}
 }
+
+// Testing a case when a checkbox is marked
+func TestAnalyzeCommentUpdateCheckBoxChecked(t *testing.T) {
+	t.Parallel()
+	newBody := `This is a comment
+foobar
+- [x] <!-- check-slug-1 --> Description of checkbox
+foobar`
+
+	oldBody := `This is a comment
+foobar
+- [ ] <!-- check-slug-1 --> Description of checkbox
+foobar`
+	checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`
+
+	wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(newBody, oldBody, checkboxPattern)
+	if !isCheckedNow {
+		t.Error("Expected isCheckedNow to be true")
+	}
+	if wasCheckedBefore {
+		t.Errorf("Expected wasCheckedBeforeto be false, actaully got %t", wasCheckedBefore)
+	}
+}
+
+// Testing a case when a checkbox is unmarked
+func TestAnalyzeCommentUpdateCheckBoxUnChecked(t *testing.T) {
+	t.Parallel()
+	newBody := `This is a comment
+foobar
+- [ ] <!-- check-slug-1 --> Description of checkbox
+foobar`
+
+	oldBody := `This is a comment
+foobar
+- [x] <!-- check-slug-1 --> Description of checkbox
+foobar`
+	checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`
+
+	wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(newBody, oldBody, checkboxPattern)
+	if isCheckedNow {
+		t.Error("Expected isCheckedNow to be false")
+	}
+	if !wasCheckedBefore {
+		t.Error("Expected wasCheckedBeforeto be true")
+	}
+}
+
+// Testing a case when a checkbox isn't in the comment body
+func TestAnalyzeCommentUpdateCheckBoxNonRelevent(t *testing.T) {
+	t.Parallel()
+	newBody := `This is a comment
+foobar
+foobar`
+
+	oldBody := `This is a comment
+foobar2
+foobar2`
+	checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`
+
+	wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(newBody, oldBody, checkboxPattern)
+	if isCheckedNow {
+		t.Error("Expected isCheckedNow to be false")
+	}
+	if wasCheckedBefore {
+		t.Error("Expected wasCheckedBeforeto be false")
+	}
+}
+
+func TestIsSyncFromBranchAllowedForThisPathTrue(t *testing.T) {
+	t.Parallel()
+	allowedPathRegex := `^workspace/.*$`
+	path := "workspace/app3"
+	result := isSyncFromBranchAllowedForThisPath(allowedPathRegex, path)
+	if !result {
+		t.Error("Expected result to be true")
+	}
+}
+
+func TestIsSyncFromBranchAllowedForThisPathFalse(t *testing.T) {
+	t.Parallel()
+	allowedPathRegex := `^workspace/.*$`
+	path := "clusters/prod/aws/eu-east-1/app3"
+	result := isSyncFromBranchAllowedForThisPath(allowedPathRegex, path)
+	if result {
+		t.Error("Expected result to be false")
+	}
+}

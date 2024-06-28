@@ -1,6 +1,6 @@
 {{define "argoCdDiff"}}
 Diff of ArgoCD applications:
-{{ range $appDiffResult := . }}
+{{ range $appDiffResult := .diffOfChangedComponents }}
 
 
 {{if $appDiffResult.DiffError }}
@@ -32,4 +32,10 @@ No diff 🤷
 {{- end }}
 
 {{- end }}
+
+{{- if .hasSyncableComponens }}
+- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps to sync to current branch revision  
+{{- end}}
+
+
 {{- end }}
