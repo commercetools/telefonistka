@@ -586,18 +586,22 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 
 	if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
 		componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
-		for _, componentPath := range componentPathList {
-			if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
-				ghPrClientDetails.PrLogger.Errorf("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
-				err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
-				if err != nil {
-					ghPrClientDetails.PrLogger.Errorf("Failed to set  ArgoCD app %s, to HEAD: err=%s\n", err)
+		if err != nil {
+			ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD: err=%s\n", err)
+		} else {
+			for _, componentPath := range componentPathList {
+				if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
+					ghPrClientDetails.PrLogger.Errorf("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
+					err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
+					if err != nil {
+						ghPrClientDetails.PrLogger.Errorf("Failed to set ArgoCD app @  %s, to HEAD: err=%s\n", componentPath, err)
+					}
 				}
 			}
 		}
 	}
 
-	return nil
+	return err
 }
 
 // Creating a unique branch name based on the PR number, PR ref and the promotion target paths

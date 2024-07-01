@@ -171,7 +171,6 @@ type relevantComponent struct {
 }
 
 func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (changedComponentPaths []string, err error) {
-
 	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
 	if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
 		changedComponentPaths = ghPrClientDetails.PrMetadata.PromotedPaths
