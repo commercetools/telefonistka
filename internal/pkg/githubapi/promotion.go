@@ -170,14 +170,20 @@ type relevantComponent struct {
 	AutoMerge     bool
 }
 
-// This function basically turns the map with struct keys into a list of strings
 func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (changedComponentPaths []string, err error) {
-	relevantComponents, err := generateListOfRelevantComponents(ghPrClientDetails, config)
-	if err != nil {
-		return nil, err
-	}
-	for component := range relevantComponents {
-		changedComponentPaths = append(changedComponentPaths, component.SourcePath+component.ComponentName)
+
+	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
+	if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
+		changedComponentPaths = ghPrClientDetails.PrMetadata.PromotedPaths
+	} else {
+		// If not we will use in-repo config to geenrate it, and turns the map with struct keys into a list of strings
+		relevantComponents, err := generateListOfRelevantComponents(ghPrClientDetails, config)
+		if err != nil {
+			return nil, err
+		}
+		for component := range relevantComponents {
+			changedComponentPaths = append(changedComponentPaths, component.SourcePath+component.ComponentName)
+		}
 	}
 	return changedComponentPaths, nil
 }

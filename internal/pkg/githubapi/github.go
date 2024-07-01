@@ -115,18 +115,10 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 			ghPrClientDetails.PrLogger.Errorf("Failed to minimize stale comments: err=%s\n", err)
 		}
 		if config.CommentArgocdDiffonPR {
-			var componentPathList []string
-
-			// Promotion PR have the list of paths to promote in the PR metadata
-			// For non promotion PR, we will generate the list of changed components based the PR changed files and the telefonistka configuration(sourcePath)
-			if DoesPrHasLabel(*eventPayload, "promotion") {
-				componentPathList = ghPrClientDetails.PrMetadata.PromotedPaths
-			} else {
-				componentPathList, err = generateListOfChangedComponentPaths(ghPrClientDetails, config)
-				if err != nil {
-					prHandleError = err
-					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
-				}
+			componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+			if err != nil {
+				prHandleError = err
+				ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
 			}
 
 			hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentPathList, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
@@ -394,16 +386,9 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 			if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
 				ghPrClientDetails.getPrMetadata(ce.Issue.GetBody()) // TODO is issue is not a PR but an actual issue, this will fail?
 
-				// Promotion PR have the list of paths to promote in the PR metadata
-				// For non promotion PR, we will generate the list of changed components based the PR changed files and the telefonistka configuration(sourcePath)
-				var componentPathList []string
-				if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
-					componentPathList = ghPrClientDetails.PrMetadata.PromotedPaths
-				} else {
-					componentPathList, err = generateListOfChangedComponentPaths(ghPrClientDetails, config)
-					if err != nil {
-						ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
-					}
+				componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+				if err != nil {
+					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
 				}
 
 				for _, componentPath := range componentPathList {
@@ -598,6 +583,20 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 	} else {
 		commentPlanInPR(ghPrClientDetails, promotions)
 	}
+
+	if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
+		componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+		for _, componentPath := range componentPathList {
+			if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
+				ghPrClientDetails.PrLogger.Errorf("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
+				err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
+				if err != nil {
+					ghPrClientDetails.PrLogger.Errorf("Failed to set  ArgoCD app %s, to HEAD: err=%s\n", err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
