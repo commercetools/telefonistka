@@ -271,6 +271,7 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		return nil
 	}
 
+	log.Debugf("=== %v ===", foundApp.Spec.Destination)
 	foundApp.Spec.Source.TargetRevision = revision
 
 	// _, err = appClient.UpdateSpec(ctx, &application.ApplicationUpdateSpecRequest{
