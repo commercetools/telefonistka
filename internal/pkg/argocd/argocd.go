@@ -273,10 +273,14 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 
 	foundApp.Spec.Source.TargetRevision = revision
 
-	_, err = appClient.UpdateSpec(ctx, &application.ApplicationUpdateSpecRequest{
-		Name:         &foundApp.Name,
-		Spec:         &foundApp.Spec,
-		AppNamespace: &foundApp.Namespace,
+	// _, err = appClient.UpdateSpec(ctx, &application.ApplicationUpdateSpecRequest{
+	// Name:         &foundApp.Name,
+	// Spec:         &foundApp.Spec,
+	// AppNamespace: &foundApp.Namespace,
+	// })
+	_, err = appClient.Update(ctx, &application.ApplicationUpdateRequest{
+		Application: foundApp,
+		Project:     &foundApp.Spec.Project,
 	})
 	if err != nil {
 		return fmt.Errorf("Error setting app %s revision to  %s failed: %v", foundApp.Name, revision, err)
@@ -284,7 +288,7 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		log.Infof("ArgoCD App %s revision set to %s", foundApp.Name, revision)
 	}
 
-	return nil
+	return err
 }
 
 func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, appClient application.ApplicationServiceClient, projClient projectpkg.ProjectServiceClient, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool) (componentDiffResult DiffResult) {
