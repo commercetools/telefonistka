@@ -70,9 +70,9 @@ func (pm prMetadata) serialize() (string, error) {
 	return base64.StdEncoding.EncodeToString(pmJson), nil
 }
 
-func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context) {
+func (ghPrClientDetails *GhPrClientDetails) getPrMetadata(prBody string) {
 	prMetadataRegex := regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
-	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(eventPayload.PullRequest.GetBody())
+	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
 	if len(serializedPrMetadata) == 2 {
 		if serializedPrMetadata[1] != "" {
 			ghPrClientDetails.PrLogger.Info("Found PR metadata")
@@ -82,7 +82,10 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 			}
 		}
 	}
+}
 
+func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context) {
+	ghPrClientDetails.getPrMetadata(eventPayload.PullRequest.GetBody())
 	// wasCommitStatusSet and the placement of SetCommitStatus in the flow is used to ensure an API call is only made where it needed
 	wasCommitStatusSet := false
 
@@ -112,18 +115,10 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 			ghPrClientDetails.PrLogger.Errorf("Failed to minimize stale comments: err=%s\n", err)
 		}
 		if config.CommentArgocdDiffonPR {
-			var componentPathList []string
-
-			// Promotion PR have the list of paths to promote in the PR metadata
-			// For non promotion PR, we will generate the list of changed components based the PR changed files and the telefonistka configuration(sourcePath)
-			if DoesPrHasLabel(*eventPayload, "promotion") {
-				componentPathList = ghPrClientDetails.PrMetadata.PromotedPaths
-			} else {
-				componentPathList, err = generateListOfChangedComponentPaths(ghPrClientDetails, config)
-				if err != nil {
-					prHandleError = err
-					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
-				}
+			componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+			if err != nil {
+				prHandleError = err
+				ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
 			}
 
 			hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentPathList, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
@@ -154,15 +149,33 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 				}
 			}
 
-			err, templateOutput := executeTemplate(ghPrClientDetails.PrLogger, "argoCdDiff", "argoCD-diff-pr-comment.gotmpl", diffOfChangedComponents)
-			if err != nil {
-				prHandleError = err
-				log.Errorf("Failed to generate ArgoCD diff comment template: err=%s\n", err)
-			}
-			err = commentPR(ghPrClientDetails, templateOutput)
-			if err != nil {
-				prHandleError = err
-				log.Errorf("Failed to comment ArgoCD diff: err=%s\n", err)
+			if len(diffOfChangedComponents) > 0 {
+				diffCommentData := struct {
+					DiffOfChangedComponents []argocd.DiffResult
+					HasSyncableComponens    bool
+				}{
+					DiffOfChangedComponents: diffOfChangedComponents,
+				}
+
+				for _, componentPath := range componentPathList {
+					if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
+						diffCommentData.HasSyncableComponens = true
+						break
+					}
+				}
+
+				err, templateOutput := executeTemplate(ghPrClientDetails.PrLogger, "argoCdDiff", "argoCD-diff-pr-comment.gotmpl", diffCommentData)
+				if err != nil {
+					prHandleError = err
+					log.Errorf("Failed to generate ArgoCD diff comment template: err=%s\n", err)
+				}
+				err = commentPR(ghPrClientDetails, templateOutput)
+				if err != nil {
+					prHandleError = err
+					log.Errorf("Failed to comment ArgoCD diff: err=%s\n", err)
+				}
+			} else {
+				ghPrClientDetails.PrLogger.Debugf("Diff not find affected ArogCD apps")
 			}
 		}
 		ghPrClientDetails.PrLogger.Infoln("Checking for Drift")
@@ -301,7 +314,8 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			"repo":     *eventPayload.Repo.Owner.Login + "/" + *eventPayload.Repo.Name,
 			"prNumber": *eventPayload.Issue.Number,
 		})
-		if *eventPayload.Comment.User.Login != botIdentity {
+		// Ignore comment even sent by the bot (this is about who trigger the event not who wrote the comment)
+		if *eventPayload.Sender.Login != botIdentity {
 			ghPrClientDetails := GhPrClientDetails{
 				Ctx:          ctx,
 				GhClientPair: &mainGithubClientPair,
@@ -312,7 +326,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 				PrAuthor:     *eventPayload.Issue.User.Login,
 				PrLogger:     prLogger,
 			}
-			_ = handleCommentPrEvent(ghPrClientDetails, eventPayload)
+			_ = handleCommentPrEvent(ghPrClientDetails, eventPayload, botIdentity)
 		} else {
 			log.Debug("Ignoring self comment")
 		}
@@ -323,7 +337,37 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 	}
 }
 
-func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent) error {
+func analyzeCommentUpdateCheckBox(newBody string, oldBody string, checkboxPattern string) (wasCheckedBefore bool, isCheckedNow bool) {
+	checkBoxRegex := regexp.MustCompile(checkboxPattern)
+	oldCheckBoxContent := checkBoxRegex.FindStringSubmatch(oldBody)
+	newCheckBoxContent := checkBoxRegex.FindStringSubmatch(newBody)
+
+	// I'm grabbing the second group of the regex, which is the checkbox content (either "x" or " ")
+	// The first element of the result is the whole match
+	if len(newCheckBoxContent) < 2 || len(oldCheckBoxContent) < 2 {
+		return false, false
+	}
+	if len(newCheckBoxContent) >= 2 {
+		if newCheckBoxContent[1] == "x" {
+			isCheckedNow = true
+		}
+	}
+
+	if len(oldCheckBoxContent) >= 2 {
+		if oldCheckBoxContent[1] == "x" {
+			wasCheckedBefore = true
+		}
+	}
+
+	return
+}
+
+func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bool {
+	allowedPathsRegex := regexp.MustCompile(allowedPathRegex)
+	return allowedPathsRegex.MatchString(path)
+}
+
+func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	config, err := GetInRepoConfig(ghPrClientDetails, defaultBranch)
 	if err != nil {
@@ -332,6 +376,34 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 	// Comment events doesn't have Ref/SHA in payload, enriching the object:
 	_, _ = ghPrClientDetails.GetRef()
 	_, _ = ghPrClientDetails.GetSHA()
+
+	// This part should only happen on edits of bot comments - this part is about catching checkbox changes
+	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity {
+		checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- telefonistka-argocd-branch-sync -->.*$`
+		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxPattern)
+		if !checkboxWaschecked && checkboxIsChecked {
+			ghPrClientDetails.PrLogger.Infof("Sync Checkbox was checked")
+			if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
+				ghPrClientDetails.getPrMetadata(ce.Issue.GetBody()) // TODO is issue is not a PR but an actual issue, this will fail?
+
+				componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+				if err != nil {
+					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
+				}
+
+				for _, componentPath := range componentPathList {
+					if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
+						err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, ghPrClientDetails.PrSHA, ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
+						if err != nil {
+							ghPrClientDetails.PrLogger.Errorf("Failed to sync ArgoCD app from branch: err=%s\n", err)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// I should probably deprecated this whole part altogether.
 	for commentSubstring, commitStatusContext := range config.ToggleCommitStatus {
 		if strings.Contains(*ce.Comment.Body, "/"+commentSubstring) {
 			err := ghPrClientDetails.ToggleCommitStatus(commitStatusContext, *ce.Sender.Name)
@@ -511,7 +583,25 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 	} else {
 		commentPlanInPR(ghPrClientDetails, promotions)
 	}
-	return nil
+
+	if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
+		componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+		if err != nil {
+			ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD: err=%s\n", err)
+		} else {
+			for _, componentPath := range componentPathList {
+				if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
+					ghPrClientDetails.PrLogger.Errorf("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
+					err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
+					if err != nil {
+						ghPrClientDetails.PrLogger.Errorf("Failed to set ArgoCD app @  %s, to HEAD: err=%s\n", componentPath, err)
+					}
+				}
+			}
+		}
+	}
+
+	return err
 }
 
 // Creating a unique branch name based on the PR number, PR ref and the promotion target paths
