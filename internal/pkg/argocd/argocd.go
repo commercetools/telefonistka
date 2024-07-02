@@ -23,6 +23,7 @@ import (
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -272,6 +273,9 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 	}
 
 	patchObject := argoappv1.Application{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: foundApp.Namespace,
+		},
 		Spec: argoappv1.ApplicationSpec{
 			Source: &argoappv1.ApplicationSource{
 				TargetRevision: revision,
@@ -287,14 +291,14 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 	log.Debugf("Patching app %s/%s with: %s", foundApp.Namespace, foundApp.Name, patch)
 
 	patchType := "merge"
-	_, err = appClient.Patch(ctx, &application.ApplicationPatchRequest{
+	patchedApp, err := appClient.Patch(ctx, &application.ApplicationPatchRequest{
 		Name:         &foundApp.Name,
 		AppNamespace: &foundApp.Namespace,
 		PatchType:    &patchType,
 		Patch:        &patch,
 	})
 	if err != nil {
-		return fmt.Errorf("Error patching app %s revision to  %s failed: %v\n, patch: %v", foundApp.Name, revision, err, patch)
+		return fmt.Errorf("Error patching app %s revision to  %s failed: %v\n, patch: %v\npatched app: %v\n", foundApp.Name, revision, err, patch, patchedApp)
 	} else {
 		log.Infof("ArgoCD App %s revision set to %s", foundApp.Name, revision)
 	}
