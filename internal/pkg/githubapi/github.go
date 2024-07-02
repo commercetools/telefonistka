@@ -377,15 +377,14 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 	_, _ = ghPrClientDetails.GetRef()
 	_, _ = ghPrClientDetails.GetSHA()
 
-	// This part should only happen on edits of bot comments - this part is about catching checkbox changes
-	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity {
+	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
+	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity && *ce.Issue.State == "open" {
 		checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- telefonistka-argocd-branch-sync -->.*$`
 		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxPattern)
 		if !checkboxWaschecked && checkboxIsChecked {
 			ghPrClientDetails.PrLogger.Infof("Sync Checkbox was checked")
 			if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
-				ghPrClientDetails.getPrMetadata(ce.Issue.GetBody()) // TODO is issue is not a PR but an actual issue, this will fail?
-
+				ghPrClientDetails.getPrMetadata(ce.Issue.GetBody())
 				componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
