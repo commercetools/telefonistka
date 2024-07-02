@@ -23,7 +23,6 @@ import (
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -272,30 +271,30 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		return nil
 	}
 
-	patchObject := argoappv1.Application{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: foundApp.Namespace,
-		},
-		Spec: argoappv1.ApplicationSpec{
-			Source: &argoappv1.ApplicationSource{
-				TargetRevision: revision,
-			},
-		},
-	}
-	patchJson, err := json.Marshal(patchObject)
-	if err != nil {
-		return fmt.Errorf("Error marshalling patch object: %v\n%v", err, patchObject)
-	}
-	patch := string(patchJson)
-
+	// patchObject := argoappv1.Application{
+	// ObjectMeta: metav1.ObjectMeta{
+	// Namespace: foundApp.Namespace,
+	// },
+	// Spec: argoappv1.ApplicationSpec{
+	// Source: &argoappv1.ApplicationSource{
+	// TargetRevision: revision,
+	// },
+	// },
+	// }
+	// patchJson, err := json.Marshal(patchObject)
+	// if err != nil {
+	// return fmt.Errorf("Error marshalling patch object: %v\n%v", err, patchObject)
+	// }
+	// patch := string(patchJson)
+	patch := fmt.Sprintf(`{"spec": {"source": {"targetRevision": "%s"}}}`, revision)
 	log.Debugf("Patching app %s/%s with: %s", foundApp.Namespace, foundApp.Name, patch)
 
 	patchType := "merge"
 	patchedApp, err := appClient.Patch(ctx, &application.ApplicationPatchRequest{
-		Name:         &foundApp.Name,
-		AppNamespace: &foundApp.Namespace,
-		PatchType:    &patchType,
-		Patch:        &patch,
+		Name: &foundApp.Name,
+		// AppNamespace: &foundApp.Namespace,
+		PatchType: &patchType,
+		Patch:     &patch,
 	})
 	if err != nil {
 		return fmt.Errorf("Error patching app %s revision to  %s failed: %v\n, patch: %v\npatched app: %v\n", foundApp.Name, revision, err, patch, patchedApp)
