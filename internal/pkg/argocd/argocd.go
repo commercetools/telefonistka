@@ -271,15 +271,27 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		return nil
 	}
 
+	patchObject := argoappv1.Application{
+		Spec: argoappv1.ApplicationSpec{
+			Source: &argoappv1.ApplicationSource{
+				TargetRevision: revision,
+			},
+		},
+	}
+	patchJson, err := json.Marshal(patchObject)
+	if err != nil {
+		return fmt.Errorf("Error marshalling patch object: %v\n%v", err, patchObject)
+	}
+	patch := string(patchJson)
+
 	patchType := "merge"
-	patch := fmt.Sprintf(`{"spec": {"source": {"targetRevision": "%s"}}}`, revision)
 	_, err = appClient.Patch(ctx, &application.ApplicationPatchRequest{
 		Name:      &foundApp.Name,
 		PatchType: &patchType,
 		Patch:     &patch,
 	})
 	if err != nil {
-		return fmt.Errorf("Error setting app %s revision to  %s failed: %v", foundApp.Name, revision, err)
+		return fmt.Errorf("Error patching app %s revision to  %s failed: %v\n, patch: %v", foundApp.Name, revision, err, patch)
 	} else {
 		log.Infof("ArgoCD App %s revision set to %s", foundApp.Name, revision)
 	}
