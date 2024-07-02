@@ -347,6 +347,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		return componentDiffResult
 	}
 	log.Debugf("Got (live)resources for app %s", app.Name)
+	log.Debugf("=== resources: %v ===", resources)
 
 	// Get the application manifests, these are the target state of the application objects, taken from the git repo, specificly from the PR branch.
 	diffOption := &DifferenceOption{}
@@ -363,6 +364,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		return componentDiffResult
 	}
 	log.Debugf("Got manifests for app %s, revision %s", app.Name, prBranch)
+	log.Debugf("=== manifests: %v ===", manifests)
 	diffOption.res = manifests
 	diffOption.revision = prBranch
 
