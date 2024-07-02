@@ -271,20 +271,6 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		return nil
 	}
 
-	log.Debugf("=== %v ===", foundApp.Spec.Destination)
-
-	// foundApp.Spec.Source.TargetRevision = revision
-	// _, err = appClient.UpdateSpec(ctx, &application.ApplicationUpdateSpecRequest{
-	// Name:         &foundApp.Name,
-	// Spec:         &foundApp.Spec,
-	// AppNamespace: &foundApp.Namespace,
-	// })
-
-	// _, err = appClient.Update(ctx, &application.ApplicationUpdateRequest{
-	// Application: foundApp,
-	// Project:     &foundApp.Spec.Project,
-	// })
-
 	patchType := "merge"
 	patch := fmt.Sprintf(`{"spec": {"source": {"targetRevision": "%s"}}}`, revision)
 	_, err = appClient.Patch(ctx, &application.ApplicationPatchRequest{
