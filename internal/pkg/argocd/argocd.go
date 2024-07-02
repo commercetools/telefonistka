@@ -286,9 +286,10 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 
 	patchType := "merge"
 	_, err = appClient.Patch(ctx, &application.ApplicationPatchRequest{
-		Name:      &foundApp.Name,
-		PatchType: &patchType,
-		Patch:     &patch,
+		Name:         &foundApp.Name,
+		AppNamespace: &foundApp.Namespace,
+		PatchType:    &patchType,
+		Patch:        &patch,
 	})
 	if err != nil {
 		return fmt.Errorf("Error patching app %s revision to  %s failed: %v\n, patch: %v", foundApp.Name, revision, err, patch)
