@@ -284,6 +284,8 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 	}
 	patch := string(patchJson)
 
+	log.Debugf("Patching app %s/%s with: %s", foundApp.Namespace, foundApp.Name, patch)
+
 	patchType := "merge"
 	_, err = appClient.Patch(ctx, &application.ApplicationPatchRequest{
 		Name:         &foundApp.Name,
