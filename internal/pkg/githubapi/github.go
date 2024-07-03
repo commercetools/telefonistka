@@ -153,8 +153,10 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 				diffCommentData := struct {
 					DiffOfChangedComponents []argocd.DiffResult
 					HasSyncableComponens    bool
+					BranchName              string
 				}{
 					DiffOfChangedComponents: diffOfChangedComponents,
+					BranchName:              ghPrClientDetails.Ref,
 				}
 
 				for _, componentPath := range componentPathList {
@@ -393,7 +395,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 
 				for _, componentPath := range componentPathList {
 					if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
-						err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, ghPrClientDetails.PrSHA, ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
+						err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
 						if err != nil {
 							ghPrClientDetails.PrLogger.Errorf("Failed to sync ArgoCD app from branch: err=%s\n", err)
 						}

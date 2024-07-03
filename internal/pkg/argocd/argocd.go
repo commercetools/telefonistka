@@ -340,6 +340,12 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	log.Debugf("Got ArgoCD app %s", app.Name)
 	componentDiffResult.ArgoCdAppName = app.Name
 	componentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
+
+	if app.Spec.Source.TargetRevision == prBranch {
+		componentDiffResult.DiffError = fmt.Errorf("App %s already has revision %s as Source Target Revision, skipping diff calculation", app.Name, prBranch)
+		return componentDiffResult
+	}
+
 	resources, err := appClient.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
 	if err != nil {
 		componentDiffResult.DiffError = err
