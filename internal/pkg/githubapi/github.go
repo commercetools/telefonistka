@@ -126,7 +126,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 				prHandleError = err
 				ghPrClientDetails.PrLogger.Errorf("Failed to get ArgoCD diff information: err=%s\n", err)
 			} else {
-				ghPrClientDetails.PrLogger.Debugf("Successfully got ArgoCD diff\n")
+				ghPrClientDetails.PrLogger.Debugf("Successfully got ArgoCD diff vs git ref %s", ghPrClientDetails.Ref)
 				if !hasComponentDiffErrors && !hasComponentDiff {
 					ghPrClientDetails.PrLogger.Debugf("ArgoCD diff is empty, this PR will not change cluster state\n")
 					prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *eventPayload.PullRequest.Number, []string{"noop"})
@@ -302,6 +302,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			PrSHA:        *eventPayload.PullRequest.Head.SHA,
 		}
 
+		log.Debugf("=== Ref is %s\n", ghPrClientDetails.Ref)
 		HandlePREvent(eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, ctx)
 
 	case *github.IssueCommentEvent:
