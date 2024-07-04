@@ -271,30 +271,28 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		return nil
 	}
 
-	// patchObject := argoappv1.Application{
-	// ObjectMeta: metav1.ObjectMeta{
-	// Namespace: foundApp.Namespace,
-	// },
-	// Spec: argoappv1.ApplicationSpec{
-	// Source: &argoappv1.ApplicationSource{
-	// TargetRevision: revision,
-	// },
-	// },
-	// }
-	// patchJson, err := json.Marshal(patchObject)
-	// if err != nil {
-	// return fmt.Errorf("Error marshalling patch object: %v\n%v", err, patchObject)
-	// }
-	// patch := string(patchJson)
-	patch := fmt.Sprintf(`{"spec": {"source": {"targetRevision": "%s"}}}`, revision)
+	patchObject := struct {
+		Spec struct {
+			Source struct {
+				TargetRevision string `json:"targetRevision"`
+			} `json:"source"`
+		} `json:"spec"`
+	}{}
+	patchObject.Spec.Source.TargetRevision = revision
+	patchJson, err := json.Marshal(patchObject)
+	if err != nil {
+		return fmt.Errorf("Error marshalling patch object: %v\n%v", err, patchObject)
+	}
+	patch := string(patchJson)
+	// patch := fmt.Sprintf(`{"spec": {"source": {"targetRevision": "%s"}}}`, revision)
 	log.Debugf("Patching app %s/%s with: %s", foundApp.Namespace, foundApp.Name, patch)
 
 	patchType := "merge"
 	patchedApp, err := appClient.Patch(ctx, &application.ApplicationPatchRequest{
-		Name: &foundApp.Name,
-		// AppNamespace: &foundApp.Namespace,
-		PatchType: &patchType,
-		Patch:     &patch,
+		Name:         &foundApp.Name,
+		AppNamespace: &foundApp.Namespace,
+		PatchType:    &patchType,
+		Patch:        &patch,
 	})
 	if err != nil {
 		return fmt.Errorf("Error patching app %s revision to  %s failed: %v\n, patch: %v\npatched app: %v\n", foundApp.Name, revision, err, patch, patchedApp)
@@ -353,7 +351,6 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		return componentDiffResult
 	}
 	log.Debugf("Got (live)resources for app %s", app.Name)
-	log.Debugf("=== resources: %v ===", resources)
 
 	// Get the application manifests, these are the target state of the application objects, taken from the git repo, specificly from the PR branch.
 	diffOption := &DifferenceOption{}
@@ -370,7 +367,6 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		return componentDiffResult
 	}
 	log.Debugf("Got manifests for app %s, revision %s", app.Name, prBranch)
-	log.Debugf("=== manifests: %v ===", manifests)
 	diffOption.res = manifests
 	diffOption.revision = prBranch
 
