@@ -169,6 +169,8 @@ See [here](docs/observability.md)
 
 ## Development
 
+### Local Testing
+
 Telefonistka have 3 major methods to interact with the world:
 
 * Receive event webhooks from GitHub
@@ -176,9 +178,11 @@ Telefonistka have 3 major methods to interact with the world:
 * Send API calls to ArgoCD API(requires network access and credentials)
 
 Supporting all those requirements in a local environment might require lots of setup.
-Assuming you have a working lab environment, tools the easiest way to localy test Telefonistka might be with tools like [mirrord](https://mirrord.dev/) to [telepresence](https://www.telepresence.io/)
+Assuming you have a working lab environment, tools the easiest way to localy test Telefonistka might be with tools like [mirrord](https://mirrord.dev/) or [telepresence](https://www.telepresence.io/)
+
 A [mirrord.json](mirrord.json) is supplied as reference.
-This is how I compile and trigger the mirror
+
+This is how I compile and trigger mirrord execution
 
 ```sh
 go build . && mirrord exec -f mirrord.json ./telefonistka server
@@ -190,6 +194,8 @@ Alternatively, you can use `ngrok` or similar services to route webhook to a loc
 * See the URLs in ngrok command output.
 * Add a webhook to repo setting (don't forget the `/webhook` path in the URL).
 * Content type needs to be `application/json`, **currently** only PR events are needed
+
+### Building Container Image From Forks
 
 To publish container images from a forked repo set the `IMAGE_NAME` and `REGISTRY` GitHub Action Repository variables to use GitHub packages.
 `REGISTRY` should be `ghcr.io` and `IMAGE_NAME` should match the repository slug, like so:
