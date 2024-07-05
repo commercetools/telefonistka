@@ -178,7 +178,7 @@ Telefonistka have 3 major methods to interact with the world:
 * Send API calls to ArgoCD API(requires network access and credentials)
 
 Supporting all those requirements in a local environment might require lots of setup.
-Assuming you have a working lab environment, tools the easiest way to localy test Telefonistka might be with tools like [mirrord](https://mirrord.dev/) or [telepresence](https://www.telepresence.io/)
+Assuming you have a working lab environment, the easiest way to locally test Telefonistka might be with tools like [mirrord](https://mirrord.dev/) or [telepresence](https://www.telepresence.io/)
 
 A [mirrord.json](mirrord.json) is supplied as reference.
 
