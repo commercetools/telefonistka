@@ -63,89 +63,97 @@ func TestGenerateSafePromotionBranchNameLongTargets(t *testing.T) {
 	}
 }
 
-// Testing a case when a checkbox is marked
-func TestAnalyzeCommentUpdateCheckBoxChecked(t *testing.T) {
+func TestAnalyzeCommentUpdateCheckBox(t *testing.T) {
 	t.Parallel()
-	newBody := `This is a comment
-foobar
-- [x] <!-- check-slug-1 --> Description of checkbox
-foobar`
-
-	oldBody := `This is a comment
-foobar
-- [ ] <!-- check-slug-1 --> Description of checkbox
-foobar`
-	checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`
-
-	wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(newBody, oldBody, checkboxPattern)
-	if !isCheckedNow {
-		t.Error("Expected isCheckedNow to be true")
-	}
-	if wasCheckedBefore {
-		t.Errorf("Expected wasCheckedBeforeto be false, got %t", wasCheckedBefore)
-	}
-}
-
-// Testing a case when a checkbox is unmarked
-func TestAnalyzeCommentUpdateCheckBoxUnChecked(t *testing.T) {
-	t.Parallel()
-	newBody := `This is a comment
+	tests := map[string]struct {
+		newBody                  string
+		oldBody                  string
+		checkboxPattern          string
+		expectedWasCheckedBefore bool
+		expectedIsCheckedNow     bool
+	}{
+		"Checkbox is marked": {
+			oldBody: `This is a comment
 foobar
 - [ ] <!-- check-slug-1 --> Description of checkbox
-foobar`
-
-	oldBody := `This is a comment
+foobar`,
+			newBody: `This is a comment
 foobar
 - [x] <!-- check-slug-1 --> Description of checkbox
-foobar`
-	checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`
-
-	wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(newBody, oldBody, checkboxPattern)
-	if isCheckedNow {
-		t.Error("Expected isCheckedNow to be false")
-	}
-	if !wasCheckedBefore {
-		t.Error("Expected wasCheckedBeforeto be true")
-	}
-}
-
-// Testing a case when a checkbox isn't in the comment body
-func TestAnalyzeCommentUpdateCheckBoxNonRelevent(t *testing.T) {
-	t.Parallel()
-	newBody := `This is a comment
+foobar`,
+			checkboxPattern:          `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`,
+			expectedWasCheckedBefore: false,
+			expectedIsCheckedNow:     true,
+		},
+		"Checkbox is unmarked": {
+			oldBody: `This is a comment
 foobar
-foobar`
-
-	oldBody := `This is a comment
-foobar2
-foobar2`
-	checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`
-
-	wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(newBody, oldBody, checkboxPattern)
-	if isCheckedNow {
-		t.Error("Expected isCheckedNow to be false")
+- [x] <!-- check-slug-1 --> Description of checkbox
+foobar`,
+			newBody: `This is a comment
+foobar
+- [ ] <!-- check-slug-1 --> Description of checkbox
+foobar`,
+			checkboxPattern:          `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`,
+			expectedWasCheckedBefore: true,
+			expectedIsCheckedNow:     false,
+		},
+		"Checkbox isn't in comment body": {
+			oldBody: `This is a comment
+foobar
+foobar`,
+			newBody: `This is a comment
+foobar
+foobar`,
+			checkboxPattern:          `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`,
+			expectedWasCheckedBefore: false,
+			expectedIsCheckedNow:     false,
+		},
 	}
-	if wasCheckedBefore {
-		t.Error("Expected wasCheckedBeforeto be false")
+	for name, tc := range tests {
+		tc := tc // capture range variable
+		name := name
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(tc.newBody, tc.oldBody, tc.checkboxPattern)
+			if isCheckedNow != tc.expectedIsCheckedNow {
+				t.Errorf("%s: Expected isCheckedNow to be %v, got %v", name, tc.expectedIsCheckedNow, isCheckedNow)
+			}
+			if wasCheckedBefore != tc.expectedWasCheckedBefore {
+				t.Errorf("%s: Expected wasCheckedBeforeto to be %v, got %v", name, tc.expectedWasCheckedBefore, wasCheckedBefore)
+			}
+		})
 	}
 }
 
-func TestIsSyncFromBranchAllowedForThisPathTrue(t *testing.T) {
+func TestIsSyncFromBranchAllowedForThisPath(t *testing.T) {
 	t.Parallel()
-	allowedPathRegex := `^workspace/.*$`
-	path := "workspace/app3"
-	result := isSyncFromBranchAllowedForThisPath(allowedPathRegex, path)
-	if !result {
-		t.Error("Expected result to be true")
+	tests := map[string]struct {
+		allowedPathRegex string
+		path             string
+		expectedResult   bool
+	}{
+		"Path is allowed": {
+			allowedPathRegex: `^workspace/.*$`,
+			path:             "workspace/app3",
+			expectedResult:   true,
+		},
+		"Path is not allowed": {
+			allowedPathRegex: `^workspace/.*$`,
+			path:             "clusters/prod/aws/eu-east-1/app3",
+			expectedResult:   false,
+		},
 	}
-}
 
-func TestIsSyncFromBranchAllowedForThisPathFalse(t *testing.T) {
-	t.Parallel()
-	allowedPathRegex := `^workspace/.*$`
-	path := "clusters/prod/aws/eu-east-1/app3"
-	result := isSyncFromBranchAllowedForThisPath(allowedPathRegex, path)
-	if result {
-		t.Error("Expected result to be false")
+	for name, tc := range tests {
+		tc := tc // capture range variable
+		name := name
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result := isSyncFromBranchAllowedForThisPath(tc.allowedPathRegex, tc.path)
+			if result != tc.expectedResult {
+				t.Errorf("%s: Expected result to be %v, got %v", name, tc.expectedResult, result)
+			}
+		})
 	}
 }
