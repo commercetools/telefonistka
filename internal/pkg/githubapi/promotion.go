@@ -174,15 +174,16 @@ func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, co
 	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
 	if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
 		changedComponentPaths = ghPrClientDetails.PrMetadata.PromotedPaths
-	} else {
-		// If not we will use in-repo config to geenrate it, and turns the map with struct keys into a list of strings
-		relevantComponents, err := generateListOfRelevantComponents(ghPrClientDetails, config)
-		if err != nil {
-			return nil, err
-		}
-		for component := range relevantComponents {
-			changedComponentPaths = append(changedComponentPaths, component.SourcePath+component.ComponentName)
-		}
+		return changedComponentPaths, nil
+	}
+
+	// If not we will use in-repo config to generate it, and turns the map with struct keys into a list of strings
+	relevantComponents, err := generateListOfRelevantComponents(ghPrClientDetails, config)
+	if err != nil {
+		return nil, err
+	}
+	for component := range relevantComponents {
+		changedComponentPaths = append(changedComponentPaths, component.SourcePath+component.ComponentName)
 	}
 	return changedComponentPaths, nil
 }

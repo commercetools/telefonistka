@@ -405,7 +405,8 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 		}
 	}
 
-	// I should probably deprecated this whole part altogether.
+	// I should probably deprecated this whole part altogether - it was designed to solve a *very* specific problem that is probably no longer relevant with GitHub Rulesets
+	// The only reason I'm keeping it is that I don't have a clear feature depreciation policy and if I do remove it should be in a distinct PR
 	for commentSubstring, commitStatusContext := range config.ToggleCommitStatus {
 		if strings.Contains(*ce.Comment.Body, "/"+commentSubstring) {
 			err := ghPrClientDetails.ToggleCommitStatus(commitStatusContext, *ce.Sender.Name)
@@ -590,14 +591,13 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 		componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
 		if err != nil {
 			ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD: err=%s\n", err)
-		} else {
-			for _, componentPath := range componentPathList {
-				if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
-					ghPrClientDetails.PrLogger.Errorf("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
-					err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
-					if err != nil {
-						ghPrClientDetails.PrLogger.Errorf("Failed to set ArgoCD app @  %s, to HEAD: err=%s\n", componentPath, err)
-					}
+		}
+		for _, componentPath := range componentPathList {
+			if isSyncFromBranchAllowedForThisPath(config.AllowSyncArgoCDAppfromBranchPathRegex, componentPath) {
+				ghPrClientDetails.PrLogger.Infof("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
+				err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.UseSHALabelForArgoDicovery)
+				if err != nil {
+					ghPrClientDetails.PrLogger.Errorf("Failed to set ArgoCD app @  %s, to HEAD: err=%s\n", componentPath, err)
 				}
 			}
 		}
