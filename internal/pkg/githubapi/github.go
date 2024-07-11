@@ -382,7 +382,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
 	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity && *ce.Issue.State == "open" {
-		checkboxPattern := `(?m)^\s*-\s*\[(.)\]\s*<!-- telefonistka-argocd-branch-sync -->.*$`
+		const checkboxPattern = `(?m)^\s*-\s*\[(.)\]\s*<!-- telefonistka-argocd-branch-sync -->.*$`
 		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxPattern)
 		if !checkboxWaschecked && checkboxIsChecked {
 			ghPrClientDetails.PrLogger.Infof("Sync Checkbox was checked")

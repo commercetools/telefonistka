@@ -160,25 +160,19 @@ func createArgoCdClients() (appClient application.ApplicationServiceClient, proj
 	}
 
 	_, appClient, err = client.NewApplicationClient()
-	// appClntConn, appClient, err := client.NewApplicationClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD app client: %v", err)
 	}
-	// defer argoio.Close(appClntConn)
 
 	_, projClient, err = client.NewProjectClient()
-	// projClntConn, projClient, err := client.NewProjectClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD project client: %v", err)
 	}
-	// defer argoio.Close(projClntConn)
 
 	_, settingClient, err = client.NewSettingsClient()
-	// setClntConn, settingClient, err := client.NewSettingsClient()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD settings client: %v", err)
 	}
-	// defer argoio.Close(setClntConn)
 	return
 }
 
@@ -264,7 +258,7 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appClient)
 	}
 	if err != nil {
-		return fmt.Errorf("Error finding ArgoCD application for component path %s: %v", componentPath, err)
+		return fmt.Errorf("error finding ArgoCD application for component path %s: %w", componentPath, err)
 	}
 	if foundApp.Spec.Source.TargetRevision == revision {
 		log.Infof("App %s already has revision %s", foundApp.Name, revision)
@@ -284,10 +278,9 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		return fmt.Errorf("Error marshalling patch object: %v\n%v", err, patchObject)
 	}
 	patch := string(patchJson)
-	// patch := fmt.Sprintf(`{"spec": {"source": {"targetRevision": "%s"}}}`, revision)
 	log.Debugf("Patching app %s/%s with: %s", foundApp.Namespace, foundApp.Name, patch)
 
-	patchType := "merge"
+	const patchType = "merge"
 	patchedApp, err := appClient.Patch(ctx, &application.ApplicationPatchRequest{
 		Name:         &foundApp.Name,
 		AppNamespace: &foundApp.Namespace,
@@ -295,7 +288,7 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 		Patch:        &patch,
 	})
 	if err != nil {
-		return fmt.Errorf("Error patching app %s revision to  %s failed: %v\n, patch: %v\npatched app: %v\n", foundApp.Name, revision, err, patch, patchedApp)
+		return fmt.Errorf("revision patching failed: %w", err)
 	} else {
 		log.Infof("ArgoCD App %s revision set to %s", foundApp.Name, revision)
 	}
