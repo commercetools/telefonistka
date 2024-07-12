@@ -26,6 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+type argoCdClients struct {
+	app     application.ApplicationServiceClient
+	project projectpkg.ProjectServiceClient
+	setting settings.SettingsServiceClient
+}
+
 // DiffElement struct to store diff element details, this represents a single k8s object
 type DiffElement struct {
 	ObjectGroup     string
@@ -143,7 +149,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func createArgoCdClients() (appClient application.ApplicationServiceClient, projClient projectpkg.ProjectServiceClient, settingClient settings.SettingsServiceClient, err error) {
+func createArgoCdClients() (ac argoCdClients, err error) {
 	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
 	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
 
@@ -156,22 +162,22 @@ func createArgoCdClients() (appClient application.ApplicationServiceClient, proj
 
 	client, err := apiclient.NewClient(opts)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD API client: %w", err)
+		return ac, fmt.Errorf("Error creating ArgoCD API client: %w", err)
 	}
 
-	_, appClient, err = client.NewApplicationClient()
+	_, ac.app, err = client.NewApplicationClient()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD app client: %w", err)
+		return ac, fmt.Errorf("Error creating ArgoCD app client: %w", err)
 	}
 
-	_, projClient, err = client.NewProjectClient()
+	_, ac.project, err = client.NewProjectClient()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD project client: %w", err)
+		return ac, fmt.Errorf("Error creating ArgoCD project client: %w", err)
 	}
 
-	_, settingClient, err = client.NewSettingsClient()
+	_, ac.setting, err = client.NewSettingsClient()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Error creating ArgoCD settings client: %w", err)
+		return ac, fmt.Errorf("Error creating ArgoCD settings client: %w", err)
 	}
 	return
 }
@@ -248,14 +254,14 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool) error {
 	var foundApp *argoappv1.Application
 	var err error
-	appClient, _, _, err := createArgoCdClients()
+	ac, err := createArgoCdClients()
 	if err != nil {
 		return fmt.Errorf("Error creating ArgoCD clients: %w", err)
 	}
 	if useSHALabelForArgoDicovery {
-		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, appClient)
+		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, ac.app)
 	} else {
-		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, appClient)
+		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, ac.app)
 	}
 	if err != nil {
 		return fmt.Errorf("error finding ArgoCD application for component path %s: %w", componentPath, err)
@@ -278,7 +284,7 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 	log.Debugf("Patching app %s/%s with: %s", foundApp.Namespace, foundApp.Name, patch)
 
 	patchType := "merge"
-	_, err = appClient.Patch(ctx, &application.ApplicationPatchRequest{
+	_, err = ac.app.Patch(ctx, &application.ApplicationPatchRequest{
 		Name:         &foundApp.Name,
 		AppNamespace: &foundApp.Namespace,
 		PatchType:    &patchType,
@@ -381,13 +387,13 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 	// env var should be centralized
-	appClient, projClient, settingClient, err := createArgoCdClients()
+	ac, err := createArgoCdClients()
 	if err != nil {
 		log.Errorf("Error creating ArgoCD clients: %v", err)
 		return false, true, nil, err
 	}
 
-	argoSettings, err := settingClient.Get(ctx, &settings.SettingsQuery{})
+	argoSettings, err := ac.setting.Get(ctx, &settings.SettingsQuery{})
 	if err != nil {
 		log.Errorf("Error getting ArgoCD settings: %v", err)
 		return false, true, nil, err
@@ -395,7 +401,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 
 	log.Debugf("Checking ArgoCD diff for components: %v", componentPathList)
 	for _, componentPath := range componentPathList {
-		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, appClient, projClient, argoSettings, useSHALabelForArgoDicovery)
+		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, ac.app, ac.project, argoSettings, useSHALabelForArgoDicovery)
 		if currentDiffResult.DiffError != nil {
 			log.Errorf("Error generating diff for component %s: %v", componentPath, currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
