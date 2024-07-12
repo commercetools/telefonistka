@@ -68,7 +68,7 @@ func TestAnalyzeCommentUpdateCheckBox(t *testing.T) {
 	tests := map[string]struct {
 		newBody                  string
 		oldBody                  string
-		checkboxPattern          string
+		checkboxIdentifier       string
 		expectedWasCheckedBefore bool
 		expectedIsCheckedNow     bool
 	}{
@@ -81,7 +81,7 @@ foobar`,
 foobar
 - [x] <!-- check-slug-1 --> Description of checkbox
 foobar`,
-			checkboxPattern:          `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`,
+			checkboxIdentifier:       "check-slug-1",
 			expectedWasCheckedBefore: false,
 			expectedIsCheckedNow:     true,
 		},
@@ -94,7 +94,7 @@ foobar`,
 foobar
 - [ ] <!-- check-slug-1 --> Description of checkbox
 foobar`,
-			checkboxPattern:          `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`,
+			checkboxIdentifier:       "check-slug-1",
 			expectedWasCheckedBefore: true,
 			expectedIsCheckedNow:     false,
 		},
@@ -105,7 +105,7 @@ foobar`,
 			newBody: `This is a comment
 foobar
 foobar`,
-			checkboxPattern:          `(?m)^\s*-\s*\[(.)\]\s*<!-- check-slug-1 -->.*$`,
+			checkboxIdentifier:       "check-slug-1",
 			expectedWasCheckedBefore: false,
 			expectedIsCheckedNow:     false,
 		},
@@ -115,7 +115,7 @@ foobar`,
 		name := name
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(tc.newBody, tc.oldBody, tc.checkboxPattern)
+			wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(tc.newBody, tc.oldBody, tc.checkboxIdentifier)
 			if isCheckedNow != tc.expectedIsCheckedNow {
 				t.Errorf("%s: Expected isCheckedNow to be %v, got %v", name, tc.expectedIsCheckedNow, isCheckedNow)
 			}

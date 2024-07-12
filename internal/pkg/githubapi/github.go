@@ -317,7 +317,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			"repo":     *eventPayload.Repo.Owner.Login + "/" + *eventPayload.Repo.Name,
 			"prNumber": *eventPayload.Issue.Number,
 		})
-		// Ignore comment even sent by the bot (this is about who trigger the event not who wrote the comment)
+		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 		if *eventPayload.Sender.Login != botIdentity {
 			ghPrClientDetails := GhPrClientDetails{
 				Ctx:          ctx,
@@ -340,7 +340,8 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 	}
 }
 
-func analyzeCommentUpdateCheckBox(newBody string, oldBody string, checkboxPattern string) (wasCheckedBefore bool, isCheckedNow bool) {
+func analyzeCommentUpdateCheckBox(newBody string, oldBody string, checkboxIdentifier string) (wasCheckedBefore bool, isCheckedNow bool) {
+	checkboxPattern := fmt.Sprintf(`(?m)^\s*-\s*\[(.)\]\s*<!-- %s -->.*$`, checkboxIdentifier)
 	checkBoxRegex := regexp.MustCompile(checkboxPattern)
 	oldCheckBoxContent := checkBoxRegex.FindStringSubmatch(oldBody)
 	newCheckBoxContent := checkBoxRegex.FindStringSubmatch(newBody)
@@ -382,8 +383,8 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
 	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity && *ce.Issue.State == "open" {
-		const checkboxPattern = `(?m)^\s*-\s*\[(.)\]\s*<!-- telefonistka-argocd-branch-sync -->.*$`
-		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxPattern)
+		const checkboxIdentifier = "telefonistka-argocd-branch-sync"
+		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxIdentifier)
 		if !checkboxWaschecked && checkboxIsChecked {
 			ghPrClientDetails.PrLogger.Infof("Sync Checkbox was checked")
 			if config.AllowSyncArgoCDAppfromBranchPathRegex != "" {
