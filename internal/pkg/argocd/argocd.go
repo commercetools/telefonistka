@@ -427,8 +427,8 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 			newAppObject.Name = tempAppName
 			// We need to remove the automated sync policy, we just want to create a temporary app object, run a diff and remove it.
 			newAppObject.Spec.SyncPolicy.Automated = nil
-			// If this app doesn't exist as object it probably doesn't exist on the main branch(this PR will add it), so we set the source ref to the PR branch
-			newAppObject.Spec.Source.TargetRevision = prBranch
+			// We don't mutate .Spec.Source.TargetRevision, we want it pointing to main branch, this ensures nobody syncs before merging the PR.
+			// We are OK with creating a "failing" app
 
 			unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newAppObject)
 			if err != nil {
@@ -440,10 +440,14 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 			}
 			log.Println(appYaml)
 
+			validateTempApp := false
+			appCreateRequest := application.ApplicationCreateRequest{
+				Application: newAppObject,
+				Validate:    &validateTempApp, // We create the objects pointing the non-existing(yet) dir in the main branch - validation will fail, its also a waste of time - wi'll run a diff shortly
+			}
 			// Create the temporary app object
-			app, err = ac.app.Create(ctx, &application.ApplicationCreateRequest{Application: newAppObject})
-			// TODO Should use "Validate: false" here? and avoid the "newAppObject.Spec.Source.TargetRevision = prBranch" above?
-			// It would be safer to keep the object pointing to the main branch...
+			app, err = ac.app.Create(ctx, &appCreateRequest)
+
 			if err != nil {
 				log.Errorf("Error creating temporary app object: %v", err)
 				componentDiffResult.DiffError = err
