@@ -379,7 +379,7 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 	}
 
 	log.Debugf("Generating diff for component %s", componentPath)
-	componentDiffResult.HasDiff, componentDiffResult.DiffElements, err = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption)
+	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption)
 
 	return componentDiffResult
 }

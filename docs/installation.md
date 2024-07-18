@@ -191,8 +191,7 @@ If a target path matches an entry in `promotionTargetBlockList` it will not be p
 
 If  `promotionTargetAllowList` exist(non empty), only target paths that matches it will be promoted to(but the previous statement about `promotionTargetBlockList` still applies).
 
-
-`disableArgoCDDiff` can be used to ensure no sensitive information **stored outside `kind:Secret` objects** is persisted to PR comments, this can happen if secrets are injected as part of the ArgoCD manifest templating stage and are stored outside `kind:Secret` objects and/or referenced by hashing function in annotations to trigger restarts. And while both use cases can (and should!) be avoided we choose to provide a workaround to prevent this issues from blocking Telefonistka implementation. 
+`disableArgoCDDiff` can be used to ensure no sensitive information **stored outside `kind:Secret` objects** is persisted to PR comments, this can happen if secrets are injected as part of the ArgoCD manifest templating stage and are stored outside `kind:Secret` objects and/or referenced by hashing function in annotations to trigger restarts. And while both use cases can (and should!) be avoided we choose to provide a workaround to prevent this issues from blocking Telefonistka implementation.
 
 ArgoCD API redact all `kind:Secret` object content automatically so under "normal" usage this is not an issue.
 
