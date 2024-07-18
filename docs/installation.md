@@ -199,9 +199,6 @@ Telefonistka will still display changed objects, just without the content:
 
 ![image](https://github.com/user-attachments/assets/f8ebc390-6051-4640-982e-6b768975dcfc)
 
-
-
-
 Example:
 
 ```yaml
