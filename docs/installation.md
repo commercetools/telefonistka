@@ -195,6 +195,15 @@ If  `promotionTargetAllowList` exist(non empty), only target paths that matches 
 
 ArgoCD API redact all `kind:Secret` object content automatically so under "normal" usage this is not an issue.
 
+Telefonistka will still display changed objects, just without the content:
+
+![image](https://github.com/user-attachments/assets/f8ebc390-6051-4640-982e-6b768975dcfc)
+
+
+
+
+Example:
+
 ```yaml
 promotionTargetBlockList:
   - env/staging/europe-west4/c1.*
