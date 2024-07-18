@@ -121,6 +121,8 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 				ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
 			}
 
+			// Building a map component's path and a boolean value that indicates if we should diff it not.
+			// I'm avoiding doing this in the ArgoCD package to avoid circular dependencies and keep package scope clean
 			componentsToDiff := map[string]bool{}
 			for _, componentPath := range componentPathList {
 				c, err := getComponentConfig(ghPrClientDetails, componentPath, ghPrClientDetails.Ref)
