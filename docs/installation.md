@@ -185,7 +185,7 @@ This optional in-component configuration file allows overriding the general prom
 File location is `COMPONENT_PATH/telefonistka.yaml` (no leading dot in file name), so it could be:
 `workspace/reloader/telefonistka.yaml` or `env/prod/us-central1/c2/wf-kube-proxy-metrics-proxy/telefonistka.yaml`
 it includes these  optional configuration keys: `promotionTargetBlockList`,  `promotionTargetAllowList` and `disableArgoCDDiff`
-`promotionTargetBlockList` and `promotionTargetAllowLis  are matched against the target component path using Golang regex engine.
+`promotionTargetBlockList` and `promotionTargetAllowList`  are matched against the target component path using Golang regex engine.
 
 If a target path matches an entry in `promotionTargetBlockList` it will not be promoted(regardless of `promotionTargetAllowList`).
 
