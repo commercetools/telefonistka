@@ -127,7 +127,7 @@ Configuration keys:
 |`argocd.autoMergeNoDiffPRs`| if true, Telefonistka will **merge** promotion PRs that are not expected to change the target clusters. Requires `commentArgocdDiffonPR` and possibly `autoApprovePromotionPrs`(depending on repo branch protection rules)|
 |`argocd.useSHALabelForAppDiscovery`| The default method for discovering relevant ArgoCD applications (for a PR) relies on fetching all applications in the repo and checking the `argocd.argoproj.io/manifest-generate-paths` **annotation**, this might cause a performance issue on a repo with a large number of ArgoCD applications. The alternative is to add SHA1 of the application path as a  **label** and rely on ArgoCD server-side filtering, label name is `telefonistka.io/component-path-sha1`.|
 |`argocd.allowSyncfromBranchPathRegex`| This controls which component(=ArgoCD apps) are allowed to be "applied" from a PR branch, by setting the ArgoCD application `Target Revision` to PR branch.|
-|`argocd.createTempAppObjectFroNewApps`| For application created in PR Telefonistka needs to create a temporary ArgoCD Application Object to render the manifests, this key enables this behavior. The application spec is pulled from a Matching ApplicationSet object and the temporary object is deleted after the manifests are rendered|
+|`argocd.createTempAppObjectFroNewApps`| For application created in PR Telefonistka needs to create a temporary ArgoCD Application Object to render the manifests, this key enables this behavior. The application spec is pulled from a Matching ApplicationSet object and the temporary object is deleted after the manifests are rendered. This feature currently support ApplicationSets with Git **Directory** generator|
 <!-- markdownlint-enable MD033 -->
 
 Example:
