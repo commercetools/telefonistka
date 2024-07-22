@@ -4,6 +4,8 @@ Diff of ArgoCD applications:
 
 
 {{if $appDiffResult.DiffError }}
+<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/> **[{{ $appDiffResult.ArgoCdAppName }}]({{ $appDiffResult.ArgoCdAppURL }})** @ `{{ $appDiffResult.ComponentPath }}`
+
 ⚠️ ⚠️ **Error getting diff from ArgoCD** (`{{ $appDiffResult.ComponentPath }}`) ⚠️ ⚠️ 
 ``` 
 {{ $appDiffResult.DiffError }}
@@ -29,6 +31,13 @@ Diff of ArgoCD applications:
 {{- else }}
 No diff 🤷
 {{- end}}
+{{if $appDiffResult.AppWasTemporarlyCreated }}
+⚠️ ⚠️ ⚠️
+This PR appears to create this new application, Telefonistka has **temporarly** created an ArgoCD app object for it just to render its manifests.
+It might may not be present in ArgoCD UI and it can not be synced from the PR branch
+⚠️ ⚠️ ⚠️
+{{- end}}
+
 {{- end }}
 
 {{- end }}
