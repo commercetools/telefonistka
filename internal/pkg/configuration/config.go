@@ -43,10 +43,6 @@ type Config struct {
 	WebhookEndpointRegexs        []WebhookEndpointRegex `yaml:"webhookEndpointRegexs"`
 	WhProxtSkipTLSVerifyUpstream bool                   `yaml:"whProxtSkipTLSVerifyUpstream"`
 	Argocd                       ArgocdConfig           `yaml:"argocd"`
-	// CommentArgocdDiffonPR                 bool                   `yaml:"commentArgocdDiffonPR"`
-	// AutoMergeNoDiffPRs                    bool                   `yaml:"autoMergeNoDiffPRs"`
-	// AllowSyncArgoCDAppfromBranchPathRegex string                 `yaml:"allowSyncArgoCDAppfromBranchPathRegex"`
-	// UseSHALabelForArgoDicovery            bool                   `yaml:"useSHALabelForArgoDicovery"`
 }
 
 type ArgocdConfig struct {

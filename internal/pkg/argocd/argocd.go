@@ -27,8 +27,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	k8sjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
 type argoCdClients struct {
@@ -370,23 +368,6 @@ func generateAppSetGitGeneratorParams(p string) map[string]interface{} {
 	return params
 }
 
-func unstructuredObjToYaml(u map[string]interface{}) (string, error) {
-	unstructuredObj := &unstructured.Unstructured{Object: u}
-	// Create a JSON serializer
-	jsonSerializer := k8sjson.NewSerializerWithOptions(
-		k8sjson.DefaultMetaFactory, nil, nil,
-		k8sjson.SerializerOptions{Yaml: true, Pretty: true, Strict: true},
-	)
-
-	// Serialize the unstructured object to YAML
-	yamlData, err := runtime.Encode(jsonSerializer, unstructuredObj)
-	if err != nil {
-		log.Fatalf("Failed to encode Pod to YAML: %v", err)
-		return "", err
-	}
-	return string(yamlData), nil
-}
-
 func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, repo string, ac argoCdClients) (app *argoappv1.Application, err error) {
 	log.Debug("Didn't find ArgoCD App, trying to find a relevant  ApplicationSet")
 	appSetOfcomponent, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.appSet)
@@ -408,15 +389,6 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 		newAppObject.Spec.SyncPolicy.Automated = nil
 		// We don't mutate .Spec.Source.TargetRevision, we want it pointing to main branch, this ensures nobody syncs before merging the PR.
 		// We are OK with creating a "failing" app
-
-		// unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(newAppObject)
-		// if err != nil {
-		// log.Fatalf("Failed to convert App to unstructured: %v", err)
-		// }
-		// appYaml, err := unstructuredObjToYaml(unstructuredObj)
-		// if err != nil {
-		// log.Fatalf("Failed to convert App to YAML: %v", err)
-		// }
 
 		validateTempApp := false
 		appCreateRequest := application.ApplicationCreateRequest{
