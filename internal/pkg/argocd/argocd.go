@@ -58,7 +58,7 @@ type DiffResult struct {
 
 // Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
 // But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
-func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (foundDiffs bool, diffElements []DiffElement, err error) {
+func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (foundDiffs bool, diffElements []DiffElement, err error) {
 	liveObjs, err := cmdutil.LiveObjects(resources.Items)
 	if err != nil {
 		return false, nil, fmt.Errorf("Failed to get live objects: %w", err)
@@ -131,7 +131,11 @@ func generateArgocdAppDiff(ctx context.Context, app *argoappv1.Application, proj
 				foundDiffs = true
 			}
 
-			diffElement.Diff, err = diffLiveVsTargetObject(live, target)
+			if keepDiffData {
+				diffElement.Diff, err = diffLiveVsTargetObject(live, target)
+			} else {
+				diffElement.Diff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
+			}
 			if err != nil {
 				return false, nil, fmt.Errorf("Failed to diff live objects: %w", err)
 			}
@@ -403,7 +407,7 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 	}
 }
 
-func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranch string, repo string, ac argoCdClients, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool, createTempAppObjectFroNewApps bool) (componentDiffResult DiffResult) {
+func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac argoCdClients, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool, createTempAppObjectFroNewApps bool) (componentDiffResult DiffResult) {
 	componentDiffResult.ComponentPath = componentPath
 
 	// Find ArgoCD application by the path SHA1 label selector and repo name
@@ -498,10 +502,8 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 		return componentDiffResult
 	}
 
-	componentDiffResult.HasDiff, componentDiffResult.DiffElements, err = generateArgocdAppDiff(ctx, app, detailedProject.Project, resources, argoSettings, diffOption)
-	if err != nil {
-		componentDiffResult.DiffError = err
-	}
+	log.Debugf("Generating diff for component %s", componentPath)
+	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption)
 
 	if componentDiffResult.AppWasTemporarlyCreated {
 		// Delete the temporary app object
@@ -518,7 +520,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 }
 
 // GenerateDiffOfChangedComponents generates diff of changed components
-func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []string, prBranch string, repo string, useSHALabelForArgoDicovery bool, createTempAppObjectFroNewApps bool) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, useSHALabelForArgoDicovery bool, createTempAppObjectFroNewApps bool) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 	// env var should be centralized
@@ -534,9 +536,8 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentPathList []st
 		return false, true, nil, err
 	}
 
-	log.Debugf("Checking ArgoCD diff for components: %v", componentPathList)
-	for _, componentPath := range componentPathList {
-		currentDiffResult := generateDiffOfAComponent(ctx, componentPath, prBranch, repo, ac, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFroNewApps)
+	for componentPath, shouldIDiff := range componentsToDiff {
+		currentDiffResult := generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, ac, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFroNewApps)
 		if currentDiffResult.DiffError != nil {
 			log.Errorf("Error generating diff for component %s: %v", componentPath, currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
