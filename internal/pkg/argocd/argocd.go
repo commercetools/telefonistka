@@ -201,7 +201,6 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 	if err != nil {
 		return nil, fmt.Errorf("Error listing ArgoCD ApplicationSets: %w", err)
 	}
-	log.Debugf("=== Found %v ArgoCD ApplicationSets", len(foundAppSets.Items))
 	for _, appSet := range foundAppSets.Items {
 		for _, generator := range appSet.Spec.Generators {
 			log.Debugf("Checking ApplicationSet %s for component path %s(repo %s)", appSet.Name, componentPath, repo)
@@ -212,7 +211,7 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 						log.Debugf("Found ArgoCD ApplicationSet %s for component path %s(repo %s)", appSet.Name, componentPath, repo)
 						return &appSet, nil
 					} else {
-						log.Debugf(" === No match for %s in %s", componentPath, dir.Path)
+						log.Debugf("No match for %s in %s", componentPath, dir.Path)
 					}
 				}
 			}
@@ -368,7 +367,7 @@ func generateAppSetGitGeneratorParams(p string) map[string]interface{} {
 	return params
 }
 
-func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, repo string, ac argoCdClients) (app *argoappv1.Application, err error) {
+func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, repo string, prBranch string, ac argoCdClients) (app *argoappv1.Application, err error) {
 	log.Debug("Didn't find ArgoCD App, trying to find a relevant  ApplicationSet")
 	appSetOfcomponent, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.appSet)
 	if appSetOfcomponent != nil {
@@ -387,17 +386,16 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 		newAppObject.Name = tempAppName
 		// We need to remove the automated sync policy, we just want to create a temporary app object, run a diff and remove it.
 		newAppObject.Spec.SyncPolicy.Automated = nil
-		// We don't mutate .Spec.Source.TargetRevision, we want it pointing to main branch, this ensures nobody syncs before merging the PR.
-		// We are OK with creating a "failing" app
+		newAppObject.Spec.Source.TargetRevision = prBranch
 
 		validateTempApp := false
 		appCreateRequest := application.ApplicationCreateRequest{
 			Application: newAppObject,
-			Validate:    &validateTempApp, // We create the objects pointing the non-existing(yet) dir in the main branch - validation will fail, its also a waste of time - wi'll run a diff shortly
+			Validate:    &validateTempApp, // It makes more sense to handle template failures in the diff generation section
 		}
 		// Create the temporary app object
 		app, err = ac.app.Create(ctx, &appCreateRequest)
-		log.Debugf("=== Created temporary app object: %v", app)
+
 		return app, err
 	} else {
 		log.Errorf("Didn't find an application nor a relevant ApplicationSet: %v", err)
@@ -428,7 +426,7 @@ func generateDiffOfAComponent(ctx context.Context, componentPath string, prBranc
 	}
 	if app == nil {
 		if createTempAppObjectFroNewApps {
-			app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, ac)
+			app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac)
 
 			if err != nil {
 				log.Errorf("Error creating temporary app object: %v", err)
