@@ -295,6 +295,14 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 	return nil, nil
 }
 
+func findArgocdApp(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient, useSHALabelForArgoDicovery bool) (app *argoappv1.Application, err error) {
+	f := findArgocdAppByManifestPathAnnotation
+	if useSHALabelForArgoDicovery {
+		f = findArgocdAppBySHA1Label
+	}
+	return f(ctx, componentPath, repo, appClient)
+}
+
 func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool) error {
 	var foundApp *argoappv1.Application
 	var err error
@@ -302,11 +310,7 @@ func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision st
 	if err != nil {
 		return fmt.Errorf("Error creating ArgoCD clients: %w", err)
 	}
-	if useSHALabelForArgoDicovery {
-		foundApp, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, ac.app)
-	} else {
-		foundApp, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, ac.app)
-	}
+	foundApp, err = findArgocdApp(ctx, componentPath, repo, ac.app, useSHALabelForArgoDicovery)
 	if err != nil {
 		return fmt.Errorf("error finding ArgoCD application for component path %s: %w", componentPath, err)
 	}
