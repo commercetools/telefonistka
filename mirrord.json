@@ -9,8 +9,13 @@
   "feature": {
     "fs": {
       "mode": "read",
-      "read_write": ".+\\.json" ,
-      "read_only": [ "^/etc/telefonistka-gh-app-creds/.*" ]
+      "read_write": ".+\\.json",
+      "read_only": [
+        "^/etc/telefonistka-gh-app-creds/.*"
+      ]
+    },
+    "network": {
+      "incoming": "steal"
     }
   },
   "operator": false,
@@ -18,4 +23,3 @@
   "sip_binaries": "bash",
   "telemetry": true
 }
-
