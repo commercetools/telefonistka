@@ -1046,11 +1046,8 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 		} else {
 			sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
 		}
-		tp = "[" + strings.Join(newPrMetadata.PreviousPromotionMetadata[k].TargetPaths, ",") + "]"
-		if len(tp) > 50 {
-			tp = tp[:45] + "...✂️"
-		}
-		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️ `%s`\n", strings.Repeat("&nbsp;&nbsp;&nbsp;&nbsp;", i), k, sp, tp)
+		tp = strings.Join(newPrMetadata.PreviousPromotionMetadata[k].TargetPaths, "`\n&nbsp;&nbsp;&nbsp;&nbsp;`")
+		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️ \n&nbsp;&nbsp;&nbsp;&nbsp;`%s`\n", strings.Repeat("&nbsp;&nbsp;&nbsp;&nbsp;", i), k, sp, tp)
 	}
 
 	prMetadataString, _ := newPrMetadata.serialize()
