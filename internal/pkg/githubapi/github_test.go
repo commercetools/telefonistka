@@ -160,6 +160,7 @@ func TestIsSyncFromBranchAllowedForThisPath(t *testing.T) {
 		})
 	}
 }
+
 func TestPrBody(t *testing.T) {
 	t.Parallel()
 	keys := []int{1, 2, 3}
