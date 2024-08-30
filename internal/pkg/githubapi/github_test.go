@@ -181,7 +181,7 @@ func TestPrBody(t *testing.T) {
 		},
 	}
 	newPrBody := prBody(keys, newPrMetadata, "")
-	expectedPrBody, err := os.ReadFile("testdata/pr_body.golden")
+	expectedPrBody, err := os.ReadFile("testdata/pr_body.golden.md")
 	if err != nil {
 		t.Fatalf("Error loading golden file: %s", err)
 	}
