@@ -1055,8 +1055,8 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string) string {
 	for i, k := range keys {
 		sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
 		x := newPrMetadata.PreviousPromotionMetadata[k].TargetPaths
-		tp = strings.Join(x, fmt.Sprintf("`\n%s`", strings.Repeat(mkTab, i+1)))
-		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️ \n%s`%s`\n", strings.Repeat(mkTab, i), k, sp, strings.Repeat(mkTab, i+1), tp)
+		tp = strings.Join(x, fmt.Sprintf("`  \n%s`", strings.Repeat(mkTab, i+1)))
+		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️  \n%s`%s`  \n", strings.Repeat(mkTab, i), k, sp, strings.Repeat(mkTab, i+1), tp)
 	}
 
 	return newPrBody
