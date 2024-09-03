@@ -186,7 +186,4 @@ func TestPrBody(t *testing.T) {
 		t.Fatalf("Error loading golden file: %s", err)
 	}
 	assert.Equal(t, string(expectedPrBody), newPrBody)
-	// if newPrBody != expectedPrBody {
-	// 	t.Errorf("Expected prBody to be %s, got %s", expectedPrBody, newPrBody)
-	// }
 }
