@@ -77,9 +77,19 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 	if err != nil {
 		return false, nil, fmt.Errorf("Failed to group objects by key: %w", err)
 	}
+
+	cerr := ""
+	if app.Status.Conditions != nil {
+		for _, condition := range app.Status.Conditions {
+			if condition.Type == argoappv1.ApplicationConditionComparisonError {
+				// let the last one win for now as we are testing only
+				cerr = condition.Message
+			}
+		}
+	}
 	items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
 	if err != nil {
-		return false, nil, fmt.Errorf("Failed to group objects for diff: %w", err)
+		return false, nil, fmt.Errorf("%s\nFailed to group objects for diff: %w", cerr, err)
 	}
 
 	for _, item := range items {
