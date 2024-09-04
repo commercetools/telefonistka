@@ -78,18 +78,9 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 		return false, nil, fmt.Errorf("Failed to group objects by key: %w", err)
 	}
 
-	cerr := ""
-	if app.Status.Conditions != nil {
-		for _, condition := range app.Status.Conditions {
-			if condition.Type == argoappv1.ApplicationConditionComparisonError {
-				// let the last one win for now as we are testing only
-				cerr = condition.Message
-			}
-		}
-	}
 	items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
 	if err != nil {
-		return false, nil, fmt.Errorf("%s\nFailed to group objects for diff: %w", cerr, err)
+		return false, nil, fmt.Errorf("Failed to group objects for diff: %w", err)
 	}
 
 	for _, item := range items {
@@ -478,6 +469,18 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 
 	if app.Spec.Source.TargetRevision == prBranch && app.Spec.SyncPolicy.Automated != nil {
 		componentDiffResult.DiffError = fmt.Errorf("App %s already has revision %s as Source Target Revision and autosync is on, skipping diff calculation", app.Name, prBranch)
+		return componentDiffResult
+	}
+
+	if app.Status.Conditions != nil {
+		cerr := ""
+		for _, c := range app.Status.Conditions {
+			if c.Type == argoappv1.ApplicationConditionComparisonError {
+				cerr = fmt.Sprintln(cerr, c.Message)
+			}
+		}
+		componentDiffResult.DiffError = fmt.Errorf("App %s has invalid spec: %s", app.Name, cerr)
+		log.Errorf("app %s condition has comparision error(s): %s", app.Name, cerr)
 		return componentDiffResult
 	}
 
