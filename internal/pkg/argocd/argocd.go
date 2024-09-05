@@ -410,6 +410,23 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 	}
 }
 
+// appComparisonError returns an error if there are comparison errors in app conditions
+func appComparisonError(app *argoappv1.Application) (err error) {
+	ac := app.Status.GetConditions(
+		map[string]bool{string(argoappv1.ApplicationConditionComparisonError): true},
+	)
+	if ac == nil {
+		return nil
+	}
+
+	cerr := ""
+	for i := range ac {
+		cerr = fmt.Sprintln(cerr, ac[i].Message)
+	}
+
+	return fmt.Errorf("%s", cerr)
+}
+
 func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac argoCdClients, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool, createTempAppObjectFromNewApps bool) (componentDiffResult DiffResult) {
 	componentDiffResult.ComponentPath = componentPath
 
@@ -468,18 +485,6 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 
 	if app.Spec.Source.TargetRevision == prBranch && app.Spec.SyncPolicy.Automated != nil {
 		componentDiffResult.DiffError = fmt.Errorf("App %s already has revision %s as Source Target Revision and autosync is on, skipping diff calculation", app.Name, prBranch)
-		return componentDiffResult
-	}
-
-	if app.Status.Conditions != nil {
-		cerr := ""
-		for _, c := range app.Status.Conditions {
-			if c.Type == argoappv1.ApplicationConditionComparisonError {
-				cerr = fmt.Sprintln(cerr, c.Message)
-			}
-		}
-		componentDiffResult.DiffError = fmt.Errorf("App %s has invalid spec: %s", app.Name, cerr)
-		log.Errorf("app %s condition has comparision error(s): %s", app.Name, cerr)
 		return componentDiffResult
 	}
 
