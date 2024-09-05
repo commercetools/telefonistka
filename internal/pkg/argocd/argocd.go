@@ -433,8 +433,8 @@ func appComparisonError(app *argoappv1.Application) (err error) {
 	}
 
 	cerr := ""
-	for i := range ac {
-		cerr = fmt.Sprintln(cerr, ac[i].Message)
+	for _, c := range ac {
+		cerr = fmt.Sprintln(cerr, c.Message)
 	}
 
 	return fmt.Errorf("%s", cerr)
