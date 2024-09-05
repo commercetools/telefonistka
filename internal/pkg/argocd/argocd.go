@@ -410,6 +410,19 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 	}
 }
 
+// deleteTempAppObject deletes a temporary app object created for diff generation
+// returns an error if the deletion fails
+func deleteTempAppObject(ctx context.Context, ac argoCdClients, app *argoappv1.Application) error {
+	_, err := ac.app.Delete(ctx, &application.ApplicationDeleteRequest{Name: &app.Name, AppNamespace: &app.Namespace})
+	if err != nil {
+		log.Errorf("Error deleting temporary app object: %v", err)
+		return err
+	}
+
+	log.Debugf("Deleted temporary app object: %s", app.Name)
+	return nil
+}
+
 // appComparisonError returns an error if there are comparison errors in app conditions
 func appComparisonError(app *argoappv1.Application) (err error) {
 	ac := app.Status.GetConditions(
@@ -527,12 +540,9 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 
 	if componentDiffResult.AppWasTemporarilyCreated {
 		// Delete the temporary app object
-		_, err = ac.app.Delete(ctx, &application.ApplicationDeleteRequest{Name: &app.Name, AppNamespace: &app.Namespace})
+		err := deleteTempAppObject(ctx, ac, app)
 		if err != nil {
-			log.Errorf("Error deleting temporary app object: %v", err)
 			componentDiffResult.DiffError = err
-		} else {
-			log.Debugf("Deleted temporary app object: %s", app.Name)
 		}
 	}
 
