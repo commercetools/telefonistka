@@ -538,9 +538,24 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 	log.Debugf("Generating diff for component %s", componentPath)
 	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption)
 
-	if componentDiffResult.AppWasTemporarilyCreated && componentDiffResult.DiffError == nil {
+	var cerr error
+	if componentDiffResult.DiffError != nil {
+		// wait a couple of seconds before checking for condition errors
+		log.Error("waiting to get the result")
+		time.Sleep(5 * time.Second)
+		cerr = appComparisonError(app)
+		if cerr != nil {
+			componentDiffResult.DiffError = fmt.Errorf("%w\n%w", cerr, componentDiffResult.DiffError)
+		}
+	}
+
+	// we only want to delete the app if it was temproarily created
+	// in case of a diff error if we found a condition error, we delete the app
+	// if we didn't find a condition error we keep the app for further investigation
+	if componentDiffResult.AppWasTemporarilyCreated && componentDiffResult.DiffError == nil && cerr != nil {
 		err := deleteTempAppObject(ctx, ac, app)
 		if err != nil {
+			// TODO: i think this is not optimal, if we have a diff error and a deletion error, we should return the deletion error as the main error
 			componentDiffResult.DiffError = err
 		}
 	}
