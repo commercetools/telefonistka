@@ -229,13 +229,13 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
 	err, templateOutput := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", diffCommentData)
 	if err != nil {
-		return comments, fmt.Errorf("Failed to generate ArgoCD diff comment template: err=%s\n", err)
+		return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 	}
 
 	// Happy path, the diff comment is small enough to be posted in one comment
 	if len(templateOutput) < githubCommentMaxSize {
 		comments = append(comments, templateOutput)
-		return comments, err
+		return comments, nil
 	}
 
 	// If the diff comment is too large, we'll split it into multiple comments, one per component
@@ -245,11 +245,12 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
 		// We also update the header to reflect the current component.
-		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s(Splited for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
+		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
 		err, templateOutput := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", componentTemplateData)
 		if err != nil {
-			return comments, fmt.Errorf("Failed to generate ArgoCD diff comment template: err=%s\n", err)
+			return comments, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
+		
 		// Even per component comments can be too large, in that case we'll just use the concise template
 		// Somewhat Happy path, the per-component diff comment is small enough to be posted in one comment
 		if len(templateOutput) < githubCommentMaxSize {
@@ -263,12 +264,9 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		// now we don't have much choice, this is the saddest path, we'll use the concise template
 		err, templateOutput = executeTemplate("argoCdDiffConcise", "argoCD-diff-pr-comment-concise.gotmpl", componentTemplateData)
 		if err != nil {
-			return comments, fmt.Errorf("Failed to generate ArgoCD diff comment template: err=%s\n", err)
+			return comments, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
 		comments = append(comments, templateOutput)
-		if err != nil {
-			return comments, err
-		}
 	}
 
 	return comments, nil
@@ -505,11 +503,11 @@ func executeTemplate(templateName string, templateFile string, data interface{})
 	var templateOutput bytes.Buffer
 	messageTemplate, err := template.New(templateName).ParseFiles(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
 	if err != nil {
-		return fmt.Errorf("Failed to parse template: err=%v", err), ""
+		return fmt.Errorf("failed to parse template: %w", err), ""
 	}
 	err = messageTemplate.ExecuteTemplate(&templateOutput, templateName, data)
 	if err != nil {
-		return fmt.Errorf("Failed to execute template: err=%v", err), ""
+		return fmt.Errorf("failed to execute template: %w", err), ""
 	}
 	return nil, templateOutput.String()
 }
