@@ -32,7 +32,7 @@ const githubCommentMaxSize = 65536
 
 type DiffCommentData struct {
 	DiffOfChangedComponents []argocd.DiffResult
-	HasSyncableComponents    bool
+	HasSyncableComponents   bool
 	BranchName              string
 	Header                  string
 }
@@ -244,14 +244,14 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		// We take the diffCommentData and replace the DiffOfChangedComponents with a single component diff
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
-		
+
 		// We also update the header to reflect the current component.
 		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
 		err, templateOutput := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", componentTemplateData)
 		if err != nil {
 			return comments, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
-		
+
 		// Even per component comments can be too large, in that case we'll just use the concise template
 		// Somewhat Happy path, the per-component diff comment is small enough to be posted in one comment
 		if len(templateOutput) < githubCommentMaxSize {
