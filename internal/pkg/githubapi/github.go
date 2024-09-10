@@ -32,7 +32,7 @@ const githubCommentMaxSize = 65536
 
 type DiffCommentData struct {
 	DiffOfChangedComponents []argocd.DiffResult
-	HasSyncableComponens    bool
+	HasSyncableComponents    bool
 	BranchName              string
 	Header                  string
 }
@@ -183,7 +183,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 
 				for _, componentPath := range componentPathList {
 					if isSyncFromBranchAllowedForThisPath(config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-						diffCommentData.HasSyncableComponens = true
+						diffCommentData.HasSyncableComponents = true
 						break
 					}
 				}
