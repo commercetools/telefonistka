@@ -192,7 +192,7 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var diffCommentData DiffCommentData
-			err := readJSONFromFile(tc.diffCommentDataTestDataFileName, &diffCommentData)
+			err := readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 			if err != nil {
 				t.Errorf("Error reading test data file: %s", err)
 			}
@@ -213,7 +213,8 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 	}
 }
 
-func readJSONFromFile(filename string, data interface{}) error {
+func readJSONFromFile(t *testing.T, filename string, data interface{}) error {
+	t.Helper()
 	// Read the JSON from the file
 	jsonData, err := os.ReadFile(filename)
 	if err != nil {
