@@ -241,15 +241,12 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 	// If the diff comment is too large, we'll split it into multiple comments, one per component
 	totalComponents := len(diffCommentData.DiffOfChangedComponents)
 	for i, singleComponentDiff := range diffCommentData.DiffOfChangedComponents {
-		// We take the diffCommentData and replace the DiffOfChangedComponents with a single component diff
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
-
-		// We also update the header to reflect the current component.
 		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
 		err, templateOutput := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", componentTemplateData)
 		if err != nil {
-			return comments, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
+			return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
 
 		// Even per component comments can be too large, in that case we'll just use the concise template

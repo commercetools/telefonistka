@@ -192,10 +192,7 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var diffCommentData DiffCommentData
-			err := readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
-			if err != nil {
-				t.Errorf("Error reading test data file: %s", err)
-			}
+			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
 			result, err := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
 			if err != nil {
@@ -213,20 +210,19 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 	}
 }
 
-func readJSONFromFile(t *testing.T, filename string, data interface{}) error {
+func readJSONFromFile(t *testing.T, filename string, data interface{}) {
 	t.Helper()
 	// Read the JSON from the file
 	jsonData, err := os.ReadFile(filename)
 	if err != nil {
-		return err
+		t.Fatalf("Error loading test data file: %s", err)
 	}
 
 	// Unserialize the JSON into the provided struct
 	err = json.Unmarshal(jsonData, data)
 	if err != nil {
-		return err
+		t.Fatalf("Error unmarshalling JSON: %s", err)
 	}
-	return nil
 }
 
 func TestPrBody(t *testing.T) {
