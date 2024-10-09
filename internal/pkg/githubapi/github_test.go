@@ -186,7 +186,7 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		},
 	}
 
-	if err := os.Setenv("TEMPLATES_PATH", "../../../templates/"); err != nil {
+	if err := os.Setenv("TEMPLATES_PATH", "../../../templates/"); err != nil { //nolint:tenv
 		t.Fatal(err)
 	}
 
