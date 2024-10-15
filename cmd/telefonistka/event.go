@@ -13,7 +13,7 @@ func init() { //nolint:gochecknoinits
 		filePath string
 	)
 
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "event",
 		Short: "Handles a GitHub event based on event JSON file",
 		Long:  "Handles a GitHub event based on event JSON file.\nThis operation mode was was built with GitHub Actions in mind",

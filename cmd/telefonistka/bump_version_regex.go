@@ -20,7 +20,7 @@ func init() { //nolint:gochecknoinits
 		autoMerge         bool
 	)
 
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "bump-regex",
 		Short: "Bump artifact version in a file using regex",
 		Long:  "Bump artifact version in a file using regex.\nThis open a pull request in the target repo.\n",

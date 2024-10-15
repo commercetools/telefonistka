@@ -8,7 +8,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-
 	"github.com/wayfair-incubator/telefonistka/pkg/githubapi"
 	"github.com/wayfair-incubator/telefonistka/pkg/utils"
 )

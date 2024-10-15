@@ -10,7 +10,6 @@ import (
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
 	log "github.com/sirupsen/logrus"
-
 	"github.com/wayfair-incubator/telefonistka/internal/github"
 	"github.com/wayfair-incubator/telefonistka/pkg/githubapi"
 	"github.com/wayfair-incubator/telefonistka/pkg/utils"

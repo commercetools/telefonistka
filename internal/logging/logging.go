@@ -2,7 +2,6 @@ package logging
 
 import (
 	log "github.com/sirupsen/logrus"
-
 	"github.com/wayfair-incubator/telefonistka/pkg/utils"
 )
 

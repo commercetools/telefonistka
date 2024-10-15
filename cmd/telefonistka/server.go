@@ -7,7 +7,7 @@ import (
 
 // This is still(https://github.com/spf13/cobra/issues/1862) the documented way to use cobra
 func init() { //nolint:gochecknoinits
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "Runs the web server that listens to GitHub webhooks",
 		Args:  cobra.ExactArgs(0),

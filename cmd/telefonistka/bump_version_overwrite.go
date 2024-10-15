@@ -19,7 +19,7 @@ func init() { //nolint:gochecknoinits
 		autoMerge         bool
 	)
 
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "bump-overwrite",
 		Short: "Bump artifact version based on provided file content.",
 		Long:  "Bump artifact version based on provided file content.\nThis open a pull request in the target repo.",

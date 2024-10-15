@@ -20,7 +20,7 @@ func init() { //nolint:gochecknoinits
 		autoMerge         bool
 	)
 
-	var cmd = &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "bump-yaml",
 		Short: "Bump artifact version in a file using yaml selector",
 		Long: `Bump artifact version in a file using yaml selector.
