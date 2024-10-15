@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: example-configmap
-  namespace: ns-test
 data:
   # Configuration values can be added here as key-value pairs
   example.property.one: "value1"

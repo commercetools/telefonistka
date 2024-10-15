@@ -1,0 +1,60 @@
+10115* argocd cluster rm kind-kind-2
+10116* argocd cluster add --server host.docker.internal kind-kind-2
+10117* kubectl gets secrets
+10118* kubectl get secrets
+10119* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data}'
+10120* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.config}'
+10121* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.config}' | base64 --decode
+10122* kubectl get secret cluster-127.0.0.1-1546780086 -o yaml
+10123* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.server}' | base64 --decode
+10124* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.server}'
+10125* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.server}'
+10126* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.server}' | base64 --decode
+10127* kubectl edit secret cluster-127.0.0.1-1546780086
+10128  echo 'aHR0cHM6Ly8xMjcuMC4wLjE6NTIwOTE=' | base64 --decode
+10129  echo "https://127.0.0.1:52091"
+10130  echo -n "https://127.0.0.1:52091"
+10131  echo -n "https://host.docker.internal:52091" | base64 --encode
+10132  echo -n "https://host.docker.internal:52091" | base64
+10133* kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.server}' | base64 --decode
+10134* kubectl edit secret cluster-127.0.0.1-1546780086
+10135  echo -n "https://host.docker.internal:52091" | base64
+10136* kubectl run -i --tty --rm debug --image=busybox --restart=Never -- sh
+10137  wget https://127.0.0.1:52091
+10138  openssl s_client -showcerts -servername 127.0.0.1 -connect 127.0.0.1:52091 </dev/null\n
+10139  echo | \\n    openssl s_client -servername 127.0.0.1 -connect 127.0.0.1:52091 2>/dev/null | \\n    openssl x509 -text
+10140  kubectx
+10141  kubectl run -i --tty --rm debug --image=busybox --restart=Never -- sh
+10142  kubectl delete pod debug
+10143  kubectl run -i --tty --rm debug --image=busybox --restart=Never -- sh
+10144  kubectl run -i --tty --rm debug2 --image=busybox --restart=Never -- sh
+10145  docker ps
+10146  docker info
+10147  docker network
+10148  docker network ls
+10149  docker network inspect kind
+10150  kubectl edit secret cluster-127.0.0.1-1546780086
+10151  kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data}' | base64 --decode
+10152  kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.config}' | base64 --decode
+10153  kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data}' | base64 --decode
+10154  kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data}'
+10155  kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.config}'
+10156  kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.config}' | base64 --decode
+10157  kubectl get secret cluster-127.0.0.1-1546780086 -o jsonpath='{.data.config}' | base64 --decode > /tmp/decoded
+10158  vim /tmp/decoded
+10159  base64 /tmp/decoded
+10160  base64 -i /tmp/decoded -o /tmp/encoded
+10161  cat /tmp/encoded
+10162  kubectl edit secret cluster-127.0.0.1-1546780086
+10163  vim /tmp/decoded
+10164* echo 'LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb3dJQkFBS0NBUUVBb2VTb0hjOG5JQTRVMm9vLzk4VlA4bG5jNENxd2ZqOWNva08vUi9HdURzZzRXdTEzCmxaMm94MjZTdDV3cEtkcUE0TkRGQ1Vqc3FTbVphSldwanA5MWxEMDdPdHBKNm91ZVVWVDAwdkUxbUY4YTJlYm0KQ3dzc0Y2MEpxRG9WbXRwUTd5T21hNFNSeDhadllZUzlLaGhRbFlzZ29JdDBFNHA2aDlYbEE0RFpTUjZOeEZRdQp1WHBpYXllY0wzdEtaMzZITnZBZlMvaWNRdFdsa1dGL0c3VWlMeXhYcXlTSHVWdmMzQnVrcll0cTJDMU8wdHpJCmsrOWlDUzdWRDJZd0VreFpCUnhDMlFmZGExdUFpUktwS3VFUkowbncrNTRUb3ZEZGxlVkRHTUgwVXMwWHJjbWwKNUVZRWNWdE9LWVFFY1pCUkFGOFFWb3FRSkNCWGhma2toR2VnbndJREFRQUJBb0lCQUN5OUl0UnlEYzdtOVU1YgpqRWZ0aUNWaVBnN1kzVU5XUVVRNlVwOFFJOWpEN2diNnZ1UmkyR1Njb3dFSXI3dDRQY3RqQmtDRm5aazEvTVlSCkxmVlREY3cwaTZ5ODdGWmIxUm1HejgySGlSY2RtUzhFaHlnZ0kwUTd0b0o5NHNDVGVuQkx1czdWcU8rN1g4WmsKUjE1ZHI4OVR6bVZ2aEZsdUdHUjNjTDFpR3lvQVRnWWRLb3dkdGJCNnRFcm1BSS82V2NDZFlBM05HZDU3bG1TMgpOUXRnc2pJcXdrNUQrU1Y5YUVOei9UNFJNNlR2U0RLRUR0aVhxS3BkWUVtZFpvUHFFZUIvSEpnTC9Sa3ROSklsCk04RGZwMDUrNE84WTdDTndYdStydEZYQS9ZeTUzanBDYmtSL0VycWtmQUwrQjlqNnhUd3BteXlJaVJMSy9yN0cKRFNUK2I0RUNnWUVBeUNzbGFscmI1R2hiUmNXMmxubTRBZlR4UzNFQklBOHdONzViTklCc3RPTno1VXB6d2ZFeApkU29iUlRvaFlBeXVIWDdPSjBBbVJTYkRNdnpVck1wSHF4eVFRYjBUR0w4MjJuL0xHcHorbHpOK2hzZ2tDaGJiCm1CNXczVnJmdmU4TWZOa2xMY2RBb2VOVnY4Ky9JbDZ0QUg0Tkhndjh2djRCekNPamJBdEF1OEVDZ1lFQXp3eCsKYUtTck4yNlNpdU5hbk54Vmc3dFFsdU5xMVBZdU56ZGpuVkVRTzJNSG80b0EyeUluM1Q2U0xpV2ZhNU5odUIrRApkeWM1aWhkd3dVRXRGTmIxTkZNanR2QzVEMG4veWJWS3p6RlowT3hYd1hpa1BjSEtBdEc1NmQ2b2drVkpFTGNYClJFUmFwUHE3UFNOVm1aNEo4VXZZaVNONWdxNDVqSWhHdGRmdTlGOENnWUE2bE1ZQ2RremNiOTRtY1ZLYWYwem0KNWJTb2k0MzB2LzB3a3psR0NEL0lRTGp1WmZleXpzL1dwbGdNenBKdDljZ1BRY2s3bTM2WHhseGlVN1E2VFlqagoveHdJNFRqeGlTU1lsY1h2Si9zcWJSdWVmbnh0cDNyazdpUEI1SktPbDZOajluajNDTlZWaTU3UTRBL2tFeWsyCmQ2MkhHYU1Da253Y0xtSHBnUEdWQVFLQmdRQ3BTNnIwdjJoc1c5SWhGSU9iN1NGVEpFOWlBVFB5VEJVLyt0OU4KMitHczNXMTZrRFhnK0EybWZ5b2g1NHR4OThHWVB0Uk5FbHFmQ2ttZEMwRGtZRnVBM0ZaQW1KYUk1TlhzeFhzVQo3V0ptVFVuNEhVQVdheVZWcHMwZ2FIcGFnbkthNDBwMy9IZ3RuQUtMbkIrN0N4bFFIdGRBVXl4ZzZUcVBLVUxBCkgzNzRld0tCZ0FzblJlKysvMUhUL3J0K1dyZmpYcFlNd09Ba2V3UlR3UWoxMjFMK3h5Tzl2NXdZWmpjUGlacFYKa2RrdnBCUnJCUnpubmN6Zm12RWhrazE5T1VJbmZ2ckRmK3B4MmJGNzJXV3g5a1RiRG4wdGhTK3VxcHRRV0s4NwozWVVmeDB0Njl2NXFPa3UybE9WSVBtaVVUcllid1MwZDhIRi9wWTlQdGFrYkZoT2tWTHd1Ci0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg==' | base64 --decode
+10165  base64 -i /tmp/decoded -o /tmp/encoded
+10166  cat /tmp/encoded| pbcopy
+10167  kubectl edit secret cluster-127.0.0.1-1546780086
+10168  kubectx
+10169  k9s
+10170  clear
+10171  vprod
+10172  vlogin
+10173  history
+10174  clear

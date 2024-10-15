@@ -42,19 +42,22 @@ dev-local-argocd:
 	kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 	kubectl apply -f dev-local/manifests/argocd-configmap.yaml
 	kubectl apply -f dev-local/manifests/argocd-ingress.yaml
+	kubectl apply -f dev-local/manifests/argocd-applicationSet.yaml
 	kubectl -n argocd patch secret argocd-secret --patch-file dev-local/manifests/argocd-password-patch.yaml
 	kubectl config set-context --current --namespace=argocd
-	argocd cluster add kind-local-test-cluster
+	argocd cluster add kind-local-test-cluster --yes || true
+	
 
 export GITHUB_TOKEN:=$(shell gh auth token)
 .PHONY: dev-local-telefonistka
 dev-local-telefonistka:
+	kubectl config use-context kind-telefonistka-dev
 	kubectl create namespace telefonistka-dev || true
 	kubectl config set-context --current --namespace=argocd
-	kubectl create secret generic argocd-token \
+	kubectl get secret argocd-token -n telefonistka-dev || kubectl create secret generic argocd-token \
 		-n telefonistka-dev \
 		--from-literal=ARGOCD_TOKEN=$$(argocd account generate-token --account telefonistka)
-	@kubectl create secret generic github-token \
+	kubectl get secret github-token -n telefonistka-dev || kubectl create secret generic github-token \
 		-n telefonistka-dev \
 		--from-literal=GITHUB_OAUTH_TOKEN=$(GITHUB_TOKEN) \
 		--from-literal=APPROVER_GITHUB_OAUTH_TOKEN=$(GITHUB_TOKEN)
@@ -65,11 +68,14 @@ dev-local-telefonistka:
 GH_REPO=commercetools/telefonistka-dev
 .PHONY: dev-local-gh
 dev-local-gh:
-	cd dev-local/telefonistka-dev-repo && \
+	[ -d dev-local/telefonistka-dev-repo/.git ] || cd dev-local/telefonistka-dev-repo && \
 	git init && \
 	git add -A && \
 	git commit -m "Initial commit" && \
-	gh repo create $(GH_REPO) --internal --source=. --push
+	gh repo view $(GH_REPO) > /dev/null || gh repo create $(GH_REPO) --internal --source=. --push
+	kubectl config set-context kind-telefonistka-dev --namespace=argocd && \
+	kubectl config use-context kind-telefonistka-dev
+	argocd repo add https://github.com/$(GH_REPO) --username telefonistka-dev --password $(GITHUB_TOKEN)
 	gh webhook forward --repo=commercetools/telefonistka-dev \
 	--events='*' \
 	--url=http://localhost/telefonistka/webhook \

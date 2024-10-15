@@ -2,9 +2,9 @@ promotionPaths:
   - sourcePath: "workspace/"
     componentPathExtraDepth: 2
     promotionPrs:
-      - targetDescription: "in-cluster"
+      - targetDescription: "kind-local-test-cluster"
         targetPaths:
-        - "clusters/in-cluster/"
+        - "clusters/kind-local-test-cluster/"
 
 dryRunMode: false
 autoApprovePromotionPrs: true
