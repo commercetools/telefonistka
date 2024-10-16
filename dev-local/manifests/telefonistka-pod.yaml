@@ -26,7 +26,7 @@ spec:
             name: github-token
             key: APPROVER_GITHUB_OAUTH_TOKEN
       - name: ARGOCD_SERVER_ADDR
-        value: "argocd-server.argocd.svc.cluster.local"
+        value: "argocd-server.argocd.svc.cluster.local:80"
       - name: ARGOCD_TOKEN
         valueFrom:
           secretKeyRef:

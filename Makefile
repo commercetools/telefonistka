@@ -57,7 +57,7 @@ dev-local-telefonistka:
 	kubectl get secret argocd-token -n telefonistka-dev || kubectl create secret generic argocd-token \
 		-n telefonistka-dev \
 		--from-literal=ARGOCD_TOKEN=$$(argocd account generate-token --account telefonistka)
-	kubectl get secret github-token -n telefonistka-dev || kubectl create secret generic github-token \
+	@kubectl get secret github-token -n telefonistka-dev || kubectl create secret generic github-token \
 		-n telefonistka-dev \
 		--from-literal=GITHUB_OAUTH_TOKEN=$(GITHUB_TOKEN) \
 		--from-literal=APPROVER_GITHUB_OAUTH_TOKEN=$(GITHUB_TOKEN)
@@ -68,14 +68,15 @@ dev-local-telefonistka:
 GH_REPO=commercetools/telefonistka-dev
 .PHONY: dev-local-gh
 dev-local-gh:
-	[ -d dev-local/telefonistka-dev-repo/.git ] || cd dev-local/telefonistka-dev-repo && \
-	git init && \
+	cd dev-local/telefonistka-dev-repo && \
+	[ -d .git ] || (git init && \
 	git add -A && \
-	git commit -m "Initial commit" && \
-	gh repo view $(GH_REPO) > /dev/null || gh repo create $(GH_REPO) --internal --source=. --push
+	git commit -m "Initial commit")
+	(gh repo view $(GH_REPO) > /dev/null) || (cd dev-local/telefonistka-dev-repo && \
+	gh repo create $(GH_REPO) --internal --source=. --push)
 	kubectl config set-context kind-telefonistka-dev --namespace=argocd && \
 	kubectl config use-context kind-telefonistka-dev
-	argocd repo add https://github.com/$(GH_REPO) --username telefonistka-dev --password $(GITHUB_TOKEN)
+	@argocd repo add https://github.com/$(GH_REPO) --username telefonistka-dev --password $(GITHUB_TOKEN)
 	gh webhook forward --repo=commercetools/telefonistka-dev \
 	--events='*' \
 	--url=http://localhost/telefonistka/webhook \

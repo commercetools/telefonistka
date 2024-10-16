@@ -1,11 +1,12 @@
-
 FROM golang:1.22.3 as test
 ARG GOPROXY
 ENV GOPATH=/go
 ENV PATH="$PATH:$GOPATH/bin"
 WORKDIR /go/src/github.com/wayfair-incubator/telefonistka
 COPY . ./
-RUN make test
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    make test
 
 FROM test as build
 ARG GOPROXY
@@ -13,7 +14,9 @@ ENV GOPATH=/go
 ENV PATH="$PATH:$GOPATH/bin"
 WORKDIR /go/src/github.com/wayfair-incubator/telefonistka
 COPY . ./
-RUN make build
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    make build
 
 
 FROM alpine:latest as alpine-release
