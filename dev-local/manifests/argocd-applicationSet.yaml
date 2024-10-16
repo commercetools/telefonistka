@@ -24,8 +24,8 @@ spec:
     preserveResourcesOnDeletion: true
   template:
     metadata:
-      # annotations:
-      #   argocd.argoproj.io/manifest-generate-paths: '.'
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '.'
       labels:
         ct_owner: '{{index .path.segments 1}}'
         helmfileBaseName: '{{ .path.basename }}'
@@ -79,8 +79,8 @@ spec:
     preserveResourcesOnDeletion: true
   template:
     metadata:
-      # annotations:
-      #   argocd.argoproj.io/manifest-generate-paths: '.'
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '.'
       labels:
         ct_owner: '{{index .path.segments 1}}'
         helmfileBaseName: '{{ .path.basename }}'
