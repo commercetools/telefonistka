@@ -288,14 +288,14 @@ func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"argocd.argoproj.io/manifest-generate-paths": "wrong-path",
+						"argocd.argoproj.io/manifest-generate-paths": "non-existing-path",
 					},
-					Name: "right-app",
+					Name: "non-existing-app",
 				},
 				Spec: argoappv1.ApplicationSpec{
 					Source: &argoappv1.ApplicationSource{
 						RepoURL: "",
-						Path:    "right/",
+						Path:    "non-existing/",
 					},
 				},
 			},
@@ -303,7 +303,7 @@ func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 	}
 
 	mockApplicationClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(expectedResponse, nil)
-	app, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient)
+	app, err := findArgocdAppByManifestPathAnnotation(ctx, "non-existing/path", "some-repo", mockApplicationClient)
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
