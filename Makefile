@@ -17,7 +17,7 @@ $(VENDOR_DIR):
 
 .PHONY: build
 build: $(VENDOR_DIR)
-	GOOS=linux CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o telefonistka .
+	GOOS=linux CGO_ENABLED=0 go build -ldflags '-extldflags "-static"' -o telefonistka .
 
 .PHONY: clean
 clean:
@@ -29,7 +29,7 @@ test: $(VENDOR_DIR)
 
 .PHONY: dev-local-cluster
 dev-local-cluster:
-	@kind get clusters | grep telefonistka-dev || kind create cluster --config dev-local/cluster-config.yaml
+	@kind get clusters | grep telefonistka-dev || kind create cluster --config dev-local/cluster-config-telefonistka-dev.yaml
 	@kind get clusters | grep local-test-cluster || kind create cluster --name local-test-cluster
 	@kubectl config use-context kind-telefonistka-dev
 	@kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml && \
@@ -79,7 +79,7 @@ dev-local-gh:
 	@argocd repo add https://github.com/$(GH_REPO) --username telefonistka-dev --password $(GITHUB_TOKEN)
 	gh webhook forward --repo=commercetools/telefonistka-dev \
 	--events='*' \
-	--url=http://localhost/telefonistka/webhook \
+	--url=http://localhost:8080/telefonistka/webhook \
 	--secret=""
 
 dev-local: dev-local-cluster dev-local-argocd dev-local-telefonistka dev-local-deploy dev-local-gh
