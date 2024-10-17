@@ -30,7 +30,7 @@ test: $(VENDOR_DIR)
 .PHONY: dev-local-cluster
 dev-local-cluster:
 	@kind get clusters | grep telefonistka-dev || kind create cluster --config dev-local/cluster-config-telefonistka-dev.yaml
-	@kind get clusters | grep local-test-cluster || kind create cluster --name local-test-cluster
+	@kind get clusters | grep local-test-cluster || kind create cluster --config dev-local/cluster-config-local-test-cluster.yaml
 	@kubectl config use-context kind-telefonistka-dev
 	@kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml && \
 	kubectl wait --timeout=2m --for=condition=Ready pod -l app.kubernetes.io/name=ingress-nginx \
@@ -46,6 +46,8 @@ dev-local-argocd:
 	kubectl -n argocd patch secret argocd-secret --patch-file dev-local/manifests/argocd-password-patch.yaml
 	kubectl config set-context --current --namespace=argocd
 	argocd cluster add kind-local-test-cluster --yes || true
+	kubectl -n argocd patch secret argocd-secret --patch-file dev-local/manifests/argocd-cluster-url-patch.yaml
+
 	
 
 export GITHUB_TOKEN:=$(shell gh auth token)
