@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: telefonistka-dev
+  namespace: telefonistka-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  rules:
+  - http:
+      paths:
+      - pathType: ImplementationSpecific
+        path: "/telefonistka/(.*)"
+        backend:
+          service:
+            name: telefonistka-dev
+            port:
+              number: 8080
