@@ -1,0 +1,108 @@
+replicaCount: 1
+
+image:
+  repository: telefonistka-dev-local
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: "telefonistka"
+fullnameOverride: "telefonistka"
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  # name: ""
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  hosts:
+    - host: telefonistka.europe-west1.gcp.escemo.com
+      paths: ["/"]
+
+resources:
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+appHttpPort: 8080
+
+env:
+  - name: GITHUB_APP_PRIVATE_KEY_PATH
+    value: "/etc/telefonistka-gh-app-creds/gh-app-key.pem"
+  - name: GITHUB_APP_ID
+    valueFrom:
+      secretKeyRef:
+        name: telefonistka-gh-app-creds
+        key: app-id
+  - name: GITHUB_WEBHOOK_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: telefonistka-gh-app-creds
+        key: webhook-secret
+  - name: APPROVER_GITHUB_APP_PRIVATE_KEY_PATH
+    value: "/etc/telefonistka-gh-app-creds/approver-app-key.pem"
+  - name: APPROVER_GITHUB_APP_ID
+    valueFrom:
+      secretKeyRef:
+        name: telefonistka-gh-app-creds
+        key: approver-app-id
+  - name: ARGOCD_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: telefonistka-argocd-client-creds
+        key: auth-token
+  - name: ARGOCD_SERVER_ADDR
+    value: argocd-server.argocd-infra.svc.cluster.local:443
+  - name: ARGOCD_PLAINTEXT
+    value: "false"
+  - name: ARGOCD_INSECURE
+    value: "true"
+volumes:
+  - name: telefonistka-gh-app-creds
+    secret:
+      secretName: telefonistka-gh-app-creds
+
+volumeMounts:
+  - name: telefonistka-gh-app-creds
+    readOnly: true
+    mountPath: "/etc/telefonistka-gh-app-creds/"
+
+livenessCheckPath: /live
+readinessCheckePath: /ready
+podAnnotations:
+  prometheus.io/path: /metrics
+  prometheus.io/port: "8080"
+  prometheus.io/scrape: "true"

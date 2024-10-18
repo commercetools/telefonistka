@@ -1,0 +1,26 @@
+promotionPaths:
+  - sourcePath: "workspace/"
+    componentPathExtraDepth: 2
+    promotionPrs:
+      - targetDescription: "kind-local-test-cluster"
+        targetPaths:
+        - "clusters/kind-local-test-cluster/"
+
+dryRunMode: false
+autoApprovePromotionPrs: true
+whProxtSkipTLSVerifyUpstream: true
+webhookEndpointRegexs:
+  - expression: "^clusters/[^/]*/.*"
+    replacements:
+      - "http://argocd-server.argocd.svc.cluster.local/api/webhook"
+      - "http://argocd-applicationset-controller.argocd.svc.cluster.local:7000/api/webhook"
+  - expression: "^workspace/.*"
+    replacements:
+      - "http://argocd-server.argocd.svc.cluster.local/api/webhook"
+      - "http://argocd-applicationset-controller.argocd.svc.cluster.local:7000/api/webhook"
+argocd:
+  commentDiffonPR: true
+  autoMergeNoDiffPRs: true
+  allowSyncfromBranchPathRegex: '^workspace/.*$'
+  useSHALabelForAppDiscovery: false
+  createTempAppObjectFromNewApps: true

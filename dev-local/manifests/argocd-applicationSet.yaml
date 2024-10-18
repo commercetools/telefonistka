@@ -1,0 +1,109 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: in-cluster 
+  namespace: argocd
+spec:
+  generators:
+  - git:
+      directories:
+      - path: workspace/*/*/*
+      repoURL: https://github.com/commercetools/telefonistka-dev
+      revision: HEAD
+      template:
+        metadata: {}
+        spec:
+          destination: {}
+          project: ""
+  goTemplate: true
+  ignoreApplicationDifferences:
+  - jsonPointers:
+    - /spec/syncPolicy
+    - /spec/source/targetRevision
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '.'
+      labels:
+        ct_owner: '{{index .path.segments 1}}'
+        helmfileBaseName: '{{ .path.basename }}'
+        telefonistka.io/component-path-sha1: '{{ .path.path | sha1sum }}'
+      name: '{{index .path.segments 3}}-in-cluster'
+      namespace: argocd
+    spec:
+      destination:
+        name: in-cluster 
+        namespace: '{{index .path.segments 2}}'
+      project: default 
+      source:
+        path: '{{ .path.path}}'
+        repoURL: https://github.com/commercetools/telefonistka-dev
+      syncPolicy:
+        automated: {}
+        retry:
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 60m
+          limit: -1
+        syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+        - RespectIgnoreDifferences=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: kind-local-test-cluster 
+  namespace: argocd
+spec:
+  generators:
+  - git:
+      directories:
+      - path: clusters/kind-local-test-cluster/*/*/*
+      repoURL: https://github.com/commercetools/telefonistka-dev
+      revision: HEAD
+      template:
+        metadata: {}
+        spec:
+          destination: {}
+          project: ""
+  goTemplate: true
+  ignoreApplicationDifferences:
+  - jsonPointers:
+    - /spec/syncPolicy
+    - /spec/source/targetRevision
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  template:
+    metadata:
+      annotations:
+        argocd.argoproj.io/manifest-generate-paths: '.'
+      labels:
+        ct_owner: '{{index .path.segments 1}}'
+        helmfileBaseName: '{{ .path.basename }}'
+        telefonistka.io/component-path-sha1: '{{ .path.path | sha1sum }}'
+      name: '{{index .path.segments 3}}-kind-local-test-cluster'
+      namespace: argocd
+    spec:
+      destination:
+        name: kind-local-test-cluster
+        namespace: '{{index .path.segments 2}}'
+      project: default 
+      source:
+        path: '{{ .path.path}}'
+        repoURL: https://github.com/commercetools/telefonistka-dev
+      syncPolicy:
+        automated: {}
+        retry:
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 60m
+          limit: -1
+        syncOptions:
+        - CreateNamespace=true
+        - ServerSideApply=true
+        - RespectIgnoreDifferences=true

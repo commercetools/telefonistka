@@ -1,0 +1,15 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: local-test-cluster 
+networking:
+  apiServerPort: 5678
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          certSANs:
+            - "host.docker.internal"
+            - "127.0.0.1"
+

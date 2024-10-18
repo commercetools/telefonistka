@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: telefonistka-dev
+  namespace: telefonistka-dev
+  labels:
+    app.kubernetes.io/name: telefonistka-dev
+spec:
+  containers:
+  - name: telefonistka-dev
+    image: telefonistka-dev-local:latest
+    imagePullPolicy: IfNotPresent
+    ports:
+      - containerPort: 8080
+    env:
+      - name: GITHUB_WEBHOOK_SECRET
+        value: ""
+      - name: GITHUB_OAUTH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-token
+            key: GITHUB_OAUTH_TOKEN
+      - name: APPROVER_GITHUB_OAUTH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-token
+            key: APPROVER_GITHUB_OAUTH_TOKEN
+      - name: ARGOCD_SERVER_ADDR
+        value: "argocd-server.argocd.svc.cluster.local:80"
+      - name: ARGOCD_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: argocd-token
+            key: ARGOCD_TOKEN
+      - name: ARGOCD_INSECURE
+        value: "true"

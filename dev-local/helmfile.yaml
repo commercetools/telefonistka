@@ -1,0 +1,13 @@
+repositories:
+  - name: commercetools
+    url: https://raw.githubusercontent.com/commercetools/helm-charts/releases
+
+releases:
+  - name: telefonistka
+    chart: commercetools/generic-http-app
+    version: 1.1.0
+    missingFileHandler: Warn
+    namespace: telefonistka
+    values:
+      # global value file
+      - "./values-global.yaml"
