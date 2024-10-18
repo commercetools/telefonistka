@@ -76,8 +76,8 @@ dev-local-gh:
 	git commit -m "Initial commit")
 	(gh repo view $(GH_REPO) > /dev/null) || (cd dev-local/telefonistka-dev-repo && \
 	gh repo create $(GH_REPO) --internal --source=. --push)
-	kubectl config set-context kind-telefonistka-dev --namespace=argocd && \
 	kubectl config use-context kind-telefonistka-dev
+	kubectl config set-context kind-telefonistka-dev --namespace=argocd 
 	@argocd repo add https://github.com/$(GH_REPO) --username telefonistka-dev --password $(GITHUB_TOKEN)
 	gh webhook forward --repo=commercetools/telefonistka-dev \
 	--events='*' \
