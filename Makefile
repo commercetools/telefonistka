@@ -99,6 +99,8 @@ dev-local-clean:
 dev-local-deploy:
 	docker build -t telefonistka-dev-local:latest .
 	kind load docker-image telefonistka-dev-local:latest --name telefonistka-dev
+	kubectl config use-context kind-telefonistka-dev
+	kubectl delete -f dev-local/manifests/telefonistka-pod.yaml
 	kubectl apply -f dev-local/manifests/telefonistka-pod.yaml
 
 .PHONY: dev-local-undeploy
