@@ -822,7 +822,7 @@ func SetCommitStatus(ghPrClientDetails GhPrClientDetails, state string) {
 	context := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
 	description := "Telefonistka GitOps Bot"
-	targetURL := "https://github.com/wayfair-incubator/telefonistka"
+	targetURL := commitStatusTargetURL(time.Now())
 
 	commitStatus := &github.RepoStatus{
 		TargetURL:   &targetURL,
@@ -1215,4 +1215,33 @@ func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath
 		return "", resp.StatusCode, err
 	}
 	return fileContentString, resp.StatusCode, nil
+}
+
+// commitStatusTargetURL generates a target URL based on an optional
+// template file specified by the environment variable CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH.
+// If the template file is not found or an error occurs during template execution,
+// it returns a default URL.
+// passed parameter commitTime can be used in the template as .CommitTime
+func commitStatusTargetURL(commitTime time.Time) string {
+	targetURL := "https://github.com/wayfair-incubator/telefonistka"
+
+	tmplFile := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH")
+	tmplName := filepath.Base(tmplFile)
+
+	// dynamic parameters to be used in the template
+	p := struct {
+		CommitTime time.Time
+	}{
+		CommitTime: commitTime,
+	}
+	renderedURL, err := executeTemplate(tmplName, tmplFile, p)
+	if err != nil {
+		// TODO: why we cannot use warnf here?
+		log.Errorf("Failed to render target URL template: %v", err)
+		return targetURL
+	}
+
+	// trim any leading/trailing whitespace
+	renderedURL = strings.TrimSpace(renderedURL)
+	return renderedURL
 }
