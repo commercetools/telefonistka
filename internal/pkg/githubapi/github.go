@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -238,7 +239,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 }
 
 func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
-	templateOutput, err := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", diffCommentData)
+	templateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), diffCommentData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 	}
@@ -255,7 +256,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
 		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
-		templateOutput, err := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", componentTemplateData)
+		templateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), componentTemplateData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
@@ -268,7 +269,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		}
 
 		// now we don't have much choice, this is the saddest path, we'll use the concise template
-		templateOutput, err = executeTemplate("argoCdDiffConcise", "argoCD-diff-pr-comment-concise.gotmpl", componentTemplateData)
+		templateOutput, err = executeTemplate("argoCdDiffConcise", defaultTemplatesFullPath("argoCD-diff-pr-comment-concise.gotmpl"), componentTemplateData)
 		if err != nil {
 			return comments, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
@@ -497,7 +498,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 }
 
 func commentPlanInPR(ghPrClientDetails GhPrClientDetails, promotions map[string]PromotionInstance) {
-	templateOutput, err := executeTemplate("dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
+	templateOutput, err := executeTemplate("dryRunMsg", defaultTemplatesFullPath("dry-run-pr-comment.gotmpl"), promotions)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Failed to generate dry-run comment template: err=%s\n", err)
 		return
@@ -507,7 +508,7 @@ func commentPlanInPR(ghPrClientDetails GhPrClientDetails, promotions map[string]
 
 func executeTemplate(templateName string, templateFile string, data interface{}) (string, error) {
 	var templateOutput bytes.Buffer
-	messageTemplate, err := template.New(templateName).ParseFiles(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
+	messageTemplate, err := template.New(templateName).ParseFiles(templateFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -516,6 +517,10 @@ func executeTemplate(templateName string, templateFile string, data interface{})
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 	return templateOutput.String(), nil
+}
+
+func defaultTemplatesFullPath(templateFile string) string {
+	return filepath.Join(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
 }
 
 func commentPR(ghPrClientDetails GhPrClientDetails, commentBody string) error {
@@ -644,7 +649,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 				templateData := map[string]interface{}{
 					"prNumber": *pull.Number,
 				}
-				templateOutput, err := executeTemplate("autoMerge", "auto-merge-comment.gotmpl", templateData)
+				templateOutput, err := executeTemplate("autoMerge", defaultTemplatesFullPath("auto-merge-comment.gotmpl"), templateData)
 				if err != nil {
 					return err
 				}
