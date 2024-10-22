@@ -1223,7 +1223,7 @@ func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath
 // it returns a default URL.
 // passed parameter commitTime can be used in the template as .CommitTime
 func commitStatusTargetURL(commitTime time.Time) string {
-	targetURL := "https://github.com/wayfair-incubator/telefonistka"
+	const targetURL string = "https://github.com/wayfair-incubator/telefonistka"
 
 	tmplFile := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH")
 	tmplName := filepath.Base(tmplFile)
