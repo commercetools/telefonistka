@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -404,9 +403,8 @@ func Test_identifyCommonPaths(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := identifyCommonPaths(tt.args.promoPaths, tt.args.targetPaths); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("commonPaths() = %v, want %v", got, tt.want)
-			}
+			got := identifyCommonPaths(tt.args.promoPaths, tt.args.targetPaths)
+			assert.Equal(t, got, tt.want)
 		})
 	}
 }
