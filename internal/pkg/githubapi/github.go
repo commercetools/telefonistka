@@ -1236,8 +1236,7 @@ func commitStatusTargetURL(commitTime time.Time) string {
 	}
 	renderedURL, err := executeTemplate(tmplName, tmplFile, p)
 	if err != nil {
-		// TODO: why we cannot use warnf here?
-		log.Errorf("Failed to render target URL template: %v", err)
+		log.Debugf("Failed to render target URL template: %v", err)
 		return targetURL
 	}
 
