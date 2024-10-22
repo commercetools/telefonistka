@@ -343,6 +343,7 @@ func TestCommitStatusTargetURL(t *testing.T) {
 }
 
 func Test_identifyCommonPaths(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		promoPaths  []string
 		targetPaths []string
@@ -403,6 +404,7 @@ func Test_identifyCommonPaths(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := identifyCommonPaths(tt.args.promoPaths, tt.args.targetPaths)
 			assert.Equal(t, got, tt.want)
 		})
