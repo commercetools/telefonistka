@@ -366,7 +366,7 @@ func Test_identifyCommonPaths(t *testing.T) {
 				promoPaths:  []string{},
 				targetPaths: []string{"path1", "path2", "path3"},
 			},
-			want: []string{},
+			want: nil,
 		},
 		{
 			name: "paths2 is empty",
@@ -374,7 +374,7 @@ func Test_identifyCommonPaths(t *testing.T) {
 				promoPaths:  []string{"path1/component/some", "path2/some/other", "path3"},
 				targetPaths: []string{},
 			},
-			want: []string{},
+			want: nil,
 		},
 		{
 			name: "paths2 missing elements",
@@ -382,7 +382,7 @@ func Test_identifyCommonPaths(t *testing.T) {
 				promoPaths:  []string{"path1", "path2", "path3"},
 				targetPaths: []string{""},
 			},
-			want: []string{},
+			want: nil,
 		},
 		{
 			name: "path1 missing elements",
@@ -390,12 +390,12 @@ func Test_identifyCommonPaths(t *testing.T) {
 				promoPaths:  []string{""},
 				targetPaths: []string{"path1", "path2"},
 			},
-			want: []string{},
+			want: nil,
 		},
 		{
 			name: "path1 and path2 common elements",
 			args: args{
-				promoPaths:  []string{"path1/component/path", "path3/compoenet/also"},
+				promoPaths:  []string{"path1/component/path", "path3/component/also"},
 				targetPaths: []string{"path1", "path2", "path3"},
 			},
 			want: []string{"path1", "path3"},

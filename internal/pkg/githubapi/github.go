@@ -1121,10 +1121,13 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string) string {
 // returns a slice containing paths in common.
 func identifyCommonPaths(promotionPaths []string, targetPaths []string) []string {
 	if (len(promotionPaths) == 0) || (len(targetPaths) == 0) {
-		return []string{}
+		return nil
 	}
-	commonPaths := []string{}
+	var commonPaths []string
 	for _, pp := range promotionPaths {
+		if pp == "" {
+			continue
+		}
 		for _, tp := range targetPaths {
 			if tp == "" {
 				continue
