@@ -67,7 +67,7 @@ dev-local-telefonistka:
 
 		
 
-GH_REPO=commercetools/telefonistka-dev
+GH_REPO=commercetools/telefonistka-dev-$(shell whoami)
 .PHONY: dev-local-gh
 dev-local-gh:
 	cd dev-local/telefonistka-dev-repo && \
