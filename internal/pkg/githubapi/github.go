@@ -104,23 +104,25 @@ func (ghPrClientDetails *GhPrClientDetails) getBlameURLPrefix() string {
 	return fmt.Sprintf("%s/%s/%s/blame", githubHost, ghPrClientDetails.Owner, ghPrClientDetails.Repo)
 }
 
-// This function is used to check if we should display the sync branch checkbox in the PR comment.
-// This depends on the allowSyncfromBranchPathRegex configuration and whether the component is new or not.
+// shouldSyncBranchCheckBoxBeDisplayed checks if the sync branch checkbox should be displayed in the PR comment.
+// The checkbox should be displayed if:
+// - The component is allowed to be synced from a branch(based on Telefonsitka configuration)
+// - The relevant app is not new, temporary app that was created just to generate the diff
 func shouldSyncBranchCheckBoxBeDisplayed(componentPathList []string, allowSyncfromBranchPathRegex string, diffOfChangedComponents []argocd.DiffResult) bool {
 	var displaySyncBranchCheckBox bool
 
-out:
+outOfLoop:
 	for _, componentPath := range componentPathList {
-		if isSyncFromBranchAllowedForThisPath(allowSyncfromBranchPathRegex, componentPath) {
-			// Here we are checking if the syncable component is not a new app that was temporarily created.
-			// We don't support syncing new apps from branches
-			for _, diffOfChangedComponent := range diffOfChangedComponents {
-				if diffOfChangedComponent.ComponentPath == componentPath {
-					if !diffOfChangedComponent.AppWasTemporarilyCreated {
-						displaySyncBranchCheckBox = true
-						break out
-					}
-				}
+		// First we check if the component is allowed to be synced from a branch
+		if !isSyncFromBranchAllowedForThisPath(allowSyncfromBranchPathRegex, componentPath) {
+			continue
+		}
+		// Then we check the relevant app is not new, temporary app.
+		// We don't support syncing new apps from branches
+		for _, diffOfChangedComponent := range diffOfChangedComponents {
+			if diffOfChangedComponent.ComponentPath == componentPath && !diffOfChangedComponent.AppWasTemporarilyCreated {
+				displaySyncBranchCheckBox = true
+				break outOfLoop
 			}
 		}
 	}
