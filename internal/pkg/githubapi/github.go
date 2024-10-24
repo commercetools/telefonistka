@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -260,7 +261,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 }
 
 func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
-	err, templateOutput := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", diffCommentData)
+	templateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), diffCommentData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 	}
@@ -277,7 +278,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
 		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
-		err, templateOutput := executeTemplate("argoCdDiff", "argoCD-diff-pr-comment.gotmpl", componentTemplateData)
+		templateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), componentTemplateData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
@@ -290,7 +291,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		}
 
 		// now we don't have much choice, this is the saddest path, we'll use the concise template
-		err, templateOutput = executeTemplate("argoCdDiffConcise", "argoCD-diff-pr-comment-concise.gotmpl", componentTemplateData)
+		templateOutput, err = executeTemplate("argoCdDiffConcise", defaultTemplatesFullPath("argoCD-diff-pr-comment-concise.gotmpl"), componentTemplateData)
 		if err != nil {
 			return comments, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
 		}
@@ -519,7 +520,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 }
 
 func commentPlanInPR(ghPrClientDetails GhPrClientDetails, promotions map[string]PromotionInstance) {
-	err, templateOutput := executeTemplate("dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
+	templateOutput, err := executeTemplate("dryRunMsg", defaultTemplatesFullPath("dry-run-pr-comment.gotmpl"), promotions)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Failed to generate dry-run comment template: err=%s\n", err)
 		return
@@ -527,17 +528,21 @@ func commentPlanInPR(ghPrClientDetails GhPrClientDetails, promotions map[string]
 	_ = commentPR(ghPrClientDetails, templateOutput)
 }
 
-func executeTemplate(templateName string, templateFile string, data interface{}) (error, string) {
+func executeTemplate(templateName string, templateFile string, data interface{}) (string, error) {
 	var templateOutput bytes.Buffer
-	messageTemplate, err := template.New(templateName).ParseFiles(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
+	messageTemplate, err := template.New(templateName).ParseFiles(templateFile)
 	if err != nil {
-		return fmt.Errorf("failed to parse template: %w", err), ""
+		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 	err = messageTemplate.ExecuteTemplate(&templateOutput, templateName, data)
 	if err != nil {
-		return fmt.Errorf("failed to execute template: %w", err), ""
+		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
-	return nil, templateOutput.String()
+	return templateOutput.String(), nil
+}
+
+func defaultTemplatesFullPath(templateFile string) string {
+	return filepath.Join(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
 }
 
 func commentPR(ghPrClientDetails GhPrClientDetails, commentBody string) error {
@@ -666,7 +671,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 				templateData := map[string]interface{}{
 					"prNumber": *pull.Number,
 				}
-				err, templateOutput := executeTemplate("autoMerge", "auto-merge-comment.gotmpl", templateData)
+				templateOutput, err := executeTemplate("autoMerge", defaultTemplatesFullPath("auto-merge-comment.gotmpl"), templateData)
 				if err != nil {
 					return err
 				}
@@ -839,7 +844,7 @@ func SetCommitStatus(ghPrClientDetails GhPrClientDetails, state string) {
 	context := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
 	description := "Telefonistka GitOps Bot"
-	targetURL := "https://github.com/wayfair-incubator/telefonistka"
+	targetURL := commitStatusTargetURL(time.Now())
 
 	commitStatus := &github.RepoStatus{
 		TargetURL:   &targetURL,
@@ -1126,12 +1131,38 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string) string {
 
 	for i, k := range keys {
 		sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
-		x := newPrMetadata.PreviousPromotionMetadata[k].TargetPaths
+		x := identifyCommonPaths(newPrMetadata.PromotedPaths, newPrMetadata.PreviousPromotionMetadata[k].TargetPaths)
 		tp = strings.Join(x, fmt.Sprintf("`  \n%s`", strings.Repeat(mkTab, i+1)))
 		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️  \n%s`%s`  \n", strings.Repeat(mkTab, i), k, sp, strings.Repeat(mkTab, i+1), tp)
 	}
 
 	return newPrBody
+}
+
+// identifyCommonPaths takes a slice of promotion paths and target paths and
+// returns a slice containing paths in common.
+func identifyCommonPaths(promotionPaths []string, targetPaths []string) []string {
+	if (len(promotionPaths) == 0) || (len(targetPaths) == 0) {
+		return nil
+	}
+	var commonPaths []string
+	for _, pp := range promotionPaths {
+		if pp == "" {
+			continue
+		}
+		for _, tp := range targetPaths {
+			if tp == "" {
+				continue
+			}
+			// strings.HasPrefix is used to check that the target path and promotion path match instead of
+			// using 'pp ==  tp' because the promotion path is targetPath + component.
+			if strings.HasPrefix(pp, tp) {
+				commonPaths = append(commonPaths, tp)
+			}
+		}
+	}
+
+	return commonPaths
 }
 
 func createPrObject(ghPrClientDetails GhPrClientDetails, newBranchRef string, newPrTitle string, newPrBody string, defaultBranch string, assignee string) (*github.PullRequest, error) {
@@ -1232,4 +1263,32 @@ func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath
 		return "", resp.StatusCode, err
 	}
 	return fileContentString, resp.StatusCode, nil
+}
+
+// commitStatusTargetURL generates a target URL based on an optional
+// template file specified by the environment variable CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH.
+// If the template file is not found or an error occurs during template execution,
+// it returns a default URL.
+// passed parameter commitTime can be used in the template as .CommitTime
+func commitStatusTargetURL(commitTime time.Time) string {
+	const targetURL string = "https://github.com/wayfair-incubator/telefonistka"
+
+	tmplFile := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH")
+	tmplName := filepath.Base(tmplFile)
+
+	// dynamic parameters to be used in the template
+	p := struct {
+		CommitTime time.Time
+	}{
+		CommitTime: commitTime,
+	}
+	renderedURL, err := executeTemplate(tmplName, tmplFile, p)
+	if err != nil {
+		log.Debugf("Failed to render target URL template: %v", err)
+		return targetURL
+	}
+
+	// trim any leading/trailing whitespace
+	renderedURL = strings.TrimSpace(renderedURL)
+	return renderedURL
 }
