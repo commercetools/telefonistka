@@ -110,9 +110,6 @@ func (ghPrClientDetails *GhPrClientDetails) getBlameURLPrefix() string {
 // - The component is allowed to be synced from a branch(based on Telefonsitka configuration)
 // - The relevant app is not new, temporary app that was created just to generate the diff
 func shouldSyncBranchCheckBoxBeDisplayed(componentPathList []string, allowSyncfromBranchPathRegex string, diffOfChangedComponents []argocd.DiffResult) bool {
-	var displaySyncBranchCheckBox bool
-
-outOfLoop:
 	for _, componentPath := range componentPathList {
 		// First we check if the component is allowed to be synced from a branch
 		if !isSyncFromBranchAllowedForThisPath(allowSyncfromBranchPathRegex, componentPath) {
@@ -122,13 +119,11 @@ outOfLoop:
 		// We don't support syncing new apps from branches
 		for _, diffOfChangedComponent := range diffOfChangedComponents {
 			if diffOfChangedComponent.ComponentPath == componentPath && !diffOfChangedComponent.AppWasTemporarilyCreated {
-				displaySyncBranchCheckBox = true
-				break outOfLoop
+				return true
 			}
 		}
 	}
-
-	return displaySyncBranchCheckBox
+	return false
 }
 
 func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context) {
