@@ -79,7 +79,7 @@ dev-local-gh:
 	kubectl config use-context kind-telefonistka-dev
 	kubectl config set-context kind-telefonistka-dev --namespace=argocd 
 	@argocd repo add https://github.com/$(GH_REPO) --username telefonistka-dev --password $(GITHUB_TOKEN)
-	gh webhook forward --repo=commercetools/telefonistka-dev \
+	gh webhook forward --repo=$(GH_REPO) \
 	--events='*' \
 	--url=http://localhost:8080/telefonistka/webhook \
 	--secret=""
