@@ -6,7 +6,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
-    GOOS=linux CGO_ENABLED=0 go build -gcflags "all=-N -l" -o ./telefonistka .
+    GOOS=linux CGO_ENABLED=0 go build -gcflags "all=-N -ls" -o ./telefonistka .
 
 FROM alpine
 WORKDIR /
