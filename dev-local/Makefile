@@ -16,6 +16,8 @@ dev-local-argocd:
 	kubectl apply -f manifests/argocd-configmap.yaml
 	kubectl apply -f manifests/argocd-ingress.yaml
 	kubectl apply -f manifests/argocd-applicationSet.yaml
+	kubectl patch applicationSet in-cluster --type='json' -p='[{"op": "replace", "path": "/spec/generators/0/git/repoURL", "value": "https://github.com/$(GH_REPO)"}]' -n argocd
+	kubectl patch applicationSet kind-local-test-cluster --type='json' -p='[{"op": "replace", "path": "/spec/generators/0/git/repoURL", "value": "https://github.com/$(GH_REPO)"}]' -n argocd
 	kubectl -n argocd patch secret argocd-secret --patch-file manifests/argocd-password-patch.yaml
 	kubectl config set-context --current --namespace=argocd
 	argocd cluster add kind-local-test-cluster --yes || true

@@ -13,4 +13,4 @@ WORKDIR /
 COPY ../ .
 COPY --from=build /go/bin/dlv dlv
 COPY --from=build /telefonistka telefonistka
-ENTRYPOINT [ "/dlv" , "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/telefonistka", "server"]
+CMD [ "/dlv" , "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/telefonistka", "server", "--continue"]
