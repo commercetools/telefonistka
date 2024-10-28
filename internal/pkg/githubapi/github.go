@@ -1127,7 +1127,7 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string) string {
 
 	for i, k := range keys {
 		sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
-		x := identifyCommonPaths(newPrMetadata.PromotedPaths, newPrMetadata.PreviousPromotionMetadata[k].TargetPaths)
+		x := uniqueCommonPaths(newPrMetadata.PromotedPaths, newPrMetadata.PreviousPromotionMetadata[k].TargetPaths)
 		tp = strings.Join(x, fmt.Sprintf("`  \n%s`", strings.Repeat(mkTab, i+1)))
 		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️  \n%s`%s`  \n", strings.Repeat(mkTab, i), k, sp, strings.Repeat(mkTab, i+1), tp)
 	}
@@ -1135,13 +1135,14 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string) string {
 	return newPrBody
 }
 
-// identifyCommonPaths takes a slice of promotion paths and target paths and
+// uniqueCommonPaths takes a slice of promotion paths and target paths and
 // returns a slice containing paths in common.
-func identifyCommonPaths(promotionPaths []string, targetPaths []string) []string {
+func uniqueCommonPaths(promotionPaths []string, targetPaths []string) []string {
 	if (len(promotionPaths) == 0) || (len(targetPaths) == 0) {
 		return nil
 	}
-	var commonPaths []string
+
+	uniqueCommonPaths := make(map[string]bool)
 	for _, pp := range promotionPaths {
 		if pp == "" {
 			continue
@@ -1153,9 +1154,16 @@ func identifyCommonPaths(promotionPaths []string, targetPaths []string) []string
 			// strings.HasPrefix is used to check that the target path and promotion path match instead of
 			// using 'pp ==  tp' because the promotion path is targetPath + component.
 			if strings.HasPrefix(pp, tp) {
-				commonPaths = append(commonPaths, tp)
+				if _, ok := uniqueCommonPaths[tp]; !ok {
+					uniqueCommonPaths[tp] = true
+				}
 			}
 		}
+	}
+
+	var commonPaths []string
+	for path := range uniqueCommonPaths {
+		commonPaths = append(commonPaths, path)
 	}
 
 	return commonPaths

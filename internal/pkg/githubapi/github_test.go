@@ -262,6 +262,32 @@ func TestPrBody(t *testing.T) {
 	assert.Equal(t, string(expectedPrBody), newPrBody)
 }
 
+func TestPrBodyMultiComponent(t *testing.T) {
+	t.Parallel()
+	keys := []int{1, 2}
+	newPrMetadata := prMetadata{
+		// note: "targetPath3" is missing from the list of promoted paths, so it should not
+		// be included in the new PR body.
+		PromotedPaths: []string{"targetPath1/component1", "targetPath1/component2", "targetPath2/component1"},
+		PreviousPromotionMetadata: map[int]promotionInstanceMetaData{
+			1: {
+				SourcePath:  "sourcePath1",
+				TargetPaths: []string{"targetPath1"},
+			},
+			2: {
+				SourcePath:  "sourcePath2",
+				TargetPaths: []string{"targetPath2"},
+			},
+		},
+	}
+	newPrBody := prBody(keys, newPrMetadata, "")
+	expectedPrBody, err := os.ReadFile("testdata/pr_body_multi_component.golden.md")
+	if err != nil {
+		t.Fatalf("Error loading golden file: %s", err)
+	}
+	assert.Equal(t, string(expectedPrBody), newPrBody)
+}
+
 func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -474,7 +500,7 @@ func Test_identifyCommonPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := identifyCommonPaths(tt.args.promoPaths, tt.args.targetPaths)
+			got := uniqueCommonPaths(tt.args.promoPaths, tt.args.targetPaths)
 			assert.Equal(t, got, tt.want)
 		})
 	}
