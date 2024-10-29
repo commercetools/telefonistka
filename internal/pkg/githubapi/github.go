@@ -1172,7 +1172,7 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 	// generating the promotion prBody. This way the promotion
 	// body will error on the side of informing the user
 	// of more promotion paths, rather than leaving some out.
-	skipCounts := make(map[string]int)
+	skipCounts := map[string]int{}
 	for component, paths := range perComponentSkippedTargetPaths {
 		skipCounts[component] = len(paths)
 	}
@@ -1195,13 +1195,11 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string, promotionSki
 	sp := ""
 	tp := ""
 
-	// sort the paths so that we have a predictable order for tests
-	// and better readability for users
-	sort.Strings(newPrMetadata.PromotedPaths)
-
 	for i, k := range keys {
 		sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
 		x := filterSkipPaths(newPrMetadata.PreviousPromotionMetadata[k].TargetPaths, promotionSkipPaths)
+		// sort the paths so that we have a predictable order for tests and better readability for users
+		sort.Strings(x)
 		tp = strings.Join(x, fmt.Sprintf("`  \n%s`", strings.Repeat(mkTab, i+1)))
 		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️  \n%s`%s`  \n", strings.Repeat(mkTab, i), k, sp, strings.Repeat(mkTab, i+1), tp)
 	}
