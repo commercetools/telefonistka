@@ -1126,6 +1126,13 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 
 	newPrMetadata.PromotedPaths = maps.Keys(promotion.ComputedSyncPaths)
 
+	promotionSkipPaths := make(map[string]bool)
+	for _, paths := range promotion.Metadata.PerComponentSkippedTargetPaths {
+		for _, p := range paths {
+			promotionSkipPaths[p] = true
+		}
+	}
+
 	newPrBody = fmt.Sprintf("Promotion path(%s):\n\n", components)
 
 	keys := make([]int, 0)
@@ -1133,7 +1140,8 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 		keys = append(keys, k)
 	}
 	sort.Ints(keys)
-	newPrBody = prBody(keys, newPrMetadata, newPrBody)
+
+	newPrBody = prBody(keys, newPrMetadata, newPrBody, promotionSkipPaths)
 
 	prMetadataString, _ := newPrMetadata.serialize()
 
@@ -1142,14 +1150,14 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 	return newPrBody
 }
 
-func prBody(keys []int, newPrMetadata prMetadata, newPrBody string) string {
+func prBody(keys []int, newPrMetadata prMetadata, newPrBody string, promotionSkipPaths map[string]bool) string {
 	const mkTab = "&nbsp;&nbsp;&nbsp;&nbsp;"
 	sp := ""
 	tp := ""
 
 	for i, k := range keys {
 		sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
-		x := identifyCommonPaths(newPrMetadata.PromotedPaths, newPrMetadata.PreviousPromotionMetadata[k].TargetPaths)
+		x := filterSkipPaths(newPrMetadata.PreviousPromotionMetadata[k].TargetPaths, promotionSkipPaths)
 		tp = strings.Join(x, fmt.Sprintf("`  \n%s`", strings.Repeat(mkTab, i+1)))
 		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️  \n%s`%s`  \n", strings.Repeat(mkTab, i), k, sp, strings.Repeat(mkTab, i+1), tp)
 	}
@@ -1157,30 +1165,26 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string) string {
 	return newPrBody
 }
 
-// identifyCommonPaths takes a slice of promotion paths and target paths and
-// returns a slice containing paths in common.
-func identifyCommonPaths(promotionPaths []string, targetPaths []string) []string {
-	if (len(promotionPaths) == 0) || (len(targetPaths) == 0) {
-		return nil
-	}
-	var commonPaths []string
-	for _, pp := range promotionPaths {
-		if pp == "" {
-			continue
-		}
-		for _, tp := range targetPaths {
-			if tp == "" {
-				continue
-			}
-			// strings.HasPrefix is used to check that the target path and promotion path match instead of
-			// using 'pp ==  tp' because the promotion path is targetPath + component.
-			if strings.HasPrefix(pp, tp) {
-				commonPaths = append(commonPaths, tp)
-			}
+// filterSkipPaths filters out the paths that are marked as skipped
+func filterSkipPaths(targetPaths []string, promotionSkipPaths map[string]bool) []string {
+	pathSkip := make(map[string]bool)
+	for _, targetPath := range targetPaths {
+		if _, ok := promotionSkipPaths[targetPath]; ok {
+			pathSkip[targetPath] = true
+		} else {
+			pathSkip[targetPath] = false
 		}
 	}
 
-	return commonPaths
+	var paths []string
+
+	for path, skip := range pathSkip {
+		if !skip {
+			paths = append(paths, path)
+		}
+	}
+
+	return paths
 }
 
 func createPrObject(ghPrClientDetails GhPrClientDetails, newBranchRef string, newPrTitle string, newPrBody string, defaultBranch string, assignee string) (*github.PullRequest, error) {
