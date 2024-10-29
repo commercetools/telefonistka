@@ -1156,7 +1156,7 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 	// therefore, we return an empty promotionSkipPaths map to signify that
 	// there are no paths that are skipped for this promotion
 	for _, component := range promotion.Metadata.ComponentNames {
-		if _, ok := promotion.Metadata.PerComponentSkippedTargetPaths[component]; !ok {
+		if _, ok := perComponentSkippedTargetPaths[component]; !ok {
 			return promotionSkipPaths
 		}
 	}
