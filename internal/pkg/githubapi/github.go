@@ -2,6 +2,7 @@ package githubapi
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha1" //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	"encoding/base64"
@@ -14,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -1174,11 +1176,13 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 	for component, paths := range perComponentSkippedTargetPaths {
 		skipCounts[component] = len(paths)
 	}
-    ranked := slices.SortFunc(maps.Keys(skipCounts), func(a, b string) int {
-       return cmp.Compare(skipCounts[a], skipCounts[b])
-     })
 
-     componentWithFewestSkippedPaths := ranked[0]
+	skipPaths := maps.Keys(skipCounts)
+	slices.SortFunc(skipPaths, func(a, b string) int {
+		return cmp.Compare(skipCounts[a], skipCounts[b])
+	})
+
+	componentWithFewestSkippedPaths := skipPaths[0]
 	for _, p := range perComponentSkippedTargetPaths[componentWithFewestSkippedPaths] {
 		promotionSkipPaths[p] = true
 	}
