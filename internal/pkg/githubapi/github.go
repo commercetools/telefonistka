@@ -1153,6 +1153,10 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 	perComponentSkippedTargetPaths := promotion.Metadata.PerComponentSkippedTargetPaths
 	promotionSkipPaths := map[string]bool{}
 
+	if len(perComponentSkippedTargetPaths) == 0 {
+		return promotionSkipPaths
+	}
+
 	// if any promoted component is not in the perComponentSkippedTargetPaths
 	// then that means we have a component that is promoted to all paths,
 	// therefore, we return an empty promotionSkipPaths map to signify that
@@ -1161,10 +1165,6 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 		if _, ok := perComponentSkippedTargetPaths[component]; !ok {
 			return promotionSkipPaths
 		}
-	}
-
-	if len(perComponentSkippedTargetPaths) == 0 {
-		return promotionSkipPaths
 	}
 
 	// if we have one or more components then we are just going to
