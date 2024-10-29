@@ -1161,9 +1161,6 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 		}
 	}
 
-	if perComponentSkippedTargetPaths == nil {
-		return promotionSkipPaths
-	}
 
 	if len(perComponentSkippedTargetPaths) == 0 {
 		return promotionSkipPaths
