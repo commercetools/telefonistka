@@ -435,3 +435,65 @@ func TestCommitStatusTargetURL(t *testing.T) {
 		})
 	}
 }
+
+func Test_getPromotionSkipPaths(t *testing.T) {
+	type args struct {
+		promotion PromotionInstance
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]bool
+	}{
+		{
+			name: "No skip paths",
+			args: args{
+				promotion: PromotionInstance{
+					Metadata: PromotionInstanceMetaData{
+						PerComponentSkippedTargetPaths: map[string][]string{},
+					},
+				},
+			},
+			want: map[string]bool{},
+		},
+		{
+			name: "one skip path",
+			args: args{
+				promotion: PromotionInstance{
+					Metadata: PromotionInstanceMetaData{
+						PerComponentSkippedTargetPaths: map[string][]string{
+							"component1": {"targetPath1", "targetPath2"},
+						},
+					},
+				},
+			},
+			want: map[string]bool{
+				"targetPath1": true,
+				"targetPath2": true,
+			},
+		},
+		{
+			name: "multiple skip path",
+			args: args{
+				promotion: PromotionInstance{
+					Metadata: PromotionInstanceMetaData{
+						PerComponentSkippedTargetPaths: map[string][]string{
+							"component1": {"targetPath1", "targetPath2", "targetPath3"},
+							"component2": {"targetPath3"},
+							"component3": {"targetPath1", "targetPath2"},
+						},
+					},
+				},
+			},
+			want: map[string]bool{
+				"targetPath3": true,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getPromotionSkipPaths(tt.args.promotion)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

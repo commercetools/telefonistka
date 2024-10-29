@@ -1126,12 +1126,7 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 
 	newPrMetadata.PromotedPaths = maps.Keys(promotion.ComputedSyncPaths)
 
-	promotionSkipPaths := make(map[string]bool)
-	for _, paths := range promotion.Metadata.PerComponentSkippedTargetPaths {
-		for _, p := range paths {
-			promotionSkipPaths[p] = true
-		}
-	}
+	promotionSkipPaths := getPromotionSkipPaths(promotion)
 
 	newPrBody = fmt.Sprintf("Promotion path(%s):\n\n", components)
 
@@ -1148,6 +1143,45 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 	newPrBody = newPrBody + "\n<!--|Telefonistka data, do not delete|" + prMetadataString + "|-->"
 
 	return newPrBody
+}
+
+// getPromotionSkipPaths returns a map of paths that are marked as skipped for this promotion
+// when we have multiple components, we are going to use the component that has the fewest skip paths
+func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
+	perComponentSkippedTargetPaths := promotion.Metadata.PerComponentSkippedTargetPaths
+	promotionSkipPaths := make(map[string]bool)
+	if perComponentSkippedTargetPaths == nil {
+		return promotionSkipPaths
+	}
+
+	if len(perComponentSkippedTargetPaths) == 0 {
+		return promotionSkipPaths
+	}
+
+	// if we have one or more components then we are just going to
+	// user the component that has the fewest skipPaths when
+	// generating the promotion prBody. This way the promotion
+	// body will error on the side of informing the user
+	// of more promotion paths, rather than leaving some out.
+	skipCounts := make(map[string]int)
+	for component, paths := range perComponentSkippedTargetPaths {
+		skipCounts[component] = len(paths)
+	}
+	// sort ['component','countOfSkipPaths'] by countOfSkipPaths
+	pathCountPairs := make([][2]interface{}, 0, len(skipCounts))
+	for k, v := range skipCounts {
+		pathCountPairs = append(pathCountPairs, [2]interface{}{k, v})
+	}
+	sort.Slice(pathCountPairs, func(i, j int) bool {
+		return pathCountPairs[i][1].(int) < pathCountPairs[j][1].(int)
+	})
+
+	componentWithFewestSkippedPaths := pathCountPairs[0][0].(string)
+	for _, p := range perComponentSkippedTargetPaths[componentWithFewestSkippedPaths] {
+		promotionSkipPaths[p] = true
+	}
+
+	return promotionSkipPaths
 }
 
 func prBody(keys []int, newPrMetadata prMetadata, newPrBody string, promotionSkipPaths map[string]bool) string {
