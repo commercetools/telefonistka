@@ -1149,7 +1149,7 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 // when we have multiple components, we are going to use the component that has the fewest skip paths
 func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 	perComponentSkippedTargetPaths := promotion.Metadata.PerComponentSkippedTargetPaths
-	promotionSkipPaths := make(map[string]bool)
+	promotionSkipPaths := map[string]bool{}
 
 	// if any promoted component is not in the perComponentSkippedTargetPaths
 	// then that means we have a component that is promoted to all paths,
@@ -1160,7 +1160,6 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 			return promotionSkipPaths
 		}
 	}
-
 
 	if len(perComponentSkippedTargetPaths) == 0 {
 		return promotionSkipPaths
@@ -1197,6 +1196,10 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string, promotionSki
 	sp := ""
 	tp := ""
 
+	// sort the paths so that we have a predictable order for tests
+	// and better readability for users
+	sort.Strings(newPrMetadata.PromotedPaths)
+
 	for i, k := range keys {
 		sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
 		x := filterSkipPaths(newPrMetadata.PreviousPromotionMetadata[k].TargetPaths, promotionSkipPaths)
@@ -1225,8 +1228,6 @@ func filterSkipPaths(targetPaths []string, promotionSkipPaths map[string]bool) [
 			paths = append(paths, path)
 		}
 	}
-
-	sort.Strings(paths)
 
 	return paths
 }
