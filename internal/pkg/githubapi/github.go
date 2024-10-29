@@ -1174,16 +1174,11 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 	for component, paths := range perComponentSkippedTargetPaths {
 		skipCounts[component] = len(paths)
 	}
-	// sort ['component','countOfSkipPaths'] by countOfSkipPaths
-	pathCountPairs := make([][2]interface{}, 0, len(skipCounts))
-	for k, v := range skipCounts {
-		pathCountPairs = append(pathCountPairs, [2]interface{}{k, v})
-	}
-	sort.Slice(pathCountPairs, func(i, j int) bool {
-		return pathCountPairs[i][1].(int) < pathCountPairs[j][1].(int)
-	})
+    ranked := slices.SortFunc(maps.Keys(skipCounts), func(a, b string) int {
+       return cmp.Compare(skipCounts[a], skipCounts[b])
+     })
 
-	componentWithFewestSkippedPaths := pathCountPairs[0][0].(string)
+     componentWithFewestSkippedPaths := ranked[0]
 	for _, p := range perComponentSkippedTargetPaths[componentWithFewestSkippedPaths] {
 		promotionSkipPaths[p] = true
 	}
