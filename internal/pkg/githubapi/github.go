@@ -1150,6 +1150,17 @@ func generatePromotionPrBody(ghPrClientDetails GhPrClientDetails, components str
 func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 	perComponentSkippedTargetPaths := promotion.Metadata.PerComponentSkippedTargetPaths
 	promotionSkipPaths := make(map[string]bool)
+
+	// if any promoted component is not in the perComponentSkippedTargetPaths
+	// then that means we have a component that is promoted to all paths,
+	// therefore, we return an empty promotionSkipPaths map to signify that
+	// there are no paths that are skipped for this promotion
+	for _, component := range promotion.Metadata.ComponentNames {
+		if _, ok := promotion.Metadata.PerComponentSkippedTargetPaths[component]; !ok {
+			return promotionSkipPaths
+		}
+	}
+
 	if perComponentSkippedTargetPaths == nil {
 		return promotionSkipPaths
 	}
