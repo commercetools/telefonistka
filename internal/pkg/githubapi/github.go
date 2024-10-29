@@ -1218,6 +1218,8 @@ func filterSkipPaths(targetPaths []string, promotionSkipPaths map[string]bool) [
 		}
 	}
 
+	sort.Strings(paths)
+
 	return paths
 }
 
