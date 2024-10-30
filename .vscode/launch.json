@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Remote debug in Kubernetes",
+            "type": "go",
+            "request": "attach",
+            "mode": "remote",
+            "remotePath": "/telefonistka",
+            "port": 10000,
+            "host": "127.0.0.1",
+            "showLog": true,
+            "debugAdapter": "dlv-dap",
+            "substitutePath": [
+                {
+                    "from": "${workspaceFolder}",
+                    "to": "/"
+                },
+            ]
+        }
+    ]
+}

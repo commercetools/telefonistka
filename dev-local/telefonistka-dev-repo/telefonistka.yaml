@@ -5,9 +5,25 @@ promotionPaths:
       - targetDescription: "kind-local-test-cluster"
         targetPaths:
         - "clusters/kind-local-test-cluster/"
-
+      - targetDescription: "Production Clusters Tier 1"
+        targetPaths:
+          - "clusters/production/aws/eu-central-1/v1/"
+          - "clusters/production/azure/eastus/v1/"
+          - "clusters/production/gcp/australia-southeast1/v1/"
+  - sourcePath: "workspace/"
+    componentPathExtraDepth: 2
+    promotionPrs:
+      - targetDescription: "same-source-diff-target"
+        targetPaths:
+        - "clusters/production/aws/eu-central-2/v1/"
+  - sourcePath: "clusters/kind-local-test-cluster/"
+    componentPathExtraDepth: 2
+    promotionPrs:
+      - targetDescription: "second-promo"
+        targetPaths:
+        - "clusters/production/aws/second/promo/"        
 dryRunMode: false
-autoApprovePromotionPrs: true
+autoApprovePromotionPrs: false
 whProxtSkipTLSVerifyUpstream: true
 webhookEndpointRegexs:
   - expression: "^clusters/[^/]*/.*"
@@ -20,7 +36,7 @@ webhookEndpointRegexs:
       - "http://argocd-applicationset-controller.argocd.svc.cluster.local:7000/api/webhook"
 argocd:
   commentDiffonPR: true
-  autoMergeNoDiffPRs: true
+  autoMergeNoDiffPRs: false
   allowSyncfromBranchPathRegex: '^workspace/.*$'
-  useSHALabelForAppDiscovery: false
-  createTempAppObjectFromNewApps: true
+  useSHALabelForAppDiscovery: true 
+  createTempAppObjectFromNewApps: false
