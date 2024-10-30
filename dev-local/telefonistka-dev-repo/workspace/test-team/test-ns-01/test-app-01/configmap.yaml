@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: example-configmap
+data:
+  # Configuration values can be added here as key-value pairs
+  example.property.one: "value1"
+  example.property.two: "value2"
+  # You can also include entire files
+  example.file: |
+    line2
+    line3

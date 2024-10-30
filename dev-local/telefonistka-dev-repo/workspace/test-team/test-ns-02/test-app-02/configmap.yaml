@@ -9,5 +9,3 @@ data:
   # You can also include entire files
   example.file: |
     line1
-    line2
-    line3

@@ -1,0 +1,2 @@
+promotionTargetAllowList:
+  - clusters/kind-local-test-cluster/
