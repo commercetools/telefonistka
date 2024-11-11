@@ -52,8 +52,15 @@ dev-local-gh:
 	(gh repo view $(GH_REPO) > /dev/null) || (cd telefonistka-dev-repo && \
 	gh repo create $(GH_REPO) --internal --source=. --push)
 	kubectl config use-context kind-telefonistka-dev
-	kubectl config set-context kind-telefonistka-dev --namespace=argocd 
-	@argocd repo add https://github.com/$(GH_REPO) --username telefonistka-dev --password $(GITHUB_TOKEN)
+	kubectl config set-context kind-telefonistka-dev --namespace=argocd
+
+	kubectl create secret generic repo-secret \
+	--from-literal=type=git \
+	--from-literal=url=https://github.com/$(GH_REPO) \
+    --from-literal=username=telefonistka-dev \
+    --from-literal=password=$(GITHUB_TOKEN)
+	kubectl label secret repo-secret argocd.argoproj.io/secret-type=repository
+
 	gh webhook forward --repo=$(GH_REPO) \
 	--events='*' \
 	--url=http://localhost:8080/telefonistka/webhook \
