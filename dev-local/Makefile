@@ -74,7 +74,7 @@ dev-local-gh:
 	--secret=""
 
 dev-local: dev-local-cluster dev-local-argocd dev-local-telefonistka dev-local-deploy dev-local-gh
-	@echo "🤖 You're good to go partner!"
+	@echo "🤖 You're good to go partner! 🤠"
 
 .PHONY: dev-local-clean
 dev-local-clean:
