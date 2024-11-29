@@ -60,12 +60,12 @@ var (
 		Subsystem: "github",
 	}, []string{"repo_slug"})
 
-	prHandleFailuresCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name:      "pr_handle_failures_total",
-		Help:      "The total number of PR handling failures",
+	commitStatusUpdates = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name:      "commit_status_updates_total",
+		Help:      "The total number of commit status updates, and their status (success/pending/failure)",
 		Namespace: "telefonistka",
-		Subsystem: "core",
-	}, []string{"repo_slug"})
+		Subsystem: "github",
+	}, []string{"repo_slug", "status"})
 
 	whUpstreamRequestsCountVec = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name:      "upstream_requests_total",
@@ -75,8 +75,11 @@ var (
 	}, []string{"status", "method", "url"})
 )
 
-func IncPrHandleFailuresCounter(repoSlug string) {
-	prHandleFailuresCounter.With(prometheus.Labels{"repo_slug": repoSlug}).Inc()
+func IncCommitStatusUpdateCounter(repoSlug string, status string) {
+	commitStatusUpdates.With(prometheus.Labels{
+		"repo_slug": repoSlug,
+		"status":    status,
+	}).Inc()
 }
 
 func PublishPrMetrics(openPrs int, openPromPRs int, openPrsWithPendingChecks int, repoSlug string) {

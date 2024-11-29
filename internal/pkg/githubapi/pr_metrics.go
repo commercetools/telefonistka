@@ -59,7 +59,6 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 
 // isPrStalePending checks if the a combinedStatus has a "telefonistka" context pending status that is older than minutesToDefineStale and is in pending state
 func isPrStalePending(commitStatuses *github.CombinedStatus, minutesToDefineStale int) bool {
-
 	staleDuration := time.Duration(minutesToDefineStale) * time.Minute * -1
 
 	for _, status := range commitStatuses.Statuses {
