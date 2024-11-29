@@ -146,6 +146,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 	defer func() {
 		if err != nil {
 			SetCommitStatus(ghPrClientDetails, "error")
+			prom.IncPrHandleFailuresCounter(ghPrClientDetails.Owner + "/" + ghPrClientDetails.Repo)
 			return
 		}
 		SetCommitStatus(ghPrClientDetails, "success")

@@ -39,6 +39,34 @@ var (
 		Subsystem: "github",
 	}, []string{"api_group", "api_path", "repo_slug", "status", "method"})
 
+	ghOpenPrsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "open_prs",
+		Help:      "The total number of open PRs",
+		Namespace: "telefonistka",
+		Subsystem: "github",
+	}, []string{"repo_slug"})
+
+	ghOpenPromotionPrsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "open_promotion_prs",
+		Help:      "The total number of open PRs with promotion label",
+		Namespace: "telefonistka",
+		Subsystem: "github",
+	}, []string{"repo_slug"})
+
+	ghOpenPrsWithPendingCheckGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name:      "open_prs_with_pending_telefonistka_checks",
+		Help:      "The total number of open PRs with pending Telefonistka checks(excluding PRs with very recent commits)",
+		Namespace: "telefonistka",
+		Subsystem: "github",
+	}, []string{"repo_slug"})
+
+	prHandleFailuresCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name:      "pr_handle_failures_total",
+		Help:      "The total number of PR handling failures",
+		Namespace: "telefonistka",
+		Subsystem: "core",
+	}, []string{"repo_slug"})
+
 	whUpstreamRequestsCountVec = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name:      "upstream_requests_total",
 		Help:      "The total number of requests forwarded upstream servers",
@@ -46,6 +74,19 @@ var (
 		Subsystem: "webhook_proxy",
 	}, []string{"status", "method", "url"})
 )
+
+func IncPrHandleFailuresCounter(repoSlug string) {
+	prHandleFailuresCounter.With(prometheus.Labels{"repo_slug": repoSlug}).Inc()
+}
+
+func PublishPrMetrics(openPrs int, openPromPRs int, openPrsWithPendingChecks int, repoSlug string) {
+	metricLables := prometheus.Labels{
+		"repo_slug": repoSlug,
+	}
+	ghOpenPrsGauge.With(metricLables).Set(float64(openPrs))
+	ghOpenPromotionPrsGauge.With(metricLables).Set(float64(openPromPRs))
+	ghOpenPrsWithPendingCheckGauge.With(metricLables).Set(float64(openPrsWithPendingChecks))
+}
 
 // This function instrument Webhook hits and parsing of their content
 func InstrumentWebhookHit(parsing_status string) {
