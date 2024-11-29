@@ -22,7 +22,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 	}
 	prs := []*github.PullRequest{}
 
-	// paginate through PRs, there might be lot of them.
+	// paginate through PRs, there might be lots of them.
 	for {
 		perPagePrs, resp, err := ghClient.v3Client.PullRequests.List(ctx, ghOwner, repo.GetName(), prListOpts)
 		_ = prom.InstrumentGhCall(resp)
@@ -40,6 +40,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 		if DoesPrHasLabel(pr.Labels, "promotion") {
 			openPromotionPrs++
 		}
+
 		log.Debugf("Checking PR %d", pr.GetNumber())
 		commitStatuses, resp, err := ghClient.v3Client.Repositories.GetCombinedStatus(ctx, ghOwner, repo.GetName(), pr.GetHead().GetSHA(), nil)
 		_ = prom.InstrumentGhCall(resp)
@@ -47,15 +48,8 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 			log.Errorf("error getting statuses for %s/%s/%d: %v", ghOwner, repo.GetName(), pr.GetNumber(), err)
 			continue
 		}
-		for _, status := range commitStatuses.Statuses {
-			if *status.Context == "telefonistka" &&
-				*status.State == "pending" &&
-				status.UpdatedAt.GetTime().Before(time.Now().Add(-time.Minute*minutesToDfineStale)) {
-				log.Debugf("Adding status %s-%v-%s !!!", *status.Context, status.UpdatedAt.GetTime(), *status.State)
-				prWithStakeChecks++
-			} else {
-				log.Debugf("Ignoring status %s-%v-%s", *status.Context, status.UpdatedAt.GetTime(), *status.State)
-			}
+		if isPrStalePending(commitStatuses, minutesToDfineStale) {
+			prWithStakeChecks++
 		}
 	}
 	openPRs = len(prs)
@@ -63,14 +57,33 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 	return
 }
 
-// GetPrMetrics counts the number of pending checks that are older than 20 minutes
+// isPrStalePending checks if the a combinedStatus has a "telefonistka" context pending status that is older than minutesToDfineStale and is in pending state
+func isPrStalePending(commitStatuses *github.CombinedStatus, minutesToDfineStale int) bool {
+
+	staleDuration := time.Duration(minutesToDfineStale) * time.Minute * -1
+
+	for _, status := range commitStatuses.Statuses {
+		if *status.Context == "telefonistka" &&
+			*status.State == "pending" &&
+			status.UpdatedAt.GetTime().Before(time.Now().Add(staleDuration)) {
+			log.Debugf("Adding status %s-%v-%s !!!", *status.Context, status.UpdatedAt.GetTime(), *status.State)
+			return true
+		} else {
+			log.Debugf("Ignoring status %s-%v-%s", *status.Context, status.UpdatedAt.GetTime(), *status.State)
+		}
+	}
+
+	return false
+}
+
+// GetPrMetrics itterates through all clients , gets all repos and then all PRs and calculates metrics
 func GetPrMetrics(mainGhClientCache *lru.Cache[string, GhClientPair]) {
 	ctx := context.Background() // TODO!!!!
 
 	for _, ghOwner := range mainGhClientCache.Keys() {
 		log.Debugf("Checking gh Owner %s", ghOwner)
 		ghClient, _ := mainGhClientCache.Get(ghOwner)
-		repos, resp, err := ghClient.v3Client.Apps.ListRepos(ctx, nil)
+		repos, resp, err := ghClient.v3Client.Apps.ListRepos(ctx, nil) // TODO what if you are not an app?
 		_ = prom.InstrumentGhCall(resp)
 		if err != nil {
 			log.Errorf("error getting repos for %s: %v", ghOwner, err)
