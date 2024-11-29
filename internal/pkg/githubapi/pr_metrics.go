@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	minutesToDfineStale = 20
+	minutesToDefineStale = 20
 )
 
 func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (prWithStakeChecks int, openPRs int, openPromotionPrs int, err error) {
@@ -48,7 +48,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 			log.Errorf("error getting statuses for %s/%s/%d: %v", ghOwner, repo.GetName(), pr.GetNumber(), err)
 			continue
 		}
-		if isPrStalePending(commitStatuses, minutesToDfineStale) {
+		if isPrStalePending(commitStatuses, minutesToDefineStale) {
 			prWithStakeChecks++
 		}
 	}
@@ -57,10 +57,10 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 	return
 }
 
-// isPrStalePending checks if the a combinedStatus has a "telefonistka" context pending status that is older than minutesToDfineStale and is in pending state
-func isPrStalePending(commitStatuses *github.CombinedStatus, minutesToDfineStale int) bool {
+// isPrStalePending checks if the a combinedStatus has a "telefonistka" context pending status that is older than minutesToDefineStale and is in pending state
+func isPrStalePending(commitStatuses *github.CombinedStatus, minutesToDefineStale int) bool {
 
-	staleDuration := time.Duration(minutesToDfineStale) * time.Minute * -1
+	staleDuration := time.Duration(minutesToDefineStale) * time.Minute * -1
 
 	for _, status := range commitStatuses.Statuses {
 		if *status.Context == "telefonistka" &&
