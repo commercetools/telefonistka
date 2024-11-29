@@ -15,7 +15,6 @@ const (
 )
 
 func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (prWithStakeChecks int, openPRs int, openPromotionPrs int, err error) {
-
 	log.Debugf("Checking repo %s", repo.GetName())
 	ghOwner := repo.GetOwner().GetLogin()
 	prListOpts := &github.PullRequestListOptions{
@@ -57,9 +56,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 			} else {
 				log.Debugf("Ignoring status %s-%v-%s", *status.Context, status.UpdatedAt.GetTime(), *status.State)
 			}
-
 		}
-
 	}
 	openPRs = len(prs)
 
@@ -83,6 +80,5 @@ func GetPrMetrics(mainGhClientCache *lru.Cache[string, GhClientPair]) {
 			stalePendingChecks, openPrs, promotionPrs, _ := getRepoPrMetrics(ctx, ghClient, repo)
 			prom.PublishPrMetrics(openPrs, promotionPrs, stalePendingChecks, repo.GetFullName())
 		}
-
 	}
 }

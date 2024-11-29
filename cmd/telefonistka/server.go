@@ -61,7 +61,7 @@ func serve() {
 		for {
 			log.Debugf("Stale check runner")
 			githubapi.GetPrMetrics(mainGhClientCache)
-			time.Sleep(60 * time.Second) //TODO: make this configurable? GH API rate limits are a facor here
+			time.Sleep(60 * time.Second) // TODO: make this configurable? GH API rate limits are a facor here
 		}
 	}()
 
