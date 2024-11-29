@@ -6,6 +6,10 @@
 |telefonistka_github_github_rest_api_client_rate_remaining|gauge|The number of remaining requests the client can make this hour||
 |telefonistka_github_github_rest_api_client_rate_limit|gauge|The number of requests per hour the client is currently limited to||
 |telefonistka_webhook_server_webhook_hits_total|counter|The total number of validated webhook hits|`parsing`|
+|telefonistka_github_open_prs|gauge|The number of open PRs|`repo_slug`|
+|telefonistka_github_open_promotion_prs|gauge|The number of open promotion PRs|`repo_slug`|
+|telefonistka_github_open_prs_with_pending_telefonistka_checks|gauge|The number of open PRs with pending Telefonistka checks(excluding PRs with very recent commits)|`repo_slug`|
+|telefonistka_github_commit_status_updates_total|counter|The total number of commit status updates, and their status (success/pending/failure)|`repo_slug`, `status`|
 
 Example metrics snippet:
 
