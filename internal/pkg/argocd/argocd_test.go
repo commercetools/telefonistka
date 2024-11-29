@@ -3,11 +3,13 @@ package argocd
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	"github.com/golang/mock/gomock"
@@ -310,4 +312,59 @@ func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 	if app != nil {
 		log.Fatal("expected the application to be nil")
 	}
+}
+
+func TestFetchArgoDiffConcurrently(t *testing.T) {
+	// MockApplicationServiceClient
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	// Save and restore the original argoClients
+	saved := argoClients
+	defer func() { argoClients = saved }()
+
+	// mock the argoClients
+	mockAppServiceClient := mocks.NewMockApplicationServiceClient(mockCtrl)
+	mockSettingsServiceClient := mocks.NewMockSettingsServiceClient(mockCtrl)
+	argoClients = argoCdClients{
+		app:     mockAppServiceClient,
+		setting: mockSettingsServiceClient,
+	}
+
+	// slowReply simulates a slow reply from the server
+	slowReply := func(ctx context.Context, in any, opts ...any) {
+		time.Sleep(1 * time.Second)
+	}
+
+	// makeComponents
+	makeComponents := func(num int) map[string]bool {
+		components := make(map[string]bool, num)
+		for i := 0; i < num; i++ {
+			components[fmt.Sprintf("component/to/diff/%d", i)] = true
+		}
+		return components
+	}
+
+	mockSettingsServiceClient.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil)
+	mockAppServiceClient.EXPECT().
+		List(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&argoappv1.ApplicationList{}, nil).
+		AnyTimes().
+		Do(slowReply)
+	// type argoCdClients struct {
+	// 	app     application.ApplicationServiceClient
+	// 	project projectpkg.ProjectServiceClient
+	// 	setting settings.SettingsServiceClient
+	// 	appSet  applicationsetpkg.ApplicationSetServiceClient
+	// }
+
+	GenerateDiffOfChangedComponents(
+		context.TODO(),
+		makeComponents(5),
+		"test-pr-branch",
+		"test-repo",
+		true,
+		false,
+	)
+
 }

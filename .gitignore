@@ -1,2 +1,3 @@
 /telefonistka
 vendor/
+internal/pkg/mocks/argocd_settings.go

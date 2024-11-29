@@ -33,6 +33,17 @@ import (
 // ctxLines is the number of context lines used in application diffs.
 const ctxLines = 10
 
+var argoClients argoCdClients // replaced during tests
+
+func InitArgoClients() error {
+	var err error
+	argoClients, err = createArgoCdClients()
+	if err != nil {
+		return fmt.Errorf("error creating ArgoCD clients: %w", err)
+	}
+	return nil
+}
+
 type argoCdClients struct {
 	app     application.ApplicationServiceClient
 	project projectpkg.ProjectServiceClient
@@ -547,21 +558,15 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, useSHALabelForArgoDicovery bool, createTempAppObjectFromNewApps bool) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
-	// env var should be centralized
-	ac, err := createArgoCdClients()
-	if err != nil {
-		log.Errorf("Error creating ArgoCD clients: %v", err)
-		return false, true, nil, err
-	}
 
-	argoSettings, err := ac.setting.Get(ctx, &settings.SettingsQuery{})
+	argoSettings, err := argoClients.setting.Get(ctx, &settings.SettingsQuery{})
 	if err != nil {
 		log.Errorf("Error getting ArgoCD settings: %v", err)
 		return false, true, nil, err
 	}
 
 	for componentPath, shouldIDiff := range componentsToDiff {
-		currentDiffResult := generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, ac, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFromNewApps)
+		currentDiffResult := generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFromNewApps)
 		if currentDiffResult.DiffError != nil {
 			log.Errorf("Error generating diff for component %s: %v", componentPath, currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
