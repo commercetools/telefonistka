@@ -472,7 +472,7 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 				componentDiffResult.AppWasTemporarilyCreated = true
 			}
 		} else {
-			componentDiffResult.DiffError = fmt.Errorf("No ArgoCD application found for component path %s(repo %s)", componentPath, repo)
+			componentDiffResult.DiffError = fmt.Errorf("no ArgoCD application found for component path %s(repo %s)", componentPath, repo)
 			return
 		}
 	} else {
@@ -483,7 +483,7 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 			Name:    &app.Name, // we expect only one app with this label and repo selectors
 			Refresh: &refreshType,
 		}
-		app, err := ac.app.Get(ctx, &appNameQuery)
+		app, err = ac.app.Get(ctx, &appNameQuery)
 		if err != nil {
 			componentDiffResult.DiffError = err
 			log.Errorf("Error getting app(HardRefresh) %v: %v", appNameQuery.Name, err)
@@ -565,10 +565,17 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 		return false, true, nil, err
 	}
 
+	diffResult := make(chan DiffResult, len(componentsToDiff))
 	for componentPath, shouldIDiff := range componentsToDiff {
-		currentDiffResult := generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFromNewApps)
+		go func(componentPath string, shouldDiff bool) {
+			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFromNewApps)
+		}(componentPath, shouldIDiff)
+	}
+
+	for range componentsToDiff {
+		currentDiffResult := <-diffResult
 		if currentDiffResult.DiffError != nil {
-			log.Errorf("Error generating diff for component %s: %v", componentPath, currentDiffResult.DiffError)
+			log.Errorf("Error generating diff for component %s: %v", currentDiffResult.ComponentPath, currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
 			err = currentDiffResult.DiffError
 		}
@@ -577,6 +584,5 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 		}
 		diffResults = append(diffResults, currentDiffResult)
 	}
-
 	return hasComponentDiff, hasComponentDiffErrors, diffResults, err
 }
