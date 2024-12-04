@@ -80,7 +80,10 @@ func TestIsPrStalePending(t *testing.T) {
 	}
 
 	for name, tc := range tests {
+		name := name
+		tc := tc
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			result := isPrStalePending(&tc.input, timeToDefineStale)
 			if result != tc.result {
 				t.Errorf("(%s)Expected %v, got %v", name, tc.result, result)
