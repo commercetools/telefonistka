@@ -12,6 +12,7 @@ import (
 )
 
 func TestIsPrStalePending(t *testing.T) {
+	t.Parallel()
 	timeToDefineStale := 15 * time.Minute
 
 	currentTime := time.Now()
@@ -86,5 +87,4 @@ func TestIsPrStalePending(t *testing.T) {
 			}
 		})
 	}
-
 }
