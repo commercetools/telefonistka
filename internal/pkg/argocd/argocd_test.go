@@ -325,9 +325,10 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	// Save and restore the original argoClients
-	saved := InitArgoClients
-	defer func() { InitArgoClients = saved }()
+	argoClients, err := createArgoCdClients()
+	if err != nil {
+		t.Errorf("error creating ArgoCD clients: %v", err)
+	}
 
 	// mock the argoClients
 	mockAppServiceClient := mocks.NewMockApplicationServiceClient(mockCtrl)
