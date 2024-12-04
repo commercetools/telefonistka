@@ -172,7 +172,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func createArgoCdClients() (ac argoCdClients, err error) {
+func CreateArgoCdClients() (ac argoCdClients, err error) {
 	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
 	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
 
@@ -320,7 +320,7 @@ func findArgocdApp(ctx context.Context, componentPath string, repo string, appCl
 func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool) error {
 	var foundApp *argoappv1.Application
 	var err error
-	ac, err := createArgoCdClients()
+	ac, err := CreateArgoCdClients()
 	if err != nil {
 		return fmt.Errorf("Error creating ArgoCD clients: %w", err)
 	}

@@ -224,7 +224,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 				ghPrClientDetails.PrLogger.Debugf("ArgoCD diff disabled for %s\n", componentPath)
 			}
 		}
-		argoClients, err := createArgoCdClients()
+		argoClients, err := argocd.CreateArgoCdClients()
 		if err != nil {
 			return fmt.Errorf("error creating ArgoCD clients: %w", err)
 		}

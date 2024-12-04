@@ -325,25 +325,17 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	argoClients, err := createArgoCdClients()
-	if err != nil {
-		t.Errorf("error creating ArgoCD clients: %v", err)
-	}
-
 	// mock the argoClients
 	mockAppServiceClient := mocks.NewMockApplicationServiceClient(mockCtrl)
 	mockSettingsServiceClient := mocks.NewMockSettingsServiceClient(mockCtrl)
 	mockProjectServiceClient := mocks.NewMockProjectServiceClient(mockCtrl)
 	// fake InitArgoClients
-	InitArgoClients = func() (argoCdClients, error) {
-		argoClients := argoCdClients{
-			app:     mockAppServiceClient,
-			setting: mockSettingsServiceClient,
-			project: mockProjectServiceClient,
-		}
-		return argoClients, nil
-	}
 
+	argoClients := argoCdClients{
+		app:     mockAppServiceClient,
+		setting: mockSettingsServiceClient,
+		project: mockProjectServiceClient,
+	}
 	// slowReply simulates a slow reply from the server
 	slowReply := func(ctx context.Context, in any, opts ...any) {
 		time.Sleep(time.Second)
