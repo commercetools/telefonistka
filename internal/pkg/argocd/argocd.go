@@ -33,15 +33,6 @@ import (
 // ctxLines is the number of context lines used in application diffs.
 const ctxLines = 10
 
-// replace in testing
-var InitArgoClients = func() (argoCdClients, error) {
-	argoClients, err := createArgoCdClients()
-	if err != nil {
-		return argoCdClients{}, fmt.Errorf("error creating ArgoCD clients: %w", err)
-	}
-	return argoClients, nil
-}
-
 type argoCdClients struct {
 	app     application.ApplicationServiceClient
 	project projectpkg.ProjectServiceClient
