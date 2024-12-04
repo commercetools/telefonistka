@@ -558,7 +558,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 		return false, true, nil, err
 	}
 
-	diffResult := make(chan DiffResult, len(componentsToDiff))
+	diffResult := make(chan DiffResult)
 	for componentPath, shouldIDiff := range componentsToDiff {
 		go func(componentPath string, shouldDiff bool) {
 			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFromNewApps)
