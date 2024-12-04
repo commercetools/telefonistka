@@ -11,6 +11,9 @@
 |telefonistka_github_open_prs_with_pending_telefonistka_checks|gauge|The number of open PRs with pending Telefonistka checks(excluding PRs with very recent commits)|`repo_slug`|
 |telefonistka_github_commit_status_updates_total|counter|The total number of commit status updates, and their status (success/pending/failure)|`repo_slug`, `status`|
 
+> [!NOTE]  
+> telefonistka_github_*_prs metrics are only supported on installtions that uses GitHub App authentication as it provides an easy way to query the relevant GH repos.
+
 Example metrics snippet:
 
 ```text
