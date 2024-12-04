@@ -10,7 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/githubapi"
 )
 
@@ -57,12 +56,6 @@ func serve() {
 	// mainGhClientCache := map[string]githubapi.GhClientPair{} //GH apps use a per-account/org client
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
-
-	// init argoclients
-	err := argocd.InitArgoClients()
-	if err != nil {
-		log.Fatalf("error initializing argo clients: %v", err)
-	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", handleWebhook(githubWebhookSecret, mainGhClientCache, prApproverGhClientCache))

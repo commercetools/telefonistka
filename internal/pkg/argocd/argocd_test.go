@@ -326,18 +326,21 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	// Save and restore the original argoClients
-	saved := argoClients
-	defer func() { argoClients = saved }()
+	saved := InitArgoClients
+	defer func() { InitArgoClients = saved }()
 
 	// mock the argoClients
 	mockAppServiceClient := mocks.NewMockApplicationServiceClient(mockCtrl)
 	mockSettingsServiceClient := mocks.NewMockSettingsServiceClient(mockCtrl)
 	mockProjectServiceClient := mocks.NewMockProjectServiceClient(mockCtrl)
-
-	argoClients = argoCdClients{
-		app:     mockAppServiceClient,
-		setting: mockSettingsServiceClient,
-		project: mockProjectServiceClient,
+	// fake InitArgoClients
+	InitArgoClients = func() (argoCdClients, error) {
+		argoClients := argoCdClients{
+			app:     mockAppServiceClient,
+			setting: mockSettingsServiceClient,
+			project: mockProjectServiceClient,
+		}
+		return argoClients, nil
 	}
 
 	// slowReply simulates a slow reply from the server

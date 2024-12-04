@@ -33,15 +33,13 @@ import (
 // ctxLines is the number of context lines used in application diffs.
 const ctxLines = 10
 
-var argoClients argoCdClients // replaced during tests
-
-func InitArgoClients() error {
-	var err error
-	argoClients, err = createArgoCdClients()
+// replace in testing
+var InitArgoClients = func() (argoCdClients, error) {
+	argoClients, err := createArgoCdClients()
 	if err != nil {
-		return fmt.Errorf("error creating ArgoCD clients: %w", err)
+		return argoCdClients{}, fmt.Errorf("error creating ArgoCD clients: %w", err)
 	}
-	return nil
+	return argoClients, nil
 }
 
 type argoCdClients struct {
@@ -556,6 +554,13 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 
 // GenerateDiffOfChangedComponents generates diff of changed components
 func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, useSHALabelForArgoDicovery bool, createTempAppObjectFromNewApps bool) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+
+	// init argoclients
+	argoClients, err := InitArgoClients()
+	if err != nil {
+		log.Fatalf("error initializing argo clients: %v", err)
+	}
+
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 
