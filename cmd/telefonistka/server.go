@@ -57,13 +57,7 @@ func serve() {
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 
-	go func() {
-		for {
-			log.Debugf("Stale check runner")
-			githubapi.GetPrMetrics(mainGhClientCache)
-			time.Sleep(60 * time.Second) // TODO: make this configurable? GH API rate limits are a facor here
-		}
-	}()
+	go githubapi.MainGhMetricsLoop(mainGhClientCache)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", handleWebhook(githubWebhookSecret, mainGhClientCache, prApproverGhClientCache))

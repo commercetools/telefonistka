@@ -11,8 +11,16 @@ import (
 )
 
 const (
-	minutesToDefineStale = 20
+	timeToDefineStale = 20 * time.Minute
+	metricRefreshTime = 60 * time.Second // TODO: make this configurable? GH API rate limits are a factor here
 )
+
+func MainGhMetricsLoop(mainGhClientCache *lru.Cache[string, GhClientPair]) {
+	for {
+		getPrMetrics(mainGhClientCache)
+		time.Sleep(metricRefreshTime)
+	}
+}
 
 func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (prWithStakeChecks int, openPRs int, openPromotionPrs int, err error) {
 	log.Debugf("Checking repo %s", repo.GetName())
@@ -48,7 +56,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 			log.Errorf("error getting statuses for %s/%s/%d: %v", ghOwner, repo.GetName(), pr.GetNumber(), err)
 			continue
 		}
-		if isPrStalePending(commitStatuses, minutesToDefineStale) {
+		if isPrStalePending(commitStatuses, timeToDefineStale) {
 			prWithStakeChecks++
 		}
 	}
@@ -57,14 +65,12 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 	return
 }
 
-// isPrStalePending checks if the a combinedStatus has a "telefonistka" context pending status that is older than minutesToDefineStale and is in pending state
-func isPrStalePending(commitStatuses *github.CombinedStatus, minutesToDefineStale int) bool {
-	staleDuration := time.Duration(minutesToDefineStale) * time.Minute * -1
-
+// isPrStalePending checks if the a combinedStatus has a "telefonistka" context pending status that is older than timeToDefineStale and is in pending state
+func isPrStalePending(commitStatuses *github.CombinedStatus, timeToDefineStale time.Duration) bool {
 	for _, status := range commitStatuses.Statuses {
 		if *status.Context == "telefonistka" &&
 			*status.State == "pending" &&
-			status.UpdatedAt.GetTime().Before(time.Now().Add(staleDuration)) {
+			status.UpdatedAt.GetTime().Before(time.Now().Add(timeToDefineStale*-1)) {
 			log.Debugf("Adding status %s-%v-%s !!!", *status.Context, status.UpdatedAt.GetTime(), *status.State)
 			return true
 		} else {
@@ -75,8 +81,8 @@ func isPrStalePending(commitStatuses *github.CombinedStatus, minutesToDefineStal
 	return false
 }
 
-// GetPrMetrics itterates through all clients , gets all repos and then all PRs and calculates metrics
-func GetPrMetrics(mainGhClientCache *lru.Cache[string, GhClientPair]) {
+// getPrMetrics itterates through all clients , gets all repos and then all PRs and calculates metrics
+func getPrMetrics(mainGhClientCache *lru.Cache[string, GhClientPair]) {
 	ctx := context.Background() // TODO!!!!
 
 	for _, ghOwner := range mainGhClientCache.Keys() {
