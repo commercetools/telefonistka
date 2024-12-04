@@ -413,12 +413,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	mockProjectServiceClient.EXPECT().
 		GetDetailedProject(gomock.Any(), gomock.Any()).
 		Return(&project.DetailedProjectsResponse{}, nil).
-		AnyTimes() // type argoCdClients struct {
-	// 	app     application.ApplicationServiceClient
-	// 	project projectpkg.ProjectServiceClient
-	// 	setting settings.SettingsServiceClient
-	// 	appSet  applicationsetpkg.ApplicationSetServiceClient
-	// }
+		AnyTimes()
 
 	const numComponents = 5
 	// start timer
