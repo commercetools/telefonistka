@@ -431,6 +431,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 		"test-repo",
 		true,
 		false,
+		argoClients,
 	)
 
 	// stop timer
