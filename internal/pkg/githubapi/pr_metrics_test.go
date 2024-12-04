@@ -12,7 +12,7 @@ import (
 )
 
 func TestIsPrStalePending(t *testing.T) {
-	minutesToDefineStale := 15
+	timeToDefineStale := 15 * time.Minute
 
 	currentTime := time.Now()
 	tests := map[string]struct {
@@ -80,7 +80,7 @@ func TestIsPrStalePending(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			result := isPrStalePending(&tc.input, minutesToDefineStale)
+			result := isPrStalePending(&tc.input, timeToDefineStale)
 			if result != tc.result {
 				t.Errorf("(%s)Expected %v, got %v", name, tc.result, result)
 			}
