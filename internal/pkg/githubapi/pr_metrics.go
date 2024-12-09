@@ -16,9 +16,9 @@ const (
 )
 
 func MainGhMetricsLoop(mainGhClientCache *lru.Cache[string, GhClientPair]) {
-	for {
+	for t := range time.Tick(metricRefreshTime) {
+		log.Debugf("Updating pr metrics at %v", t)
 		getPrMetrics(mainGhClientCache)
-		time.Sleep(metricRefreshTime)
 	}
 }
 
