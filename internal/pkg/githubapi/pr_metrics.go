@@ -22,7 +22,7 @@ func MainGhMetricsLoop(mainGhClientCache *lru.Cache[string, GhClientPair]) {
 	}
 }
 
-func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (prWithStakeChecks int, openPRs int, openPromotionPrs int, err error) {
+func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (prWithStaleChecks int, openPRs int, openPromotionPrs int, err error) {
 	log.Debugf("Checking repo %s", repo.GetName())
 	ghOwner := repo.GetOwner().GetLogin()
 	prListOpts := &github.PullRequestListOptions{
@@ -57,7 +57,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 			continue
 		}
 		if isPrStalePending(commitStatuses, timeToDefineStale) {
-			prWithStakeChecks++
+			prWithStaleChecks++
 		}
 	}
 	openPRs = len(prs)
