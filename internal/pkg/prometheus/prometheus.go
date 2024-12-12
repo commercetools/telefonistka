@@ -10,6 +10,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+type PrCounters struct {
+	OpenPrs           int
+	OpenPromotionPrs  int
+	PrWithStaleChecks int
+}
+
 var (
 	webhookHitsVec = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name:      "webhook_hits_total",
@@ -82,13 +88,13 @@ func IncCommitStatusUpdateCounter(repoSlug string, status string) {
 	}).Inc()
 }
 
-func PublishPrMetrics(openPrs int, openPromPRs int, openPrsWithPendingChecks int, repoSlug string) {
+func PublishPrMetrics(pc PrCounters, repoSlug string) {
 	metricLables := prometheus.Labels{
 		"repo_slug": repoSlug,
 	}
-	ghOpenPrsGauge.With(metricLables).Set(float64(openPrs))
-	ghOpenPromotionPrsGauge.With(metricLables).Set(float64(openPromPRs))
-	ghOpenPrsWithPendingCheckGauge.With(metricLables).Set(float64(openPrsWithPendingChecks))
+	ghOpenPrsGauge.With(metricLables).Set(float64(pc.OpenPrs))
+	ghOpenPromotionPrsGauge.With(metricLables).Set(float64(pc.OpenPromotionPrs))
+	ghOpenPrsWithPendingCheckGauge.With(metricLables).Set(float64(pc.PrWithStaleChecks))
 }
 
 // This function instrument Webhook hits and parsing of their content

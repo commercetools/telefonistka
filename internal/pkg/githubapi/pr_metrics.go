@@ -22,7 +22,7 @@ func MainGhMetricsLoop(mainGhClientCache *lru.Cache[string, GhClientPair]) {
 	}
 }
 
-func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (prWithStaleChecks int, openPRs int, openPromotionPrs int, err error) {
+func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (pc prom.PrCounters, err error) {
 	log.Debugf("Checking repo %s", repo.GetName())
 	ghOwner := repo.GetOwner().GetLogin()
 	prListOpts := &github.PullRequestListOptions{
@@ -46,7 +46,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 
 	for _, pr := range prs {
 		if DoesPrHasLabel(pr.Labels, "promotion") {
-			openPromotionPrs++
+			pc.OpenPromotionPrs++
 		}
 
 		log.Debugf("Checking PR %d", pr.GetNumber())
@@ -57,10 +57,10 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 			continue
 		}
 		if isPrStalePending(commitStatuses, timeToDefineStale) {
-			prWithStaleChecks++
+			pc.PrWithStaleChecks++
 		}
 	}
-	openPRs = len(prs)
+	pc.OpenPrs = len(prs)
 
 	return
 }
@@ -97,12 +97,12 @@ func getPrMetrics(mainGhClientCache *lru.Cache[string, GhClientPair]) {
 			continue
 		}
 		for _, repo := range repos.Repositories {
-			stalePendingChecks, openPrs, promotionPrs, err := getRepoPrMetrics(ctx, ghClient, repo)
+			pc, err := getRepoPrMetrics(ctx, ghClient, repo)
 			if err != nil {
 				log.Errorf("error getting repos for %s: %v", ghOwner, err)
 				continue
 			}
-			prom.PublishPrMetrics(openPrs, promotionPrs, stalePendingChecks, repo.GetFullName())
+			prom.PublishPrMetrics(pc, repo.GetFullName())
 		}
 	}
 }
