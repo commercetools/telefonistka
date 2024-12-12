@@ -1,9 +1,5 @@
 package githubapi
 
-// @Title
-// @Description
-// @Author
-// @Update
 import (
 	"testing"
 	"time"
