@@ -2,7 +2,9 @@ package telefonistka
 
 import (
 	"os"
+	"strconv"
 
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/spf13/cobra"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/githubapi"
@@ -29,7 +31,17 @@ func init() { //nolint:gochecknoinits
 func event(eventType string, eventFilePath string) {
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
-	githubapi.ReciveEventFile(eventFilePath, eventType, mainGhClientCache, prApproverGhClientCache)
+	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
+	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
+	serverAddr := getEnv("ARGOCD_SERVER_ADDR", "localhost:8080")
+	token := getEnv("ARGOCD_TOKEN", "")
+	argoOpts := apiclient.ClientOptions{
+		ServerAddr: serverAddr,
+		AuthToken:  token,
+		PlainText:  plaintext,
+		Insecure:   insecure,
+	}
+	githubapi.ReciveEventFile(eventFilePath, eventType, mainGhClientCache, prApproverGhClientCache, &argoOpts)
 }
 
 func getEnv(key, fallback string) string {

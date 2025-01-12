@@ -6,10 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -165,24 +163,7 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, er
 	return string(patch), nil
 }
 
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
-func CreateArgoCdClients() (ac argoCdClients, err error) {
-	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
-	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
-
-	opts := &apiclient.ClientOptions{
-		ServerAddr: getEnv("ARGOCD_SERVER_ADDR", "localhost:8080"),
-		AuthToken:  getEnv("ARGOCD_TOKEN", ""),
-		PlainText:  plaintext,
-		Insecure:   insecure,
-	}
-
+func CreateArgoCdClients(opts *apiclient.ClientOptions) (ac argoCdClients, err error) {
 	client, err := apiclient.NewClient(opts)
 	if err != nil {
 		return ac, fmt.Errorf("Error creating ArgoCD API client: %w", err)
@@ -317,10 +298,10 @@ func findArgocdApp(ctx context.Context, componentPath string, repo string, appCl
 	return f(ctx, componentPath, repo, appClient)
 }
 
-func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool) error {
+func SetArgoCDAppRevision(ctx context.Context, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool, opts *apiclient.ClientOptions) error {
 	var foundApp *argoappv1.Application
 	var err error
-	ac, err := CreateArgoCdClients()
+	ac, err := CreateArgoCdClients(opts)
 	if err != nil {
 		return fmt.Errorf("Error creating ArgoCD clients: %w", err)
 	}

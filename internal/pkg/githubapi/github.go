@@ -21,6 +21,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -124,7 +125,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(componentPathList []string, allowSyncfr
 	return false
 }
 
-func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context) {
+func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context, argoOpts *apiclient.ClientOptions) {
 	defer func() {
 		if r := recover(); r != nil {
 			ghPrClientDetails.PrLogger.Errorf("Recovered: %v", r)
@@ -153,9 +154,9 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 
 	switch stat {
 	case "merged":
-		err = handleMergedPrEvent(ghPrClientDetails, approverGithubClientPair.v3Client)
+		err = handleMergedPrEvent(ghPrClientDetails, approverGithubClientPair.v3Client, argoOpts)
 	case "changed":
-		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload)
+		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload, argoOpts)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails, eventPayload)
 	}
@@ -193,7 +194,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDeta
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, eventPayload *github.PullRequestEvent) error {
+func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, eventPayload *github.PullRequestEvent, argoOpts *apiclient.ClientOptions) error {
 	botIdentity, _ := GetBotGhIdentity(mainGithubClientPair.v4Client, ctx)
 	err := MimizeStalePrComments(ghPrClientDetails, mainGithubClientPair.v4Client, botIdentity)
 	if err != nil {
@@ -224,7 +225,8 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 				ghPrClientDetails.PrLogger.Debugf("ArgoCD diff disabled for %s\n", componentPath)
 			}
 		}
-		argoClients, err := argocd.CreateArgoCdClients()
+
+		argoClients, err := argocd.CreateArgoCdClients(argoOpts)
 		if err != nil {
 			return fmt.Errorf("error creating ArgoCD clients: %w", err)
 		}
@@ -326,7 +328,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 }
 
 // ReciveEventFile this one is similar to ReciveWebhook but it's used for CLI triggering, i  simulates a webhook event to use the same code path as the webhook handler.
-func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair]) {
+func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], argoOpts *apiclient.ClientOptions) {
 	log.Infof("Event type: %s", eventType)
 	log.Infof("Proccesing file: %s", eventFilePath)
 
@@ -345,11 +347,11 @@ func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("X-GitHub-Event", eventType)
 
-	handleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload)
+	handleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, argoOpts)
 }
 
 // ReciveWebhook is the main entry point for the webhook handling it starts parases the webhook payload and start a thread to handle the event success/failure are dependant on the payload parsing only
-func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
+func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte, argoOpts *apiclient.ClientOptions) error {
 	payload, err := github.ValidatePayload(r, githubWebhookSecret)
 	if err != nil {
 		log.Errorf("error reading request body: err=%s\n", err)
@@ -366,11 +368,11 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 	}
 	prom.InstrumentWebhookHit("successful")
 
-	go handleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload)
+	go handleEvent(eventPayloadInterface, mainGhClientCache, prApproverGhClientCache, r, payload, argoOpts)
 	return nil
 }
 
-func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
+func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte, argoOpts *apiclient.ClientOptions) {
 	// We don't use the request context as it might have a short deadline and we don't want to stop event handling based on that
 	// But we do want to stop the event handling after a certain point, so:
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -428,7 +430,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			PrSHA:        *eventPayload.PullRequest.Head.SHA,
 		}
 
-		HandlePREvent(eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, ctx)
+		HandlePREvent(eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, ctx, argoOpts)
 
 	case *github.IssueCommentEvent:
 		repoOwner := *eventPayload.Repo.Owner.Login
@@ -452,7 +454,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 				PrAuthor:     *eventPayload.Issue.User.Login,
 				PrLogger:     prLogger,
 			}
-			_ = handleCommentPrEvent(ghPrClientDetails, eventPayload, botIdentity)
+			_ = handleCommentPrEvent(ghPrClientDetails, eventPayload, botIdentity, argoOpts)
 		} else {
 			log.Debug("Ignoring self comment")
 		}
@@ -493,7 +495,7 @@ func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bo
 	return allowedPathsRegex.MatchString(path)
 }
 
-func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string) error {
+func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string, argoOpts *apiclient.ClientOptions) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	config, err := GetInRepoConfig(ghPrClientDetails, defaultBranch)
 	if err != nil {
@@ -518,7 +520,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 
 				for _, componentPath := range componentPathList {
 					if isSyncFromBranchAllowedForThisPath(config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-						err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery)
+						err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery, argoOpts)
 						if err != nil {
 							ghPrClientDetails.PrLogger.Errorf("Failed to sync ArgoCD app from branch: err=%s\n", err)
 						}
@@ -617,7 +619,7 @@ func BumpVersion(ghPrClientDetails GhPrClientDetails, defaultBranch string, file
 	return nil
 }
 
-func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubClient *github.Client) error {
+func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubClient *github.Client, argoOpts *apiclient.ClientOptions) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	config, err := GetInRepoConfig(ghPrClientDetails, defaultBranch)
 	if err != nil {
@@ -723,7 +725,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 		for _, componentPath := range componentPathList {
 			if isSyncFromBranchAllowedForThisPath(config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
 				ghPrClientDetails.PrLogger.Infof("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
-				err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery)
+				err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery, argoOpts)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Errorf("Failed to set ArgoCD app @  %s, to HEAD: err=%s\n", componentPath, err)
 				}
