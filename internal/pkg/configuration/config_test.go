@@ -2,9 +2,8 @@ package configuration
 
 import (
 	"os"
+	"reflect"
 	"testing"
-
-	"github.com/go-test/deep"
 )
 
 func TestConfigurationParse(t *testing.T) {
@@ -74,7 +73,7 @@ func TestConfigurationParse(t *testing.T) {
 		},
 	}
 
-	if diff := deep.Equal(expectedConfig, config); diff != nil {
-		t.Error(diff)
+	if got, want := config, expectedConfig; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
 	}
 }
