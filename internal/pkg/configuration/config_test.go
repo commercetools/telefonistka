@@ -10,7 +10,7 @@ import (
 func TestConfigurationParse(t *testing.T) {
 	t.Parallel()
 
-	configurationFileContent, _ := os.ReadFile("tests/testConfigurationParsing.yaml")
+	configurationFileContent, _ := os.ReadFile("testdata/testConfigurationParsing.yaml")
 
 	config, err := ParseConfigFromYaml(string(configurationFileContent))
 	if err != nil {
