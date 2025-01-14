@@ -1294,7 +1294,7 @@ func GetInRepoConfig(ghPrClientDetails GhPrClientDetails, defaultBranch string) 
 	inRepoConfigFileContentString, _, err := GetFileContent(ghPrClientDetails, defaultBranch, "telefonistka.yaml")
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Could not get in-repo configuration: err=%s\n", err)
-		return nil, err
+		inRepoConfigFileContentString = ""
 	}
 	c, err := cfg.ParseConfigFromYaml(inRepoConfigFileContentString)
 	if err != nil {
