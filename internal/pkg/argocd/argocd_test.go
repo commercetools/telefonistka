@@ -57,8 +57,8 @@ func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
 		componentPath,
 		repo,
 		ac,
-	); err == nil {
-		t.Errorf("got unexpected nil error")
+	); err != nil {
+		t.Errorf("got unexpected error")
 	}
 }
 

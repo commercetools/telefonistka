@@ -233,6 +233,27 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 					}
 				}
 			}
+
+			if generator.Plugin != nil &&
+				generator.Plugin.Input.Parameters != nil {
+				for key, value := range generator.Plugin.Input.Parameters {
+					if key == "path" {
+						var parsedPath string
+
+						if err := json.Unmarshal(value.Raw, &parsedPath); err != nil {
+							return nil, fmt.Errorf("unable to unmarshal plugin generator path: %w", err)
+						}
+
+						match, _ := path.Match(parsedPath, componentPath)
+						if match {
+							log.Debugf("Found ArgoCD ApplicationSet %q for component path %q(repo %s)", appSet.Name, componentPath, repo)
+							return &appSet, nil
+						} else {
+							log.Debugf("No match for %s in %q", componentPath, parsedPath)
+						}
+					}
+				}
+			}
 		}
 	}
 	return nil, fmt.Errorf("No ArgoCD ApplicationSet found for component path %s(repo %s)", componentPath, repo)
