@@ -35,7 +35,7 @@ func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
 		t.Skipf("Set ARGOCD_SERVER_ADDR and ARGOCD_TOKEN to run test")
 	}
 
-	path, repo := "workspace/cloud-tools/humio/logscale-daily-usage-reporter", "commercetools/k8s-gitops"
+	componentPath, repo := "clusters/playground/aws/eu-central-1/v1/cloud-tools/humio/logscale-daily-usage-reporter", "commercetools/k8s-gitops"
 
 	opts := apiclient.ClientOptions{
 		ServerAddr: serverAddr,
@@ -54,7 +54,7 @@ func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
 
 	if _, err := findRelevantAppSetByPath(
 		context.Background(),
-		path,
+		componentPath,
 		repo,
 		ac,
 	); err == nil {
