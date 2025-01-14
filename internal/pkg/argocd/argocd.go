@@ -222,7 +222,7 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 	for _, appSet := range foundAppSets.Items {
 		for _, generator := range appSet.Spec.Generators {
 			log.Debugf("Checking ApplicationSet %s for component path %s(repo %s)", appSet.Name, componentPath, repo)
-			if generator.Git.RepoURL == repo {
+			if generator.Git != nil && generator.Git.RepoURL == repo {
 				for _, dir := range generator.Git.Directories {
 					match, _ := path.Match(dir.Path, componentPath)
 					if match {
