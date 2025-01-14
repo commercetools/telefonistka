@@ -26,6 +26,8 @@ import (
 )
 
 func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
+	t.Parallel()
+
 	serverAddr := os.Getenv("ARGOCD_SERVER_ADDR")
 	authToken := os.Getenv("ARGOCD_TOKEN")
 
