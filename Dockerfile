@@ -1,5 +1,5 @@
 
-FROM golang:1.23.4 as test
+FROM golang:1.23.4 AS test
 ARG GOPROXY
 ENV GOPATH=/go
 ENV PATH="$PATH:$GOPATH/bin"
@@ -7,7 +7,7 @@ WORKDIR /go/src/github.com/wayfair-incubator/telefonistka
 COPY . ./
 RUN make test
 
-FROM test as build
+FROM test AS build
 ARG GOPROXY
 ENV GOPATH=/go
 ENV PATH="$PATH:$GOPATH/bin"
@@ -16,7 +16,7 @@ COPY . ./
 RUN make build
 
 
-FROM alpine:latest as alpine-release
+FROM alpine:latest AS alpine-release
 WORKDIR /telefonistka
 COPY --from=build /go/src/github.com/wayfair-incubator/telefonistka/telefonistka /telefonistka/bin/telefonistka
 COPY templates/ /telefonistka/templates/
