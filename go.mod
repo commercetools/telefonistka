@@ -11,7 +11,7 @@ require (
 	github.com/argoproj/gitops-engine v0.7.1-0.20240715141605-18ba62e1f1fb
 	github.com/bradleyfalzon/ghinstallation/v2 v2.10.0
 	github.com/cenkalti/backoff/v4 v4.2.1
-	github.com/go-test/deep v1.1.0
+	github.com/go-test/deep v1.1.1
 	github.com/golang/mock v1.6.0
 	github.com/google/go-github/v62 v62.0.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
