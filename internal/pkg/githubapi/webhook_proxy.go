@@ -17,11 +17,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// @Title
-// @Description
-// @Author
-// @Update
-
 func generateListOfChangedFiles(eventPayload *github.PushEvent) []string {
 	fileList := map[string]bool{} // using map for uniqueness
 
