@@ -17,10 +17,10 @@ import (
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	reposerverApiClient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/mocks"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/testutils"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
