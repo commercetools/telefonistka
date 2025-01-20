@@ -13,7 +13,7 @@ get-deps: $(VENDOR_DIR)
 
 $(VENDOR_DIR):
 	go generate $$(go list ./internal/pkg/mocks/...)
-	GO111MODULE=on go mod vendor
+	go mod download
 
 .PHONY: build
 build: $(VENDOR_DIR)
