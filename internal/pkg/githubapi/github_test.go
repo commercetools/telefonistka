@@ -118,8 +118,6 @@ foobar`,
 		},
 	}
 	for name, tc := range tests {
-		tc := tc // capture range variable
-		name := name
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			wasCheckedBefore, isCheckedNow := analyzeCommentUpdateCheckBox(tc.newBody, tc.oldBody, tc.checkboxIdentifier)
@@ -153,8 +151,6 @@ func TestIsSyncFromBranchAllowedForThisPath(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		tc := tc // capture range variable
-		name := name
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			result := isSyncFromBranchAllowedForThisPath(tc.allowedPathRegex, tc.path)
@@ -194,8 +190,6 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		tc := tc // capture range variable
-		name := name
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var diffCommentData DiffCommentData

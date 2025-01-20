@@ -10,7 +10,7 @@ linters:
     - durationcheck
     - errcheck
     - errname
-    - exportloopref
+    - copyloopvar
     - gci
     - gochecknoinits
     - gofmt
