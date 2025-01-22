@@ -59,6 +59,9 @@ type DiffResult struct {
 	DiffError                error
 	AppWasTemporarilyCreated bool
 	AppSyncedFromPRBranch    bool
+	ArgoCdAppHealthStatus    string
+	ArgoCdAppSyncStatus      string
+	ArgoCdAppAutoSyncEnabled bool
 }
 
 // Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
@@ -503,8 +506,11 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 	}
 	componentDiffResult.ArgoCdAppName = app.Name
 	componentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
+	componentDiffResult.ArgoCdAppHealthStatus = string(app.Status.Health.Status)
+	componentDiffResult.ArgoCdAppSyncStatus = string(app.Status.Sync.Status)
+	componentDiffResult.ArgoCdAppAutoSyncEnabled = app.Spec.SyncPolicy.Automated != nil
 
-	if app.Spec.Source.TargetRevision == prBranch && app.Spec.SyncPolicy.Automated != nil {
+	if app.Spec.Source.TargetRevision == prBranch && componentDiffResult.ArgoCdAppAutoSyncEnabled {
 		componentDiffResult.DiffError = nil
 		componentDiffResult.AppSyncedFromPRBranch = true
 

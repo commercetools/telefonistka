@@ -15,6 +15,18 @@ Diff of ArgoCD applications(⚠️ concise view, full diff didn't fit GH comment
 {{- else }}
 <img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/> **[{{ $appDiffResult.ArgoCdAppName }}]({{ $appDiffResult.ArgoCdAppURL }})** @ `{{ $appDiffResult.ComponentPath }}`
 {{if $appDiffResult.HasDiff }}
+{{ if  ne $appDiffResult.ArgoCdAppHealthStatus "Healthy" }}
+> [!CAUTION]
+> The ArgoCD app health status is currently `{{ $appDiffResult.ArgoCdAppHealthStatus }}`.
+{{- end}}
+{{ if  ne $appDiffResult.ArgoCdAppSyncStatus "Synced" }}
+> [!WARNING]
+> The ArgoCD app sync status is currently `{{ $appDiffResult.ArgoCdAppSyncStatus }}`.
+{{- end}}
+{{ if  not $appDiffResult.ArgoCdAppAutoSyncEnabled }}
+> [!NOTE]
+> This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.
+{{- end}}
 
 <details><summary>ArgoCD list of changed objects(Click to expand):</summary>
 
