@@ -23,7 +23,10 @@
       ],
       "HasDiff": true,
       "DiffError": null,
-      "AppWasTemporarilyCreated": false
+      "AppWasTemporarilyCreated": false,
+      "ArgoCdAppHealthStatus": "Healthy",
+      "ArgoCdAppSyncStatus": "Synced",
+      "ArgoCdAppAutoSyncEnabled": true
     },
     {
       "ComponentPath": "clusters/playground/aws/eu-central-1/v2/special-delivery/ssllab-test/ssllab-test",
@@ -47,7 +50,10 @@
       ],
       "HasDiff": true,
       "DiffError": null,
-      "AppWasTemporarilyCreated": false
+      "AppWasTemporarilyCreated": false,
+      "ArgoCdAppHealthStatus": "Healthy",
+      "ArgoCdAppSyncStatus": "Synced",
+      "ArgoCdAppAutoSyncEnabled": true
     },
     {
       "ComponentPath": "clusters/playground/aws/eu-central-1/v3/special-delivery/ssllab-test/ssllab-test",
@@ -71,7 +77,10 @@
       ],
       "HasDiff": true,
       "DiffError": null,
-      "AppWasTemporarilyCreated": false
+      "AppWasTemporarilyCreated": false,
+      "ArgoCdAppHealthStatus": "Healthy",
+      "ArgoCdAppSyncStatus": "Synced",
+      "ArgoCdAppAutoSyncEnabled": true
     }
   ],
   "DisplaySyncBranchCheckBox": false,
