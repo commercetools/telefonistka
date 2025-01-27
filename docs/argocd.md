@@ -38,6 +38,9 @@ Example:
 
 While displaying "diff" in the PR can catch most templating issues sometime testing a change in a non production environment is needed, if you want to test the configuration before merging the PR you can selectively allow PR that manipulate files in specific folders to include the `Set ArgoCD apps Target Revision to <Pull Request Branch>` checkbox.
 
+![image](https://github.com/user-attachments/assets/c2b5c56b-865f-411d-9b72-e8cc0001151f)
+
+
 If the checkbox is marked Telefonistka will set the ArgoCD application object `/spec/source/targetRevision` key to the PR branch, if you have `auto-sync` enabled ArgoCD will sync the workbload object from the branch.
 
 On PR merge, Telefonistka will revert `/spec/source/targetRevision` back to the main branch.
@@ -47,7 +50,7 @@ On PR merge, Telefonistka will revert `/spec/source/targetRevision` back to the 
 
 This feature is gated with the `argocd.allowSyncfromBranchPathRegex` configuration key.
 
-This new example will enable the "non main branch syncing" feature for PRs that only manipulate files under `env/staging/` folder:
+This example configuration will enable the "non main branch syncing" feature for PRs that only manipulate files under `env/staging/` folder:
 
 ```yaml
 argocd:
@@ -56,14 +59,13 @@ argocd:
 
 > [!Note]
 > The applcationSet controller might need to be configured to ignore changes to this specific key, like so:
-
-```yaml
-spec:
-  goTemplate: true
-  ignoreApplicationDifferences:
-    - jsonPointers:
-        - /spec/source/targetRevision
-```
+>
+> ```yaml
+> spec:
+>  ignoreApplicationDifferences:
+>    - jsonPointers:
+>        - /spec/source/targetRevision
+>```
 
 ## AutoMerge "no diff" Promotion PRs
 
