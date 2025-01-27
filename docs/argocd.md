@@ -16,7 +16,10 @@ If the list of changed objects pushed the comment size beyond the max size Telef
 
 Telefonistka can even "diff" new applications, that don't yet have an ArgoCD application object. But this feature is currently implemented in a somewhat opinionated way and only support application created by ApplicationSets with Git Directory generators or Custom Plugin generator that accept a `Path` parameter.  This behavior is gated behind the `argocd.createTempAppObjectFromNewApps` [configuration key](installation.md).
 
-TODO screenshot
+Example:
+
+<img width="960" alt="image" src="https://github.com/user-attachments/assets/d821a2b2-0b83-44f3-9875-8dfa4909d6e9" />
+
 
 ## Warn user on changes to unhealthy/OutOfSync apps
 
@@ -28,7 +31,11 @@ Telefonistka also checks the state of ArgoCD application and adds warning for th
 
 3) `auto-sync` is not enabled
 
-TODO screenshot
+Example:
+
+<img width="923" alt="image" src="https://github.com/user-attachments/assets/4b1ec561-3772-4179-aa28-71e71b826eae" />
+
+
 
 ## AutoMerge "no diff" Promotion PRs
 
