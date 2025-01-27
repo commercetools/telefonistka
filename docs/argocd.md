@@ -1,4 +1,4 @@
-# ArgoCD-specific feature
+# ArgoCD-specific features
 
 While Telefonistka was initially written to be agnostic of the IaC stack some ArgoCD specific features where added recently, this document describes them
 
@@ -14,12 +14,11 @@ If a single application diff is still bigger that the max comment size Telefonis
 
 If the list of changed objects pushed the comment size beyond the max size Telefonistka will explode, maybe, probably.
 
-Telefonistka can even "diff" new applications, that don't yet have an ArgoCD application object. But this feature is currently implemented in a somewhat opinionated way and only support application created by ApplicationSets with Git Directory generators or Custom Plugin generator that accept a `Path` parameter.  This behavior is gated behind the `argocd.createTempAppObjectFromNewApps` [configuration key](installation.md).
+Telefonistka can even "diff" new applications, ones that don't yet have an ArgoCD application object(where not merged to main yet). But this feature is currently implemented in a somewhat opinionated way and only support application created by ApplicationSets with Git Directory generators or Custom Plugin generator that accept a `Path` parameter.  This behavior is gated behind the `argocd.createTempAppObjectFromNewApps` [configuration key](installation.md).
 
 Example:
 
 <img width="960" alt="image" src="https://github.com/user-attachments/assets/d821a2b2-0b83-44f3-9875-8dfa4909d6e9" />
-
 
 ## Warn user on changes to unhealthy/OutOfSync apps
 
@@ -35,7 +34,36 @@ Example:
 
 <img width="923" alt="image" src="https://github.com/user-attachments/assets/4b1ec561-3772-4179-aa28-71e71b826eae" />
 
+## Selectively allow temporary syncing of applications from non main branch 
 
+While displaying "diff" in the PR can catch most templating issues sometime testing a change in a non production environment is needed, if you want to test the configuration before merging the PR you can selectively allow PR that manipulate files in specific folders to include the `Set ArgoCD apps Target Revision to <Pull Request Branch>` checkbox.
+
+If the checkbox is marked Telefonistka will set the ArgoCD application object `/spec/source/targetRevision` key to the PR branch, if you have `auto-sync` enabled ArgoCD will sync the workbload object from the branch.
+
+On PR merge, Telefonistka will revert `/spec/source/targetRevision` back to the main branch.
+
+> [!Note]
+> As of the time of this writing, Telefonistka will **not**  revert  `/spec/source/targetRevision` to the main branch when you uncheck the checkbox, only on PR merge.
+
+This feature is gated with the `argocd.allowSyncfromBranchPathRegex` configuration key.
+
+This new example will enable the "non main branch syncing" feature for PRs that only manipulate files under `env/staging/` folder:
+
+```yaml
+argocd:
+  allowSyncfromBranchPathRegex: '^env/staging/.*$'
+```
+
+> [!Note]
+> The applcationSet controller might need to be configured to ignore changes to this specific key, like so:
+
+```yaml
+spec:
+  goTemplate: true
+  ignoreApplicationDifferences:
+    - jsonPointers:
+        - /spec/source/targetRevision
+```
 
 ## AutoMerge "no diff" Promotion PRs
 
