@@ -56,14 +56,17 @@ Terraform, Helmfile, ArgoCD whatever, as long as environments and sites are mode
 
 ### ArgoCD integration
 
-Displaying planned change in PR comments and more.
+Displaying planned change in PR comment, syncing from non-main branch, application state warnings and more.
+
+![image](https://github.com/user-attachments/assets/c2eb0ce6-8718-4c4a-b7dd-5339f0a0440a)
+
 
 See [here](docs/argocd.md).
 
 
 ### Unopinionated directory structure
 
-The [in-configuration file](docs/installation.md#repo-configuration) is flexible and even has some regex support.
+The [in-repo configuration file](docs/installation.md#repo-configuration) is flexible and even has some regex support.
 
 The project goal is support any reasonable setup and we'll try to address unsupported setups.
 
