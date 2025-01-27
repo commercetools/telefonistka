@@ -6,7 +6,7 @@ While Telefonistka was initially written to be agnostic of the IaC stack some Ar
 
 In most cases users directly manipulate Kubernetes manifests in their DRY form(Helm chart/value files or Kustomize configuration), causing a change to have unexpected results in the rendered manifests, additionally, the state of the in cluster objects in not always known in advance preventing the users from knowing the exact change that will happen in the cluster after merging a PR.
 
-By posting the diffrences between the cluster objects and the manifests rendered from the PR branch the PR author **and reviewer** can have a better understanding of the PR merge actual affect.
+By posting the differences between the cluster objects and the manifests rendered from the PR branch the PR author **and reviewer** can have a better understanding of the PR merge actual affect.
 
 In case the diff output pushes to comment size over the maximum GitHub comment size Telefonistka will try to split each ArgoCD application Diff to a separate comment.
 
@@ -44,7 +44,7 @@ While displaying "diff" in the PR can catch most templating issues sometime test
 
 ![image](https://github.com/user-attachments/assets/c2b5c56b-865f-411d-9b72-e8cc0001151f)
 
-If the checkbox is marked Telefonistka will set the ArgoCD application object `/spec/source/targetRevision` key to the PR branch, if you have `auto-sync` enabled ArgoCD will sync the workbload object from the branch.
+If the checkbox is marked Telefonistka will set the ArgoCD application object `/spec/source/targetRevision` key to the PR branch, if you have `auto-sync` enabled ArgoCD will sync the workload object from the branch.
 
 On PR merge, Telefonistka will revert `/spec/source/targetRevision` back to the main branch.
 
@@ -68,7 +68,7 @@ argocd:
 >  ignoreApplicationDifferences:
 >    - jsonPointers:
 >        - /spec/source/targetRevision
->```
+> ```
 
 ## AutoMerge "no diff" Promotion PRs
 
