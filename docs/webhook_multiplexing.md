@@ -42,3 +42,7 @@ webhookEndpointRegexs:
       - "https://argocd-server6.example.com/api/webhook"
       - "https://argocd-server6.example.com/api/webhook"
 ```
+
+
+> [!IMPORTANT]  
+> You can (and should!) use IP filltering based on GitHub list of IPs for outbound webhooks(see [here](https://api.github.com/meta) ) 

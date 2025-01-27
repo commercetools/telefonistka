@@ -49,9 +49,17 @@ Telefonistka will automagically create pull requests that "sync" our changes to 
 
 ## Notable Features
 
-### IaC stack agnostic
+### IaC stack agnostic(most promotion related features)
 
 Terraform, Helmfile, ArgoCD whatever, as long as environments and sites are modeled as folders and components are copied between environments "as is".
+
+
+### ArgoCD integration
+
+Displaying planned change in PR comments and more.
+
+See [here](docs/argocd.md).
+
 
 ### Unopinionated directory structure
 
