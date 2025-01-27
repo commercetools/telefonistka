@@ -53,16 +53,13 @@ Telefonistka will automagically create pull requests that "sync" our changes to 
 
 Terraform, Helmfile, ArgoCD whatever, as long as environments and sites are modeled as folders and components are copied between environments "as is".
 
-
 ### ArgoCD integration
 
 Displaying planned change in PR comment, syncing from non-main branch, application state warnings and more.
 
 ![image](https://github.com/user-attachments/assets/c2eb0ce6-8718-4c4a-b7dd-5339f0a0440a)
 
-
 See [here](docs/argocd.md).
-
 
 ### Unopinionated directory structure
 
@@ -119,14 +116,6 @@ This is how this warning looks in the PR:
 
 <!-- markdownlint-disable MD033 -->
 <img src="https://user-images.githubusercontent.com/1616153/219383563-8b833c17-7701-45b6-9471-d937d03142f4.png"  width="50%" height="50%">
-<!-- markdownlint-enable MD033 -->
-
-### ArgoCD integration
-
-Telefonistka can compare manifests in PR branches to live objects in the clusters and comment on the difference in PRs
-
-<!-- markdownlint-disable MD033 -->
-<img width="50%" alt="image" src="https://github.com/commercetools/telefonistka/assets/1616153/fe38dc7a-2dea-4461-a0bf-3b07531135a9">
 <!-- markdownlint-enable MD033 -->
 
 ### Artifact version bumping from CLI

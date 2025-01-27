@@ -18,7 +18,9 @@ Telefonistka can even "diff" new applications, ones that don't yet have an ArgoC
 
 Example:
 
+<!-- markdownlint-disable MD033 -->
 <img width="960" alt="image" src="https://github.com/user-attachments/assets/d821a2b2-0b83-44f3-9875-8dfa4909d6e9" />
+<!-- markdownlint-enable MD033 -->
 
 ## Warn user on changes to unhealthy/OutOfSync apps
 
@@ -32,14 +34,15 @@ Telefonistka also checks the state of ArgoCD application and adds warning for th
 
 Example:
 
+<!-- markdownlint-disable MD033 -->
 <img width="923" alt="image" src="https://github.com/user-attachments/assets/4b1ec561-3772-4179-aa28-71e71b826eae" />
+<!-- markdownlint-enable MD033 -->
 
-## Selectively allow temporary syncing of applications from non main branch 
+## Selectively allow temporary syncing of applications from non main branch
 
 While displaying "diff" in the PR can catch most templating issues sometime testing a change in a non production environment is needed, if you want to test the configuration before merging the PR you can selectively allow PR that manipulate files in specific folders to include the `Set ArgoCD apps Target Revision to <Pull Request Branch>` checkbox.
 
 ![image](https://github.com/user-attachments/assets/c2b5c56b-865f-411d-9b72-e8cc0001151f)
-
 
 If the checkbox is marked Telefonistka will set the ArgoCD application object `/spec/source/targetRevision` key to the PR branch, if you have `auto-sync` enabled ArgoCD will sync the workbload object from the branch.
 
