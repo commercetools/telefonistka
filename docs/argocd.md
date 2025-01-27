@@ -14,7 +14,9 @@ If a single application diff is still bigger that the max comment size Telefonis
 
 If the list of changed objects pushed the comment size beyond the max size Telefonistka will explode, maybe, probably.
 
-Telefonistka can even "diff" new applications, ones that don't yet have an ArgoCD application object(where not merged to main yet). But this feature is currently implemented in a somewhat opinionated way and only support application created by ApplicationSets with Git Directory generators or Custom Plugin generator that accept a `Path` parameter.  This behavior is gated behind the `argocd.createTempAppObjectFromNewApps` [configuration key](installation.md).
+Telefonistka can even "diff" new applications, ones that don't yet have an ArgoCD application object(where not merged to main yet). But this feature is currently implemented in a somewhat opinionated way and only support application created by ApplicationSets with Git Directory generators or Custom Plugin generator that accept a `Path` parameter.
+
+This behavior is gated behind the `argocd.createTempAppObjectFromNewApps` [configuration key](installation.md).
 
 Example:
 
