@@ -44,4 +44,4 @@ webhookEndpointRegexs:
 ```
 
 > [!IMPORTANT]  
-> When configuring ingress you can (and should!) use IP filltering based on GitHub list of IPs for outbound webhooks(see [here](https://api.github.com/meta) )
+> When configuring ingress you can (and should!) use IP filltering based on GitHubs list of IPs for outbound webhooks (see [here](https://api.github.com/meta)).
