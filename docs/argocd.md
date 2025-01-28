@@ -62,7 +62,7 @@ argocd:
   allowSyncfromBranchPathRegex: '^env/staging/.*$'
 ```
 
-> [!Note]
+> [!NOTE]
 > The `ApplicationSet` controller might need to be configured to ignore changes to this specific key, like so:
 >
 > ```yaml
