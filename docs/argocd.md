@@ -12,7 +12,7 @@ In cases where the rendered diff output goes over the maximum GitHub comment siz
 
 If a single application diff is still bigger that the max comment size, Telefonistka will only list the changed objects instead of showing the entire changed content.
 
-If the list of changed objects pushed the comment size beyond the max size Telefonistka will explode, maybe, probably.
+If the list of changed objects pushed the comment size beyond the max size Telefonistka will fail.
 
 Telefonistka can even "diff" new applications, ones that do not yet have an ArgoCD application object (e.g. the application has not been merged to main yet). But this feature is currently implemented in a somewhat opinionated way and only support applications created by `ApplicationSets` with a Git Directory Generator or a Custom Plugin Generator that accept a `Path` parameter.
 
