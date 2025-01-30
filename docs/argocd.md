@@ -82,4 +82,4 @@ In those cases Telefonistka can auto-merge the promotion PR, saving the effort o
 
 ## Proxy github webhooks
 
-While not strictly an "ArgoCD feature" Telefonistk ability to proxy webhooks can provide flexability in configuration and securing webhook to ArgoCD server and the AppplicationSet controlelr, see [here](webhook_multiplexing.md)
+While not strictly an "ArgoCD feature" Telefonistka's ability to proxy webhooks can provide greater flexibility in configuration and securing webhook delivery to ArgoCD server and the ApplicationSet controller, see [here](webhook_multiplexing.md)
