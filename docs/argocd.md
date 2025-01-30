@@ -6,7 +6,7 @@ While Telefonistka was initially written to be agnostic of the IaC stack some Ar
 
 In most cases users directly manipulate Kubernetes manifests in their DRY form (Helm chart/value files or Kustomize configuration), causing a change to have unexpected results in the rendered manifests. Additionally, the state of the in-cluster objects is not always known in advance which prevents the users from knowing the exact change that will happen in the cluster after merging a PR.
 
-By posting the differences between the cluster objects and the manifests rendered from the PR branch the PR author **and reviewer** can have a better understanding of the effects of a PR merge.
+Posting the differences between the cluster objects and the manifests rendered from the PR branch helps the PR author and reviewer better understand the effects of a PR merge.
 
 In cases where the rendered diff output goes over the maximum GitHub comment size limit, Telefonistka will try to split each ArgoCD application diff into a separate comment.
 
