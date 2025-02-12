@@ -22,13 +22,13 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
+	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	md "github.com/nao1215/markdown"
 	log "github.com/sirupsen/logrus"
-	"github.com/commercetools/telefonistka/internal/pkg/argocd"
-	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
-	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"golang.org/x/exp/maps"
 )
 
@@ -292,8 +292,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 	if partNumber != 0 {
 		mb.PlainTextf("Component %d/%d: %s (Split for comment size)", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
 	}
-	mb.PlainText("Diff of ArgoCD applications:")
-
+	mb.PlainText("\n\nDiff of ArgoCD applications:\n")
 	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
 		if appDiffResult.DiffError != nil {
 			mb.Cautionf("%s (%s) ", md.Bold("Error getting diff from ArgoCD"), md.Code(appDiffResult.ComponentPath))
@@ -303,7 +302,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 			}
 			mb.CodeBlocks(md.SyntaxHighlightNone, appDiffResult.DiffError.Error())
 		} else {
-			mb.PlainTextf("%s %s @ %s", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), md.Code(appDiffResult.ComponentPath))
+			mb.PlainTextf("\n\n\n%s %s @ %s", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), md.Code(appDiffResult.ComponentPath))
 			if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
 				mb.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
 			}
@@ -314,13 +313,13 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 				mb.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
 			}
 			if appDiffResult.HasDiff {
-				mb.PlainText("<details><summary>ArgoCD Diff(Click to expand):</summary>\n```diff")
+				mb.PlainText("\n\n\n\n\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
 				for _, objectDiff := range appDiffResult.DiffElements {
 					if objectDiff.Diff != "" {
 						mb.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
 					}
 				}
-				mb.PlainText("```\n</details>")
+				mb.PlainText("```\n\n</details>")
 
 			} else {
 				if appDiffResult.AppSyncedFromPRBranch {
