@@ -132,6 +132,7 @@ func TestRenderDiff(t *testing.T) {
 	if got, want := rendered.String(), want; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
+	t.Logf("got: \n%s\n", rendered.String())
 }
 
 func renderTemplate(t *testing.T, tpl string, data any) *bytes.Buffer {

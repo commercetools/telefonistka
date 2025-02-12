@@ -24,9 +24,12 @@ import (
 	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
 	"github.com/argoproj/argo-cd/v2/util/argo/normalizers"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
+	"github.com/gonvenience/ytbx"
+	"github.com/homeport/dyff/pkg/dyff"
 	log "github.com/sirupsen/logrus"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd/diff"
 	yaml2 "gopkg.in/yaml.v2"
+	yaml3 "gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -164,7 +167,38 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, er
 	if err != nil {
 		return "", err
 	}
+
+	var liveNode yaml3.Node
+	var targetNode yaml3.Node
+
+	marsheledLive, _ := live.MarshalJSON()
+	marsheledTarget, _ := target.MarshalJSON()
+
+	err = yaml3.Unmarshal(marsheledLive, &liveNode)
+	err = yaml3.Unmarshal(marsheledTarget, &targetNode)
+
 	patch := diff.Diff(ctxLines, "live", a, "target", b)
+
+	var liveDocs []*yaml3.Node
+	var targetDocs []*yaml3.Node
+	liveDocs = append(liveDocs, &liveNode)
+	targetDocs = append(targetDocs, &targetNode)
+
+	var liveIf ytbx.InputFile
+	var targetIf ytbx.InputFile
+
+	liveIf = ytbx.InputFile{
+		Location:  "live",
+		Documents: liveDocs,
+	}
+
+	targetIf = ytbx.InputFile{
+		Location:  "target",
+		Documents: targetDocs,
+	}
+
+	dReport, err := dyff.CompareInputFiles(liveIf, targetIf)
+	fmt.Printf("Diff: %v\n", dReport)
 	return string(patch), nil
 }
 
