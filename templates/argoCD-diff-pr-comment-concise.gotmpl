@@ -14,7 +14,13 @@ Diff of ArgoCD applications(⚠️ concise view, full diff didn't fit GH comment
 
 {{- else }}
 <img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/> **[{{ $appDiffResult.ArgoCdAppName }}]({{ $appDiffResult.ArgoCdAppURL }})** @ `{{ $appDiffResult.ComponentPath }}`
-{{if $appDiffResult.HasDiff }}
+
+{{if $appDiffResult.AppWasTemporarilyCreated }}
+> [!NOTE]
+> Telefonistka has temporarily created an ArgoCD app object to render manifest previews.
+Please be aware:
+> * The app will only appear in the ArgoCD UI for a few seconds.
+{{- else }}
 {{ if  ne $appDiffResult.ArgoCdAppHealthStatus "Healthy" }}
 > [!CAUTION]
 > The ArgoCD app health status is currently `{{ $appDiffResult.ArgoCdAppHealthStatus }}`.
@@ -27,6 +33,8 @@ Diff of ArgoCD applications(⚠️ concise view, full diff didn't fit GH comment
 > [!NOTE]
 > This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.
 {{- end}}
+{{- end}}
+{{if $appDiffResult.HasDiff }}
 
 <details><summary>ArgoCD list of changed objects(Click to expand):</summary>
 
@@ -44,12 +52,6 @@ Diff of ArgoCD applications(⚠️ concise view, full diff didn't fit GH comment
 {{- else }}
 
 No diff 🤷
-{{- end}}
-{{if $appDiffResult.AppWasTemporarilyCreated }}
-> [!NOTE]
-> Telefonistka has temporarily created an ArgoCD app object to render manifest previews.
-Please be aware:
-> * The app will only appear in the ArgoCD UI for a few seconds.
 {{- end}}
 
 {{- end }}
