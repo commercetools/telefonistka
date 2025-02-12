@@ -211,6 +211,35 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 	}
 }
 
+func TestCompareMarkdown(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		diffCommentDataTestDataFileName string
+	}{
+		"All cluster diffs fit in one comment": {
+			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var diffCommentData DiffCommentData
+			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
+
+			goTtemplateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), diffCommentData)
+			if err != nil {
+				t.Fatal("GoTemplate - failed to generate ArgoCD diff comment template")
+			}
+			markDownLibOutput := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
+
+			_ = os.WriteFile("/tmp/gotemp.md", []byte(goTtemplateOutput), 0644)
+			_ = os.WriteFile("/tmp/markdown.md", []byte(markDownLibOutput), 0644)
+
+			assert.Equal(t, goTtemplateOutput, markDownLibOutput)
+		})
+	}
+}
+
 func readJSONFromFile(t *testing.T, filename string, data interface{}) {
 	t.Helper()
 	// Read the JSON from the file

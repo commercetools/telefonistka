@@ -24,6 +24,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
+	md "github.com/nao1215/markdown"
 	log "github.com/sirupsen/logrus"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
 	cfg "github.com/wayfair-incubator/telefonistka/internal/pkg/configuration"
@@ -282,6 +283,63 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 		return fmt.Errorf("detecting drift: %w", err)
 	}
 	return nil
+}
+
+func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, partNumber int, totalParts int) string {
+	buf := new(bytes.Buffer)
+	mb := md.NewMarkdown(buf)
+	const argoSmallLogo = `<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/>`
+	if partNumber != 0 {
+		mb.PlainTextf("Component %d/%d: %s (Split for comment size)", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
+	}
+	mb.PlainText("Diff of ArgoCD applications:")
+
+	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
+		if appDiffResult.DiffError != nil {
+			mb.Cautionf("%s (%s) ", md.Bold("Error getting diff from ArgoCD"), md.Code(appDiffResult.ComponentPath))
+			mb.PlainTextf("Please check the App Conditions of %s %s for more details.", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)))
+			if appDiffResult.AppWasTemporarilyCreated {
+				mb.Warning("For investigation we kept the temporary application, please make sure to clean it up later!")
+			}
+			mb.CodeBlocks(md.SyntaxHighlightNone, appDiffResult.DiffError.Error())
+		} else {
+			mb.PlainTextf("%s %s @ %s", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), md.Code(appDiffResult.ComponentPath))
+			if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
+				mb.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
+			}
+			if appDiffResult.ArgoCdAppSyncStatus != "Synced" {
+				mb.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
+			}
+			if !appDiffResult.ArgoCdAppAutoSyncEnabled {
+				mb.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
+			}
+			if appDiffResult.HasDiff {
+				mb.PlainText("<details><summary>ArgoCD Diff(Click to expand):</summary>\n```diff")
+				for _, objectDiff := range appDiffResult.DiffElements {
+					if objectDiff.Diff != "" {
+						mb.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
+					}
+				}
+				mb.PlainText("```\n</details>")
+
+			} else {
+				if appDiffResult.AppSyncedFromPRBranch {
+					mb.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")
+				} else {
+					mb.PlainText(" No diff 🤷")
+				}
+				if appDiffResult.AppWasTemporarilyCreated {
+					mb.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.\nPlease be aware:\n* The app will only appear in the ArgoCD UI for a few seconds.")
+				}
+
+			}
+		}
+	}
+	if diffCommentData.DisplaySyncBranchCheckBox {
+		mb.PlainText("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `{{ .BranchName }}`")
+	}
+	mb.Build()
+	return buf.String()
 }
 
 func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
