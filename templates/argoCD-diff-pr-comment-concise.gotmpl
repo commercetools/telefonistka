@@ -31,7 +31,7 @@ Please be aware:
 {{- end}}
 {{ if  not $appDiffResult.ArgoCdAppAutoSyncEnabled }}
 > [!NOTE]
-> This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.
+> This ArgoCD app doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.
 {{- end}}
 {{- end}}
 {{if $appDiffResult.HasDiff }}
