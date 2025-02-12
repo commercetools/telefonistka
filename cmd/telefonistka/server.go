@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/wayfair-incubator/telefonistka/internal/pkg/githubapi"
+	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
 )
 
 func getCrucialEnv(key string) string {

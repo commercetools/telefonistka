@@ -7,7 +7,7 @@ import (
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	log "github.com/sirupsen/logrus"
-	prom "github.com/wayfair-incubator/telefonistka/internal/pkg/prometheus"
+	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 )
 
 const (

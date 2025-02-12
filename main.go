@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/wayfair-incubator/telefonistka/cmd/telefonistka"
+	"github.com/commercetools/telefonistka/cmd/telefonistka"
 )
 
 func main() {

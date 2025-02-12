@@ -13,7 +13,7 @@ import (
 	"github.com/mikefarah/yq/v4/pkg/yqlib"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/wayfair-incubator/telefonistka/internal/pkg/githubapi"
+	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
 )
 
 // This is still(https://github.com/spf13/cobra/issues/1862) the documented way to use cobra
