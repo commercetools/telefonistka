@@ -11,14 +11,14 @@
           "ObjectName": "ssllabs-exporter",
           "ObjectKind": "Service",
           "ObjectNamespace": "",
-          "Diff": "  (*unstructured.Unstructured)(\n- \tnil,\n+ \t\u0026{\n+ \t\tObject: map[string]any{\n+ \t\t\t\"apiVersion\": string(\"v1\"),\n+ \t\t\t\"kind\":       string(\"Service\"),\n+ \t\t\t\"metadata\":   map[string]any{\"labels\": map[string]any{...}, \"name\": string(\"ssllabs-exporter\")},\n+ \t\t\t\"spec\": map[string]any{\n+ \t\t\t\t\"ports\":    []any{...},\n+ \t\t\t\t\"selector\": map[string]any{...},\n+ \t\t\t\t\"type\":     string(\"ClusterIP\"),\n+ \t\t\t},\n+ \t\t},\n+ \t},\n  )\n"
+          "Diff": "--- old-lorem-ipsum.yaml\n+++ new-lorem-ipsum.yaml\n@@ -11,7 +11,7 @@\n\tconsectetur:\n\t\tadipiscing: \"elit\"\n\t\tsed: \n-\t\t\t- \"do eiusmod\"\n+\t\t\t- \"do eiusmod tempor\"\n\t\t\t- \"tempor incididunt\"\n\t\t\t- \"ut labore\"\n\tet: \n@@ -17,7 +17,7 @@\n\t\tenim: \"ad minim veniam\"\n\t\tquis: \"nostrud exercitation\"\n\tullamco:\n-\t\tlaboris: \"nisi ut aliquip\"\n+\t\tlaboris: \"nisi ut aliquip ex\"\n\t\tex: \n\t\t\tea: \"commodo consequat\"\n\tduis: \n@@ -31,7 +31,7 @@\n\texcepteur: \n\t\tsint: \"occaecat cupidatat non proident\"\n\t\tsunt: \n-\t\t\tin: \"culpa qui officia\"\n+\t\t\tin: \"culpa qui officia deserunt\"\n\t\t\tdeserunt: \"mollit anim id est laborum\""
         },
         {
           "ObjectGroup": "apps",
           "ObjectName": "ssllabs-exporter",
           "ObjectKind": "Deployment",
           "ObjectNamespace": "",
-          "Diff": "  (*unstructured.Unstructured)(\n- \tnil,\n+ \t\u0026{\n+ \t\tObject: map[string]any{\n+ \t\t\t\"apiVersion\": string(\"apps/v1\"),\n+ \t\t\t\"kind\":       string(\"Deployment\"),\n+ \t\t\t\"metadata\":   map[string]any{\"labels\": map[string]any{...}, \"name\": string(\"ssllabs-exporter\")},\n+ \t\t\t\"spec\": map[string]any{\n+ \t\t\t\t\"replicas\": int64(2),\n+ \t\t\t\t\"selector\": map[string]any{...},\n+ \t\t\t\t\"template\": map[string]any{...},\n+ \t\t\t},\n+ \t\t},\n+ \t},\n  )\n"
+          "Diff": "--- old-lorem-ipsum.yaml\n+++ new-lorem-ipsum.yaml\n@@ -11,7 +11,7 @@\n\tconsectetur:\n\t\tadipiscing: \"elit\"\n\t\tsed: \n-\t\t\t- \"do eiusmod\"\n+\t\t\t- \"do eiusmod tempor\"\n\t\t\t- \"tempor incididunt\"\n\t\t\t- \"ut labore\"\n\tet: \n@@ -17,7 +17,7 @@\n\t\tenim: \"ad minim veniam\"\n\t\tquis: \"nostrud exercitation\"\n\tullamco:\n-\t\tlaboris: \"nisi ut aliquip\"\n+\t\tlaboris: \"nisi ut aliquip ex\"\n\t\tex: \n\t\t\tea: \"commodo consequat\"\n\tduis: \n@@ -31,7 +31,7 @@\n\texcepteur: \n\t\tsint: \"occaecat cupidatat non proident\"\n\t\tsunt: \n-\t\t\tin: \"culpa qui officia\"\n+\t\t\tin: \"culpa qui officia deserunt\"\n\t\t\tdeserunt: \"mollit anim id est laborum\""
         }
       ],
       "HasDiff": true,

@@ -18,39 +18,61 @@ Diff of ArgoCD applications:
 ```diff
 
 /Service/ssllabs-exporter:
-  (*unstructured.Unstructured)(
-- 	nil,
-+ 	&{
-+ 		Object: map[string]any{
-+ 			"apiVersion": string("v1"),
-+ 			"kind":       string("Service"),
-+ 			"metadata":   map[string]any{"labels": map[string]any{...}, "name": string("ssllabs-exporter")},
-+ 			"spec": map[string]any{
-+ 				"ports":    []any{...},
-+ 				"selector": map[string]any{...},
-+ 				"type":     string("ClusterIP"),
-+ 			},
-+ 		},
-+ 	},
-  )
-
+--- old-lorem-ipsum.yaml
++++ new-lorem-ipsum.yaml
+@@ -11,7 +11,7 @@
+	consectetur:
+		adipiscing: "elit"
+		sed: 
+-			- "do eiusmod"
++			- "do eiusmod tempor"
+			- "tempor incididunt"
+			- "ut labore"
+	et: 
+@@ -17,7 +17,7 @@
+		enim: "ad minim veniam"
+		quis: "nostrud exercitation"
+	ullamco:
+-		laboris: "nisi ut aliquip"
++		laboris: "nisi ut aliquip ex"
+		ex: 
+			ea: "commodo consequat"
+	duis: 
+@@ -31,7 +31,7 @@
+	excepteur: 
+		sint: "occaecat cupidatat non proident"
+		sunt: 
+-			in: "culpa qui officia"
++			in: "culpa qui officia deserunt"
+			deserunt: "mollit anim id est laborum"
 /Deployment/ssllabs-exporter:
-  (*unstructured.Unstructured)(
-- 	nil,
-+ 	&{
-+ 		Object: map[string]any{
-+ 			"apiVersion": string("apps/v1"),
-+ 			"kind":       string("Deployment"),
-+ 			"metadata":   map[string]any{"labels": map[string]any{...}, "name": string("ssllabs-exporter")},
-+ 			"spec": map[string]any{
-+ 				"replicas": int64(2),
-+ 				"selector": map[string]any{...},
-+ 				"template": map[string]any{...},
-+ 			},
-+ 		},
-+ 	},
-  )
-
+--- old-lorem-ipsum.yaml
++++ new-lorem-ipsum.yaml
+@@ -11,7 +11,7 @@
+	consectetur:
+		adipiscing: "elit"
+		sed: 
+-			- "do eiusmod"
++			- "do eiusmod tempor"
+			- "tempor incididunt"
+			- "ut labore"
+	et: 
+@@ -17,7 +17,7 @@
+		enim: "ad minim veniam"
+		quis: "nostrud exercitation"
+	ullamco:
+-		laboris: "nisi ut aliquip"
++		laboris: "nisi ut aliquip ex"
+		ex: 
+			ea: "commodo consequat"
+	duis: 
+@@ -31,7 +31,7 @@
+	excepteur: 
+		sint: "occaecat cupidatat non proident"
+		sunt: 
+-			in: "culpa qui officia"
++			in: "culpa qui officia deserunt"
+			deserunt: "mollit anim id est laborum"
 ```
 
 </details>
