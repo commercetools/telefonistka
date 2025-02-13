@@ -195,10 +195,7 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 			var diffCommentData DiffCommentData
 			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
-			result, err := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
-			if err != nil {
-				t.Errorf("Error generating diff comments: %s", err)
-			}
+			result := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
 			if len(result) != tc.expectedNumberOfComments {
 				t.Errorf("%s: Expected number of comments to be %v, got %v", name, tc.expectedNumberOfComments, len(result))
 			}
@@ -255,6 +252,13 @@ func TestMarkdownGenerator(t *testing.T) {
 			totalParts:                      0,
 			expectedOutputContentFile:       "./testdata/diff_comment_test_output_outOfSync.md",
 		},
+		"Temp app, should not show sync/unhealthy warnings": {
+			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_newApp.json",
+			beConcise:                       false,
+			partNumber:                      0,
+			totalParts:                      0,
+			expectedOutputContentFile:       "./testdata/diff_comment_test_output_newApp.md",
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -265,7 +269,7 @@ func TestMarkdownGenerator(t *testing.T) {
 			genneratedMarkDownOutput := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
 
 			//This is how I generate the expected test data
-			// _ = os.WriteFile(tc.expectedOutputContentFile, []byte(genneratedMarkDownOutput), 0644)
+			_ = os.WriteFile(tc.expectedOutputContentFile, []byte(genneratedMarkDownOutput), 0644)
 
 			expectedOutputContent, err := os.ReadFile(tc.expectedOutputContentFile)
 			if err != nil {

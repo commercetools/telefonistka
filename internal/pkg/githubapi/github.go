@@ -304,14 +304,20 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 			mb.CodeBlocks(md.SyntaxHighlightNone, appDiffResult.DiffError.Error())
 		} else {
 			mb.PlainTextf("%s %s @ %s", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), md.Code(appDiffResult.ComponentPath))
-			if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
-				mb.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
-			}
-			if appDiffResult.ArgoCdAppSyncStatus != "Synced" {
-				mb.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
-			}
-			if !appDiffResult.ArgoCdAppAutoSyncEnabled {
-				mb.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
+
+			// If the app was temporarily created, we should inform the user about it, if not we should inform about "unusual" health and sync status
+			if appDiffResult.AppWasTemporarilyCreated {
+				mb.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \nPlease be aware:  \n* The app will only appear in the ArgoCD UI for a few seconds.")
+			} else {
+				if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
+					mb.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
+				}
+				if appDiffResult.ArgoCdAppSyncStatus != "Synced" {
+					mb.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
+				}
+				if !appDiffResult.ArgoCdAppAutoSyncEnabled {
+					mb.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
+				}
 			}
 			if appDiffResult.HasDiff {
 				mb.PlainText("\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
@@ -333,10 +339,6 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 				} else {
 					mb.PlainText(" No diff 🤷")
 				}
-				if appDiffResult.AppWasTemporarilyCreated {
-					mb.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.\nPlease be aware:\n* The app will only appear in the ArgoCD UI for a few seconds.")
-				}
-
 			}
 		}
 	}
