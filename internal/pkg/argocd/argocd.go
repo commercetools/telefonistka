@@ -24,8 +24,8 @@ import (
 	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
 	"github.com/argoproj/argo-cd/v2/util/argo/normalizers"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
-	log "github.com/sirupsen/logrus"
 	"github.com/commercetools/telefonistka/internal/pkg/argocd/diff"
+	log "github.com/sirupsen/logrus"
 	yaml2 "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

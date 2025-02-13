@@ -8,9 +8,9 @@ import (
 	"sort"
 	"testing"
 
+	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
 	"github.com/go-test/deep"
 	"github.com/google/go-github/v62/github"
-	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
 )
 
 func TestGenerateListOfEndpoints(t *testing.T) {
