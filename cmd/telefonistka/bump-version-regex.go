@@ -6,13 +6,13 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/wayfair-incubator/telefonistka/internal/pkg/githubapi"
 )
 
 // This is still(https://github.com/spf13/cobra/issues/1862) the documented way to use cobra

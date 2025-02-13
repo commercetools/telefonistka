@@ -1,4 +1,4 @@
-module github.com/commercetools/telefonistka
+module github.com/wayfair-incubator/telefonistka
 
 go 1.23.0
 

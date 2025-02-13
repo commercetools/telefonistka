@@ -14,7 +14,7 @@ any real-time space (eg. Slack, Discord, etc).
 ## Reporting Issues
 
 Before reporting a new issue, please ensure that the issue was not already reported or fixed by searching through our
-[issues list](https://github.com/commercetools/telefonistka/issues).
+[issues list](https://github.com/wayfair-incubator/telefonistka/issues).
 
 When creating a new issue, please be sure to include a **title and clear description**, as much relevant information as
 possible, and, if possible, a test case.
@@ -37,7 +37,7 @@ and fix existing bugs. Here is what you can do:
 
 - Help ensure that existing issues follows the recommendations from the _[Reporting Issues](#reporting-issues)_ section,
   providing feedback to the issue's author on what might be missing.
-- Review and update the existing content of our [Wiki](https://github.com/commercetools/telefonistka/wiki) with up-to-date
+- Review and update the existing content of our [Wiki](https://github.com/wayfair-incubator/telefonistka/wiki) with up-to-date
   instructions and code samples.
 - Review existing pull requests, and testing patches against real existing applications that use Telefonistka.
 - Write a test, or add a missing test case to an existing test.
