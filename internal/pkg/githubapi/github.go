@@ -290,12 +290,12 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 	mb := md.NewMarkdown(buf)
 	const argoSmallLogo = `<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/>`
 	if partNumber != 0 {
-		mb.PlainTextf("Component %d/%d: %s (Split for comment size)", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
+		mb.PlainTextf("Component %d/%d: %s (Split for comment size)\n", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
 	}
 	if !beConcise {
-		mb.PlainText("\n\nDiff of ArgoCD applications:\n")
+		mb.PlainText("Diff of ArgoCD applications:\n")
 	} else {
-		mb.PlainText("\n\nDiff of ArgoCD applications(concise view, full diff didn't fit GH comment):\n")
+		mb.PlainText("Diff of ArgoCD applications(concise view, full diff didn't fit GH comment):\n")
 	}
 	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
 		if appDiffResult.DiffError != nil {
@@ -306,7 +306,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 			}
 			mb.CodeBlocks(md.SyntaxHighlightNone, appDiffResult.DiffError.Error())
 		} else {
-			mb.PlainTextf("\n\n\n%s %s @ %s", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), md.Code(appDiffResult.ComponentPath))
+			mb.PlainTextf("%s %s @ %s", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), md.Code(appDiffResult.ComponentPath))
 			if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
 				mb.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
 			}
@@ -317,7 +317,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 				mb.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
 			}
 			if appDiffResult.HasDiff {
-				mb.PlainText("\n\n\n\n\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
+				mb.PlainText("\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
 				for _, objectDiff := range appDiffResult.DiffElements {
 					if objectDiff.Diff != "" {
 						if !beConcise {
@@ -328,7 +328,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 						}
 					}
 				}
-				mb.PlainText("```\n\n</details>")
+				mb.PlainText("\n\n```\n\n</details>")
 
 			} else {
 				if appDiffResult.AppSyncedFromPRBranch {
