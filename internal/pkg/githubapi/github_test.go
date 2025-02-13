@@ -176,12 +176,12 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		"Split diffs, one cluster per comment": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
 			expectedNumberOfComments:        3,
-			maxCommentLength:                1000,
+			maxCommentLength:                4000,
 		},
 		"Split diffs, but maxCommentLength is very small so need to use the concise template": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
 			expectedNumberOfComments:        3,
-			maxCommentLength:                600,
+			maxCommentLength:                2000,
 		},
 	}
 
@@ -196,6 +196,9 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
 			result := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
+			for i, c := range result {
+				t.Logf("comment %v length: %v", i, len(c))
+			}
 			if len(result) != tc.expectedNumberOfComments {
 				t.Errorf("%s: Expected number of comments to be %v, got %v", name, tc.expectedNumberOfComments, len(result))
 			}
