@@ -3,9 +3,9 @@ package telefonistka
 import (
 	"os"
 
+	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/spf13/cobra"
-	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
 )
 
 // This is still(https://github.com/spf13/cobra/issues/1862) the documented way to use cobra
