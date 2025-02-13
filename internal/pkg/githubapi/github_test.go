@@ -271,8 +271,8 @@ func TestMarkdownGenerator(t *testing.T) {
 
 			genneratedMarkDownOutput := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
 
-			//This is how I generate the expected test data
-			_ = os.WriteFile(tc.expectedOutputContentFile, []byte(genneratedMarkDownOutput), 0644)
+			// This is how I generate the expected test data
+			// _ = os.WriteFile(tc.expectedOutputContentFile, []byte(genneratedMarkDownOutput), 0600)
 
 			expectedOutputContent, err := os.ReadFile(tc.expectedOutputContentFile)
 			if err != nil {

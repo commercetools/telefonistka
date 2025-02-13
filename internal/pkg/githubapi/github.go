@@ -327,7 +327,6 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 							mb.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
 						} else {
 							mb.PlainTextf("%s/%s/%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName)
-
 						}
 					}
 				}
