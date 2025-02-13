@@ -264,7 +264,11 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 			diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(componentPathList, config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
 			componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
 			log.Infof("Generating ArgoCD Diff Comment for components: %+v, length of diff elements: %d", string(componentsToDiffJSON), len(diffCommentData.DiffOfChangedComponents))
-			comments := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
+			comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
+			if err != nil {
+				return fmt.Errorf("generating ArgoCD diff comments: %w", err)
+			}
+
 			for _, comment := range comments {
 				err = commentPR(ghPrClientDetails, comment)
 				if err != nil {
@@ -282,7 +286,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 	return nil
 }
 
-func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, partNumber int, totalParts int) string {
+func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, partNumber int, totalParts int) (string, error) {
 	buf := new(bytes.Buffer)
 	mb := md.NewMarkdown(buf)
 	const argoSmallLogo = `<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/>`
@@ -344,17 +348,21 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 	if diffCommentData.DisplaySyncBranchCheckBox {
 		mb.PlainText("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `{{ .BranchName }}`")
 	}
-	mb.Build()
-	return buf.String()
+	err := mb.Build()
+	return buf.String(), err
 }
 
-func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string) {
-	commentBody := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
+func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
+	commentBody, err := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
+	if err != nil {
+		log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+		return comments, err
+	}
 
 	// Happy path, the diff comment is small enough to be posted in one comment
 	if len(commentBody) < githubCommentMaxSize {
 		comments = append(comments, commentBody)
-		return comments
+		return comments, nil
 	}
 
 	// If the diff comment is too large, we'll split it into multiple comments, one per component
@@ -363,7 +371,11 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
 		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
-		commentBody := buildArgoCdDiffComment(diffCommentData, false, i+1, totalComponents)
+		commentBody, err := buildArgoCdDiffComment(diffCommentData, false, i+1, totalComponents)
+		if err != nil {
+			log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+			return comments, err
+		}
 
 		// Even per component comments can be too large, in that case we'll just use the concise template
 		// Somewhat Happy path, the per-component diff comment is small enough to be posted in one comment
@@ -373,11 +385,15 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		}
 
 		// now we don't have much choice, this is the saddest path, we'll use the concise template
-		commentBody = buildArgoCdDiffComment(diffCommentData, true, i+1, totalComponents)
+		commentBody, err = buildArgoCdDiffComment(diffCommentData, true, i+1, totalComponents)
+		if err != nil {
+			log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+			return comments, err
+		}
 		comments = append(comments, commentBody)
 	}
 
-	return comments
+	return comments, nil
 }
 
 // ReciveEventFile this one is similar to ReciveWebhook but it's used for CLI triggering, i  simulates a webhook event to use the same code path as the webhook handler.

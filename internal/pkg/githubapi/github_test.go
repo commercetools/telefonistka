@@ -195,7 +195,10 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 			var diffCommentData DiffCommentData
 			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
-			result := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
+			result, err := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
+			if err != nil {
+				t.Fatalf("Error generating ArgoCD diff comments: %s", err)
+			}
 			for i, c := range result {
 				t.Logf("comment %v length: %v", i, len(c))
 			}
@@ -269,7 +272,10 @@ func TestMarkdownGenerator(t *testing.T) {
 			var diffCommentData DiffCommentData
 			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
-			genneratedMarkDownOutput := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
+			genneratedMarkDownOutput, err := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
+			if err != nil {
+				t.Fatalf("Error generating ArgoCD diff comments: %s", err)
+			}
 
 			// This is how I generate the expected test data
 			// _ = os.WriteFile(tc.expectedOutputContentFile, []byte(genneratedMarkDownOutput), 0600)

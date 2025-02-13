@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
-	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 )
 
 func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch string, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
