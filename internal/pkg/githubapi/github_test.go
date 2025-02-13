@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenerateSafePromotionBranchName(t *testing.T) {
@@ -211,13 +211,49 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 	}
 }
 
-func TestCompareMarkdown(t *testing.T) {
+func TestMarkdownGenerator(t *testing.T) {
 	t.Parallel()
 	tests := map[string]struct {
 		diffCommentDataTestDataFileName string
+		beConcise                       bool
+		partNumber                      int
+		totalParts                      int
+		expectedOutputContentFile       string
 	}{
-		"All cluster diffs fit in one comment": {
+		"Basic templating": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
+			beConcise:                       false,
+			partNumber:                      0,
+			totalParts:                      0,
+			expectedOutputContentFile:       "./testdata/diff_comment_test_output.md",
+		},
+		"Concice templeting": {
+			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
+			beConcise:                       true,
+			partNumber:                      0,
+			totalParts:                      0,
+			expectedOutputContentFile:       "./testdata/diff_comment_test_output_concise.md",
+		},
+		"Part of splitted comment ": {
+			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
+			beConcise:                       false,
+			partNumber:                      3,
+			totalParts:                      8,
+			expectedOutputContentFile:       "./testdata/diff_comment_test_output_part.md",
+		},
+		"Unhealthy": {
+			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_unhealthy.json",
+			beConcise:                       false,
+			partNumber:                      0,
+			totalParts:                      0,
+			expectedOutputContentFile:       "./testdata/diff_comment_test_output_unhealthy.md",
+		},
+		"OutOfSync": {
+			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_outOfSync.json",
+			beConcise:                       false,
+			partNumber:                      0,
+			totalParts:                      0,
+			expectedOutputContentFile:       "./testdata/diff_comment_test_output_outOfSync.md",
 		},
 	}
 	for name, tc := range tests {
@@ -226,16 +262,16 @@ func TestCompareMarkdown(t *testing.T) {
 			var diffCommentData DiffCommentData
 			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
-			goTtemplateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), diffCommentData)
+			genneratedMarkDownOutput := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
+
+			//This is how I generate the expected test data _ = os.WriteFile(tc.expectedOutputContentFile, []byte(genneratedMarkDownOutput), 0644)
+
+			expectedOutputContent, err := os.ReadFile(tc.expectedOutputContentFile)
 			if err != nil {
-				t.Fatal("GoTemplate - failed to generate ArgoCD diff comment template")
+				t.Fatalf("Error loading golden file: %s", err)
 			}
-			markDownLibOutput := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
 
-			_ = os.WriteFile("/tmp/gotemp.md", []byte(goTtemplateOutput), 0644)
-			_ = os.WriteFile("/tmp/markdown.md", []byte(markDownLibOutput), 0644)
-
-			assert.Equal(t, goTtemplateOutput, markDownLibOutput)
+			assert.Equal(t, genneratedMarkDownOutput, string(expectedOutputContent))
 		})
 	}
 }

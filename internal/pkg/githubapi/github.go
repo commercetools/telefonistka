@@ -292,7 +292,11 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 	if partNumber != 0 {
 		mb.PlainTextf("Component %d/%d: %s (Split for comment size)", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
 	}
-	mb.PlainText("\n\nDiff of ArgoCD applications:\n")
+	if !beConcise {
+		mb.PlainText("\n\nDiff of ArgoCD applications:\n")
+	} else {
+		mb.PlainText("\n\nDiff of ArgoCD applications(concise view, full diff didn't fit GH comment):\n")
+	}
 	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
 		if appDiffResult.DiffError != nil {
 			mb.Cautionf("%s (%s) ", md.Bold("Error getting diff from ArgoCD"), md.Code(appDiffResult.ComponentPath))
@@ -316,7 +320,12 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 				mb.PlainText("\n\n\n\n\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
 				for _, objectDiff := range appDiffResult.DiffElements {
 					if objectDiff.Diff != "" {
-						mb.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
+						if !beConcise {
+							mb.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
+						} else {
+							mb.PlainTextf("%s/%s/%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName)
+
+						}
 					}
 				}
 				mb.PlainText("```\n\n</details>")
