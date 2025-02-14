@@ -266,9 +266,8 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 			log.Infof("Generating ArgoCD Diff Comment for components: %+v, length of diff elements: %d", string(componentsToDiffJSON), len(diffCommentData.DiffOfChangedComponents))
 			comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
 			if err != nil {
-				return fmt.Errorf("generating ArgoCD diff comments: %w", err)
+				return fmt.Errorf("generate diff comment: %w", err)
 			}
-
 			for _, comment := range comments {
 				err = commentPR(ghPrClientDetails, comment)
 				if err != nil {

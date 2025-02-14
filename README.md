@@ -206,7 +206,7 @@ like so:
 
 ## Roadmap
 
-See the [open issues](https://github.com/commercetools/telefonistka/issues) for a list of proposed features (and known issues).
+See the [open issues](https://github.com/wayfair-incubator/telefonistka/issues) for a list of proposed features (and known issues).
 
 ## Contributing
 
