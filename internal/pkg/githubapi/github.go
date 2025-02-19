@@ -24,7 +24,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
-	md "github.com/nao1215/markdown"
+	"github.com/nao1215/markdown"
 	log "github.com/sirupsen/logrus"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
 	cfg "github.com/wayfair-incubator/telefonistka/internal/pkg/configuration"
@@ -286,66 +286,66 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 
 func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, partNumber int, totalParts int) (string, error) {
 	buf := new(bytes.Buffer)
-	mb := md.NewMarkdown(buf)
+	md := markdown.NewMarkdown(buf)
 	const argoSmallLogo = `<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/>`
 	if partNumber != 0 {
-		mb.PlainTextf("Component %d/%d: %s (Split for comment size)\n", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
+		md.PlainTextf("Component %d/%d: %s (Split for comment size)\n", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
 	}
 	if !beConcise {
-		mb.PlainText("Diff of ArgoCD applications:\n")
+		md.PlainText("Diff of ArgoCD applications:\n")
 	} else {
-		mb.PlainText("Diff of ArgoCD applications (concise view, full diff didn't fit GH comment):\n")
+		md.PlainText("Diff of ArgoCD applications (concise view, full diff didn't fit GH comment):\n")
 	}
 	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
 		if appDiffResult.DiffError != nil {
-			mb.Cautionf("%s (%s) ", md.Bold("Error getting diff from ArgoCD"), md.Code(appDiffResult.ComponentPath))
-			mb.PlainTextf("Please check the App Conditions of %s %s for more details.", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)))
+			md.Cautionf("%s (%s) ", markdown.Bold("Error getting diff from ArgoCD"), markdown.Code(appDiffResult.ComponentPath))
+			md.PlainTextf("Please check the App Conditions of %s %s for more details.", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)))
 			if appDiffResult.AppWasTemporarilyCreated {
-				mb.Warning("For investigation we kept the temporary application, please make sure to clean it up later!")
+				md.Warning("For investigation we kept the temporary application, please make sure to clean it up later!")
 			}
-			mb.CodeBlocks(md.SyntaxHighlightNone, appDiffResult.DiffError.Error())
+			md.CodeBlocks(markdown.SyntaxHighlightNone, appDiffResult.DiffError.Error())
 		} else {
-			mb.PlainTextf("%s %s @ %s", argoSmallLogo, md.Bold(md.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), md.Code(appDiffResult.ComponentPath))
+			md.PlainTextf("%s %s @ %s", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), markdown.Code(appDiffResult.ComponentPath))
 
 			// If the app was temporarily created, we should inform the user about it, if not we should inform about "unusual" health and sync status
 			if appDiffResult.AppWasTemporarilyCreated {
-				mb.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \nPlease be aware:  \n* The app will only appear in the ArgoCD UI for a few seconds.")
+				md.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \nPlease be aware:  \n* The app will only appear in the ArgoCD UI for a few seconds.")
 			} else {
 				if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
-					mb.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
+					md.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
 				}
 				if appDiffResult.ArgoCdAppSyncStatus != "Synced" {
-					mb.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
+					md.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
 				}
 				if !appDiffResult.ArgoCdAppAutoSyncEnabled {
-					mb.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
+					md.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
 				}
 			}
 			if appDiffResult.HasDiff {
-				mb.PlainText("\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
+				md.PlainText("\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
 				for _, objectDiff := range appDiffResult.DiffElements {
 					if objectDiff.Diff != "" {
 						if !beConcise {
-							mb.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
+							md.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
 						} else {
-							mb.PlainTextf("%s/%s/%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName)
+							md.PlainTextf("%s/%s/%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName)
 						}
 					}
 				}
-				mb.PlainText("\n\n```\n\n</details>\n")
+				md.PlainText("\n\n```\n\n</details>\n")
 			} else {
 				if appDiffResult.AppSyncedFromPRBranch {
-					mb.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")
+					md.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")
 				} else {
-					mb.PlainText("No diff 🤷")
+					md.PlainText("No diff 🤷")
 				}
 			}
 		}
 	}
 	if diffCommentData.DisplaySyncBranchCheckBox {
-		mb.PlainTextf("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `%s`", diffCommentData.BranchName)
+		md.PlainTextf("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `%s`", diffCommentData.BranchName)
 	}
-	err := mb.Build()
+	err := md.Build()
 	return buf.String(), err
 }
 
