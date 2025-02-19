@@ -332,7 +332,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 						}
 					}
 				}
-				mb.PlainText("\n\n```\n\n</details>")
+				mb.PlainText("\n\n```\n\n</details>\n")
 			} else {
 				if appDiffResult.AppSyncedFromPRBranch {
 					mb.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")

@@ -67,4 +67,5 @@ Diff of ArgoCD applications:
 ```
 
 </details>
+
 - [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `promotions/284-simulate-error-5c159151017f`
