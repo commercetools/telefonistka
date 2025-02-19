@@ -279,20 +279,20 @@ func TestMarkdownGenerator(t *testing.T) {
 			var diffCommentData DiffCommentData
 			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
-			genneratedMarkDownOutput, err := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
+			generatedMarkDownOutput, err := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
 			if err != nil {
 				t.Fatalf("Error generating ArgoCD diff comments: %s", err)
 			}
 
 			// This is how I generate the expected test data
-			// _ = os.WriteFile(tc.expectedOutputContentFile, []byte(genneratedMarkDownOutput), 0600)
+			// _ = os.WriteFile(tc.expectedOutputContentFile, []byte(generatedMarkDownOutput), 0600)
 
 			expectedOutputContent, err := os.ReadFile(tc.expectedOutputContentFile)
 			if err != nil {
 				t.Fatalf("Error loading golden file: %s", err)
 			}
 
-			assert.Equal(t, genneratedMarkDownOutput, string(expectedOutputContent))
+			assert.Equal(t, generatedMarkDownOutput, string(expectedOutputContent))
 		})
 	}
 }
