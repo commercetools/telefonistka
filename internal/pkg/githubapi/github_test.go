@@ -265,6 +265,13 @@ func TestMarkdownGenerator(t *testing.T) {
 			totalParts:                      0,
 			expectedOutputContentFile:       "./testdata/diff_comment_test_output_newApp.md",
 		},
+		"Show Sync from Branch checkbox": {
+			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_sync_branch.json",
+			beConcise:                       false,
+			partNumber:                      0,
+			totalParts:                      0,
+			expectedOutputContentFile:       "./testdata/diff_comment_test_output_sync_branch.md",
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

@@ -41,7 +41,6 @@ type DiffCommentData struct {
 	DiffOfChangedComponents   []argocd.DiffResult
 	DisplaySyncBranchCheckBox bool
 	BranchName                string
-	Header                    string
 }
 
 type promotionInstanceMetaData struct {
@@ -344,7 +343,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 		}
 	}
 	if diffCommentData.DisplaySyncBranchCheckBox {
-		mb.PlainText("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `{{ .BranchName }}`")
+		mb.PlainTextf("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `%s`", diffCommentData.BranchName)
 	}
 	err := mb.Build()
 	return buf.String(), err
@@ -368,7 +367,6 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 	for i, singleComponentDiff := range diffCommentData.DiffOfChangedComponents {
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
-		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
 		commentBody, err := buildArgoCdDiffComment(diffCommentData, false, i+1, totalComponents)
 		if err != nil {
 			log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)

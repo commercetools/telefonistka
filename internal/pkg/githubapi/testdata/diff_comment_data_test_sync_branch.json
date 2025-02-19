@@ -24,11 +24,11 @@
       "HasDiff": true,
       "DiffError": null,
       "AppWasTemporarilyCreated": false,
-      "ArgoCdAppHealthStatus": "Unhealthy",
+      "ArgoCdAppHealthStatus": "Healthy",
       "ArgoCdAppSyncStatus": "Synced",
       "ArgoCdAppAutoSyncEnabled": true
     }
   ],
-  "DisplaySyncBranchCheckBox": false,
+  "DisplaySyncBranchCheckBox": true,
   "BranchName": "promotions/284-simulate-error-5c159151017f"
 }
