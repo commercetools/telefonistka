@@ -294,7 +294,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 	if !beConcise {
 		mb.PlainText("Diff of ArgoCD applications:\n")
 	} else {
-		mb.PlainText("Diff of ArgoCD applications(concise view, full diff didn't fit GH comment):\n")
+		mb.PlainText("Diff of ArgoCD applications (concise view, full diff didn't fit GH comment):\n")
 	}
 	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
 		if appDiffResult.DiffError != nil {
@@ -337,7 +337,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 				if appDiffResult.AppSyncedFromPRBranch {
 					mb.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")
 				} else {
-					mb.PlainText(" No diff 🤷")
+					mb.PlainText("No diff 🤷")
 				}
 			}
 		}
