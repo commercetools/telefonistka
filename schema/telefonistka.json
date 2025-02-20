@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://json.schemastore.org/telefonistka.json",
-  "title": "Schema for telefonistka.yaml files",
+  "title": "Schema for repo-level telefonistka.yaml files",
   "type": "object",
   "additionalProperties": false,
   "definitions": {
@@ -141,6 +141,24 @@
           "description": "For application created in PR Telefonistka needs to create a temporary ArgoCD Application Object to render the manifests, this key enables this behavior"
         }
       }
+    },
+    "promotionTargetBlockList": {
+      "type": "array",
+      "description": "Component-level configuration only. Highest priority. List of target paths blocked from promoting. Can be regex",
+      "items": {
+        "type": "string"
+      }
+    },
+    "promotionTargetAllowList": {
+      "type": "array",
+      "description": "Component-level configuration only. List of target paths allowed to be promoted. Can be regex",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disableArgoCDDiff": {
+      "type": "boolean",
+      "description": "Component-level configuration only. If true, no sensitive information stored outside kind:Secret objects is persisted to PR comments"
     }
   }
 }
