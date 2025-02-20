@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://json.schemastore.org/telefonistka.json",
+  "title": "Schema for telefonistka.yaml files",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "path": {
+      "type": "object",
+      "description": "A promotion flow",
+      "properties": {
+        "sourcePath": {
+          "type": "string",
+          "description": "The directory that holds components(subdirectories) to be synced, can include a regex"
+        },
+        "componentPathExtraDepth": {
+          "type": "integer",
+          "description": "The number of extra nesting levels to add to the 'components' being promoted, this allows nesting components in subdirectories while keeping them distinct. A 2 value will mean the component name includes the 3 subdirectories under the sourcePath"
+        },
+        "conditions": {
+          "type": "object",
+          "description": "Conditions for triggering a specific promotion flows. Flows are evaluated in order, first one to match is triggered",
+          "properties": {
+            "prHasLabels": {
+              "type": "array",
+              "description": "Array of PR labels, if the triggering PR has any of these labels the condition is considered fulfilled",
+              "items": {
+                "type": "string"
+              }
+            },
+            "autoMerge": {
+              "type": "boolean",
+              "description": "If set to true, PR will be automatically merged after it is created"
+            }
+          }
+        },
+        "promotionPrs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/pr"
+          }
+        }
+      }
+    },
+    "pr": {
+      "type": "object",
+      "description": "a PR that will be opened when files are changed under sourcePath",
+      "properties": {
+        "targetPaths": {
+          "type": "array",
+          "description": "A directory to be synced from the changed component under sourcePath",
+          "items": {
+            "type": "string"
+          }
+        },
+        "targetDescription": {
+          "type": "string",
+          "description": "An optional string that describes the target paths, will be used in the promotion PR titles"
+        }
+      }
+    },
+    "regex": {
+      "type": "object",
+      "description": "Regex to configure Github event forwarding",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "description": "Directory in the repo to watch for watch"
+        },
+        "replacements": {
+          "type": "array",
+          "description": "List of webhook endpoint to send the Github event. You can use capture groups from the regex expression",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "properties": {
+    "promotionPaths": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/path"
+      }
+    },
+    "promtionPRlables": {
+      "type": "array",
+      "description": "List of labels to apply on PR",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dryRunMode": {
+      "type": "boolean",
+      "description": "If true, the bot will comment the planned promotion on the merged PR"
+    },
+    "autoApprovePromotionPrs": {
+      "type": "boolean",
+      "description": "If true the bot will auto-approve all promotion PRs, with the assumption the original PR was peer reviewed and is promoted verbatim. Required additional GH token via APPROVER_GITHUB_OAUTH_TOKEN env variable"
+    },
+    "toggleCommitStatus": {
+      "type": "object",
+      "description": "Map of strings, allow (non-repo-admin) users to change the Github commit status state(from failure to success and back). This can be used to continue promotion of a change that doesn't pass repo checks. the keys are strings commented in the PRs, values are Github commit status context to be overridden"
+    },
+    "webhookEndpointRegexs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/regex"
+      }
+    },
+    "whProxtSkipTLSVerifyUpstream": {
+      "type": "boolean",
+      "description": "This disables upstream TLS server certificate validation for the webhook proxy functionality. Default is false"
+    },
+    "argocd": {
+      "type": "object",
+      "description": "ArgoCD configuration",
+      "properties": {
+        "commentDiffonPR": {
+          "type": "boolean",
+          "description": "Uses ArgoCD API to calculate expected changes to k8s state and comment the resulting 'diff' as comment in the PR"
+        },
+        "autoMergeNoDiffPRs": {
+          "type": "boolean",
+          "description": "If true, Telefonistka will merge promotion PRs that are not expected to change the target clusters"
+        },
+        "useSHALabelForAppDiscovery": {
+          "type": "boolean",
+          "description": "Use SHA1 of the application path as a label and rely on ArgoCD server-side filtering, label name is telefonistka.io/component-path-sha1"
+        },
+        "allowSyncfromBranchPathRegex": {
+          "type": "string",
+          "description": "This controls which component(=ArgoCD apps) are allowed to be 'applied' from a PR branch, by setting the ArgoCD application Target Revision to PR branch"
+        },
+        "createTempAppObjectFromNewApps": {
+          "type": "boolean",
+          "description": "For application created in PR Telefonistka needs to create a temporary ArgoCD Application Object to render the manifests, this key enables this behavior"
+        }
+      }
+    }
+  }
+}
