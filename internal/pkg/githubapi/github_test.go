@@ -217,67 +217,53 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 func TestMarkdownGenerator(t *testing.T) {
 	t.Parallel()
 	tests := map[string]struct {
-		diffCommentDataTestDataFileName string
-		beConcise                       bool
-		partNumber                      int
-		totalParts                      int
-		expectedOutputContentFile       string
+		beConcise  bool
+		partNumber int
+		totalParts int
 	}{
 		"Basic templating": {
-			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
-			beConcise:                       false,
-			partNumber:                      0,
-			totalParts:                      0,
-			expectedOutputContentFile:       "./testdata/diff_comment_test_output.md",
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
 		},
 		"Concice templeting": {
-			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
-			beConcise:                       true,
-			partNumber:                      0,
-			totalParts:                      0,
-			expectedOutputContentFile:       "./testdata/diff_comment_test_output_concise.md",
+			beConcise:  true,
+			partNumber: 0,
+			totalParts: 0,
 		},
 		"Part of splitted comment ": {
-			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
-			beConcise:                       false,
-			partNumber:                      3,
-			totalParts:                      8,
-			expectedOutputContentFile:       "./testdata/diff_comment_test_output_part.md",
+			beConcise:  false,
+			partNumber: 3,
+			totalParts: 8,
 		},
 		"Unhealthy": {
-			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_unhealthy.json",
-			beConcise:                       false,
-			partNumber:                      0,
-			totalParts:                      0,
-			expectedOutputContentFile:       "./testdata/diff_comment_test_output_unhealthy.md",
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
 		},
 		"OutOfSync": {
-			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_outOfSync.json",
-			beConcise:                       false,
-			partNumber:                      0,
-			totalParts:                      0,
-			expectedOutputContentFile:       "./testdata/diff_comment_test_output_outOfSync.md",
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
 		},
-		"Temp app, should not show sync/unhealthy warnings": {
-			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_newApp.json",
-			beConcise:                       false,
-			partNumber:                      0,
-			totalParts:                      0,
-			expectedOutputContentFile:       "./testdata/diff_comment_test_output_newApp.md",
+		"Temp app should not show sync or unhealthy warnings": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
 		},
 		"Show Sync from Branch checkbox": {
-			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test_sync_branch.json",
-			beConcise:                       false,
-			partNumber:                      0,
-			totalParts:                      0,
-			expectedOutputContentFile:       "./testdata/diff_comment_test_output_sync_branch.md",
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var diffCommentData DiffCommentData
-			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
+			diffCommentDataTestDataFileName := "./testdata/data/" + t.Name() + ".json"
+			expectedOutputContentFile := "./testdata/output/" + t.Name() + ".md"
+			readJSONFromFile(t, diffCommentDataTestDataFileName, &diffCommentData)
 
 			generatedMarkDownOutput, err := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
 			if err != nil {
@@ -285,9 +271,9 @@ func TestMarkdownGenerator(t *testing.T) {
 			}
 
 			// This is how I generate the expected test data
-			// _ = os.WriteFile(tc.expectedOutputContentFile, []byte(generatedMarkDownOutput), 0600)
+			// _ = os.WriteFile(expectedOutputContentFile, []byte(generatedMarkDownOutput), 0600)
 
-			expectedOutputContent, err := os.ReadFile(tc.expectedOutputContentFile)
+			expectedOutputContent, err := os.ReadFile(expectedOutputContentFile)
 			if err != nil {
 				t.Fatalf("Error loading golden file: %s", err)
 			}
