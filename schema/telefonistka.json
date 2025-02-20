@@ -36,6 +36,7 @@
         },
         "promotionPrs": {
           "type": "array",
+          "description": "List of PR that will be opened when files are changed under sourcePath",
           "items": {
             "$ref": "#/definitions/pr"
           }
@@ -44,7 +45,7 @@
     },
     "pr": {
       "type": "object",
-      "description": "a PR that will be opened when files are changed under sourcePath",
+      "description": "A PR that will be opened when files are changed under sourcePath",
       "properties": {
         "targetPaths": {
           "type": "array",
@@ -80,6 +81,7 @@
   "properties": {
     "promotionPaths": {
       "type": "array",
+      "description": "List of promotion flow",
       "items": {
         "$ref": "#/definitions/path"
       }
@@ -105,6 +107,7 @@
     },
     "webhookEndpointRegexs": {
       "type": "array",
+      "description": "List of configuration for Github event forwarding",
       "items": {
         "$ref": "#/definitions/regex"
       }
