@@ -101,7 +101,7 @@ func TestDiffLiveVsTargetObject(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			live, target, want := readLiveTarget(t)
-			got, err := diffLiveVsTargetObject(live, target)
+			got, err := diffLiveVsTargetObject(live, target, false)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -118,7 +118,29 @@ func TestRenderDiff(t *testing.T) {
 	live := readManifest(t, "testdata/TestRenderDiff.live")
 	target := readManifest(t, "testdata/TestRenderDiff.target")
 	want := readFileString(t, "testdata/TestRenderDiff.md")
-	data, err := diffLiveVsTargetObject(live, target)
+	data, err := diffLiveVsTargetObject(live, target, false)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// backticks are tricky https://github.com/golang/go/issues/24475
+	r := strings.NewReplacer("¬", "`")
+	tmpl := r.Replace("¬¬¬diff\n{{.}}¬¬¬\n")
+
+	rendered := renderTemplate(t, tmpl, data)
+
+	if got, want := rendered.String(), want; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	t.Logf("got: \n%s\n", rendered.String())
+}
+
+func TestRenderFancyDiff(t *testing.T) {
+	t.Parallel()
+	live := readManifest(t, "testdata/TestRenderDiff.live")
+	target := readManifest(t, "testdata/TestRenderDiff.target")
+	want := readFileString(t, "testdata/TestRenderFacnyDiff.md")
+	data, err := diffLiveVsTargetObject(live, target, true)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
