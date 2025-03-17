@@ -1,5 +1,5 @@
 
-FROM golang:1.23.4 AS test
+FROM golang:1.24.1 AS test
 ARG GOPROXY
 ENV GOPATH=/go
 ENV PATH="$PATH:$GOPATH/bin"
