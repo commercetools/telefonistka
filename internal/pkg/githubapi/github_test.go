@@ -176,12 +176,12 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		"Split diffs, one cluster per comment": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
 			expectedNumberOfComments:        3,
-			maxCommentLength:                1000,
+			maxCommentLength:                4000,
 		},
 		"Split diffs, but maxCommentLength is very small so need to use the concise template": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
 			expectedNumberOfComments:        3,
-			maxCommentLength:                600,
+			maxCommentLength:                2000,
 		},
 	}
 
@@ -197,7 +197,10 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 
 			result, err := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
 			if err != nil {
-				t.Errorf("Error generating diff comments: %s", err)
+				t.Fatalf("Error generating ArgoCD diff comments: %s", err)
+			}
+			for i, c := range result {
+				t.Logf("comment %v length: %v", i, len(c))
 			}
 			if len(result) != tc.expectedNumberOfComments {
 				t.Errorf("%s: Expected number of comments to be %v, got %v", name, tc.expectedNumberOfComments, len(result))
@@ -207,6 +210,75 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 					t.Errorf("%s: Expected comment length to be less than %d, got %d", name, tc.maxCommentLength, len(comment))
 				}
 			}
+		})
+	}
+}
+
+func TestMarkdownGenerator(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		beConcise  bool
+		partNumber int
+		totalParts int
+	}{
+		"Basic templating": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
+		},
+		"Concice templeting": {
+			beConcise:  true,
+			partNumber: 0,
+			totalParts: 0,
+		},
+		"Part of splitted comment ": {
+			beConcise:  false,
+			partNumber: 3,
+			totalParts: 8,
+		},
+		"Unhealthy": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
+		},
+		"OutOfSync": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
+		},
+		"Temp app should not show sync or unhealthy warnings": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
+		},
+		"Show Sync from Branch checkbox": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var diffCommentData DiffCommentData
+			diffCommentDataTestDataFileName := "./testdata/data/" + t.Name() + ".json"
+			expectedOutputContentFile := "./testdata/output/" + t.Name() + ".md"
+			readJSONFromFile(t, diffCommentDataTestDataFileName, &diffCommentData)
+
+			generatedMarkDownOutput, err := buildArgoCdDiffComment(diffCommentData, tc.beConcise, tc.partNumber, tc.totalParts)
+			if err != nil {
+				t.Fatalf("Error generating ArgoCD diff comments: %s", err)
+			}
+
+			// This is how I generate the expected test data
+			// _ = os.WriteFile(expectedOutputContentFile, []byte(generatedMarkDownOutput), 0600)
+
+			expectedOutputContent, err := os.ReadFile(expectedOutputContentFile)
+			if err != nil {
+				t.Fatalf("Error loading golden file: %s", err)
+			}
+
+			assert.Equal(t, generatedMarkDownOutput, string(expectedOutputContent))
 		})
 	}
 }

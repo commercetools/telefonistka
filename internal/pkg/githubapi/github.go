@@ -24,6 +24,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/nao1215/markdown"
 	log "github.com/sirupsen/logrus"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
 	cfg "github.com/wayfair-incubator/telefonistka/internal/pkg/configuration"
@@ -40,7 +41,6 @@ type DiffCommentData struct {
 	DiffOfChangedComponents   []argocd.DiffResult
 	DisplaySyncBranchCheckBox bool
 	BranchName                string
-	Header                    string
 }
 
 type promotionInstanceMetaData struct {
@@ -284,15 +284,81 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 	return nil
 }
 
+func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, partNumber int, totalParts int) (string, error) {
+	buf := new(bytes.Buffer)
+	md := markdown.NewMarkdown(buf)
+	const argoSmallLogo = `<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/>`
+	if partNumber != 0 {
+		md.PlainTextf("Component %d/%d: %s (Split for comment size)\n", partNumber, totalParts, diffCommentData.DiffOfChangedComponents[0].ComponentPath)
+	}
+	if !beConcise {
+		md.PlainText("Diff of ArgoCD applications:\n")
+	} else {
+		md.PlainText("Diff of ArgoCD applications (concise view, full diff didn't fit GH comment):\n")
+	}
+	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
+		if appDiffResult.DiffError != nil {
+			md.Cautionf("%s (%s) ", markdown.Bold("Error getting diff from ArgoCD"), markdown.Code(appDiffResult.ComponentPath))
+			md.PlainTextf("Please check the App Conditions of %s %s for more details.", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)))
+			if appDiffResult.AppWasTemporarilyCreated {
+				md.Warning("For investigation we kept the temporary application, please make sure to clean it up later!")
+			}
+			md.CodeBlocks(markdown.SyntaxHighlightNone, appDiffResult.DiffError.Error())
+		} else {
+			md.PlainTextf("%s %s @ %s", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), markdown.Code(appDiffResult.ComponentPath))
+
+			// If the app was temporarily created, we should inform the user about it, if not we should inform about "unusual" health and sync status
+			if appDiffResult.AppWasTemporarilyCreated {
+				md.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \nPlease be aware:  \n* The app will only appear in the ArgoCD UI for a few seconds.")
+			} else {
+				if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
+					md.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
+				}
+				if appDiffResult.ArgoCdAppSyncStatus != "Synced" {
+					md.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
+				}
+				if !appDiffResult.ArgoCdAppAutoSyncEnabled {
+					md.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
+				}
+			}
+			if appDiffResult.HasDiff {
+				md.PlainText("\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
+				for _, objectDiff := range appDiffResult.DiffElements {
+					if objectDiff.Diff != "" {
+						if !beConcise {
+							md.PlainTextf("%s/%s/%s:\n%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName, objectDiff.Diff)
+						} else {
+							md.PlainTextf("%s/%s/%s", objectDiff.ObjectNamespace, objectDiff.ObjectKind, objectDiff.ObjectName)
+						}
+					}
+				}
+				md.PlainText("\n\n```\n\n</details>\n")
+			} else {
+				if appDiffResult.AppSyncedFromPRBranch {
+					md.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")
+				} else {
+					md.PlainText("No diff 🤷")
+				}
+			}
+		}
+	}
+	if diffCommentData.DisplaySyncBranchCheckBox {
+		md.PlainTextf("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `%s`", diffCommentData.BranchName)
+	}
+	err := md.Build()
+	return buf.String(), err
+}
+
 func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
-	templateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), diffCommentData)
+	commentBody, err := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
+		log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+		return comments, err
 	}
 
 	// Happy path, the diff comment is small enough to be posted in one comment
-	if len(templateOutput) < githubCommentMaxSize {
-		comments = append(comments, templateOutput)
+	if len(commentBody) < githubCommentMaxSize {
+		comments = append(comments, commentBody)
 		return comments, nil
 	}
 
@@ -301,25 +367,26 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 	for i, singleComponentDiff := range diffCommentData.DiffOfChangedComponents {
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
-		componentTemplateData.Header = fmt.Sprintf("Component %d/%d: %s (Split for comment size)", i+1, totalComponents, singleComponentDiff.ComponentPath)
-		templateOutput, err := executeTemplate("argoCdDiff", defaultTemplatesFullPath("argoCD-diff-pr-comment.gotmpl"), componentTemplateData)
+		commentBody, err := buildArgoCdDiffComment(diffCommentData, false, i+1, totalComponents)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
+			log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+			return comments, err
 		}
 
 		// Even per component comments can be too large, in that case we'll just use the concise template
 		// Somewhat Happy path, the per-component diff comment is small enough to be posted in one comment
-		if len(templateOutput) < githubCommentMaxSize {
-			comments = append(comments, templateOutput)
+		if len(commentBody) < githubCommentMaxSize {
+			comments = append(comments, commentBody)
 			continue
 		}
 
 		// now we don't have much choice, this is the saddest path, we'll use the concise template
-		templateOutput, err = executeTemplate("argoCdDiffConcise", defaultTemplatesFullPath("argoCD-diff-pr-comment-concise.gotmpl"), componentTemplateData)
+		commentBody, err = buildArgoCdDiffComment(diffCommentData, true, i+1, totalComponents)
 		if err != nil {
-			return comments, fmt.Errorf("failed to generate ArgoCD diff comment template: %w", err)
+			log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+			return comments, err
 		}
-		comments = append(comments, templateOutput)
+		comments = append(comments, commentBody)
 	}
 
 	return comments, nil

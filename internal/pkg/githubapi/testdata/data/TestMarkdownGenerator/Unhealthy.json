@@ -1,0 +1,34 @@
+
+{
+  "DiffOfChangedComponents": [
+    {
+      "ComponentPath": "clusters/playground/aws/eu-central-1/v1/special-delivery/ssllab-test/ssllab-test",
+      "ArgoCdAppName": "temp-ssllab-test-plg-aws-eu-central1-v1",
+      "ArgoCdAppURL": "https://argocd-lab.example.com/applications/temp-ssllab-test-plg-aws-eu-central1-v1",
+      "DiffElements": [
+        {
+          "ObjectGroup": "",
+          "ObjectName": "ssllabs-exporter",
+          "ObjectKind": "Service",
+          "ObjectNamespace": "",
+          "Diff": "--- old-lorem-ipsum.yaml\n+++ new-lorem-ipsum.yaml\n@@ -11,7 +11,7 @@\n\tconsectetur:\n\t\tadipiscing: \"elit\"\n\t\tsed: \n-\t\t\t- \"do eiusmod\"\n+\t\t\t- \"do eiusmod tempor\"\n\t\t\t- \"tempor incididunt\"\n\t\t\t- \"ut labore\"\n\tet: \n@@ -17,7 +17,7 @@\n\t\tenim: \"ad minim veniam\"\n\t\tquis: \"nostrud exercitation\"\n\tullamco:\n-\t\tlaboris: \"nisi ut aliquip\"\n+\t\tlaboris: \"nisi ut aliquip ex\"\n\t\tex: \n\t\t\tea: \"commodo consequat\"\n\tduis: \n@@ -31,7 +31,7 @@\n\texcepteur: \n\t\tsint: \"occaecat cupidatat non proident\"\n\t\tsunt: \n-\t\t\tin: \"culpa qui officia\"\n+\t\t\tin: \"culpa qui officia deserunt\"\n\t\t\tdeserunt: \"mollit anim id est laborum\""
+        },
+        {
+          "ObjectGroup": "apps",
+          "ObjectName": "ssllabs-exporter",
+          "ObjectKind": "Deployment",
+          "ObjectNamespace": "",
+          "Diff": "--- old-lorem-ipsum.yaml\n+++ new-lorem-ipsum.yaml\n@@ -11,7 +11,7 @@\n\tconsectetur:\n\t\tadipiscing: \"elit\"\n\t\tsed: \n-\t\t\t- \"do eiusmod\"\n+\t\t\t- \"do eiusmod tempor\"\n\t\t\t- \"tempor incididunt\"\n\t\t\t- \"ut labore\"\n\tet: \n@@ -17,7 +17,7 @@\n\t\tenim: \"ad minim veniam\"\n\t\tquis: \"nostrud exercitation\"\n\tullamco:\n-\t\tlaboris: \"nisi ut aliquip\"\n+\t\tlaboris: \"nisi ut aliquip ex\"\n\t\tex: \n\t\t\tea: \"commodo consequat\"\n\tduis: \n@@ -31,7 +31,7 @@\n\texcepteur: \n\t\tsint: \"occaecat cupidatat non proident\"\n\t\tsunt: \n-\t\t\tin: \"culpa qui officia\"\n+\t\t\tin: \"culpa qui officia deserunt\"\n\t\t\tdeserunt: \"mollit anim id est laborum\""
+        }
+      ],
+      "HasDiff": true,
+      "DiffError": null,
+      "AppWasTemporarilyCreated": false,
+      "ArgoCdAppHealthStatus": "Unhealthy",
+      "ArgoCdAppSyncStatus": "Synced",
+      "ArgoCdAppAutoSyncEnabled": true
+    }
+  ],
+  "DisplaySyncBranchCheckBox": false,
+  "BranchName": "promotions/284-simulate-error-5c159151017f"
+}

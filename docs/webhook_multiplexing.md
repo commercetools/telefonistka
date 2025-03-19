@@ -42,3 +42,6 @@ webhookEndpointRegexs:
       - "https://argocd-server6.example.com/api/webhook"
       - "https://argocd-server6.example.com/api/webhook"
 ```
+
+> [!IMPORTANT]  
+> When configuring ingress you can (and should!) use IP filltering based on GitHubs list of IPs for outbound webhooks (see [here](https://api.github.com/meta)).
