@@ -1,7 +1,9 @@
 ```diff
-# apiVersion: commercetools.io/v1alpha1
-# kind: Bar
-# name: example-baz-bar
+apiVersion: commercetools.io/v1alpha1
+kind: Bar
+metadata:
+  name: example-baz-bar
+
 @@ rbacBindings.security-audit-viewer-vault.subjects @@
 ! - one list entry removed:
 - - name: "vault:some-team@domain.tld"
