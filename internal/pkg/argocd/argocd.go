@@ -212,7 +212,7 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured, useFancyDif
 
 	dReport, err := dyff.CompareInputFiles(liveIf, targetIf, cOptions...)
 	if err != nil {
-		log.Errorf("Failed to generate Dyff report: %v", err)
+		return "", fmt.Errorf("failed to generate Dyff report: %w", err)
 	}
 
 	reportWriter := &dyff.DiffSyntaxReport{
@@ -236,9 +236,9 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured, useFancyDif
 
 	err = reportWriter.WriteReport(out)
 	if err != nil {
-		log.Errorf("Failed to format a Dyff report: %v", err)
+		return "", fmt.Errorf("failed to format a Dyff report: %w", err)
 	}
-	header := "# apiVersion: " + apiVersion + "\n# kind: " + kind + "\n# name: " + name
+	header := "apiVersion: " + apiVersion + "\nkind: " + kind + "\nmetadata:\n  name: " + name + "\n"
 	return header + string(out.String()), nil
 }
 
