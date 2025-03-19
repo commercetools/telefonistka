@@ -161,7 +161,6 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 // is compatible with Github markdown diff highlighting.
 func diffLiveVsTargetObject(live, target *unstructured.Unstructured, useFancyDiff bool) (string, error) {
 	if !useFancyDiff {
-
 		// Simple diff
 		a, err := yaml2.Marshal(live)
 		if err != nil {
@@ -239,7 +238,7 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured, useFancyDif
 		return "", fmt.Errorf("failed to format a Dyff report: %w", err)
 	}
 	header := "apiVersion: " + apiVersion + "\nkind: " + kind + "\nmetadata:\n  name: " + name + "\n"
-	return header + string(out.String()), nil
+	return header + out.String(), nil
 }
 
 func getEnv(key, fallback string) string {
