@@ -5,7 +5,6 @@ go 1.24.1
 require github.com/alexliesenfeld/health v0.8.0
 
 require (
-	github.com/argoproj/argo-cd/v2 v2.14.6
 	github.com/argoproj/argo-cd/v3 v3.0.0-20250312153142-a45f71576314
 	github.com/argoproj/gitops-engine v0.7.1-0.20250305152649-acb47d5407b6
 	github.com/bradleyfalzon/ghinstallation/v2 v2.14.0
@@ -56,7 +55,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.8.1 // indirect
-	github.com/bombsimon/logrusr/v2 v2.0.1 // indirect
 	github.com/bombsimon/logrusr/v4 v4.1.0 // indirect
 	github.com/casbin/casbin/v2 v2.103.0 // indirect
 	github.com/casbin/govaluate v1.3.0 // indirect
