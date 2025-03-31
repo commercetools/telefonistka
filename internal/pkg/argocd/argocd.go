@@ -107,6 +107,7 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 			WithDiffSettings(app.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles, ignoreNormalizerOpts).
 			WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
 			WithNoCache().
+			WithStructuredMergeDiff(true).
 			Build()
 		if err != nil {
 			return false, nil, fmt.Errorf("Failed to build diff config: %w", err)
