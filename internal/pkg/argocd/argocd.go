@@ -13,16 +13,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/argoproj/argo-cd/v3/applicationset/utils"
-	cmdutil "github.com/argoproj/argo-cd/v3/cmd/util"
-	"github.com/argoproj/argo-cd/v3/pkg/apiclient"
-	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
-	applicationsetpkg "github.com/argoproj/argo-cd/v3/pkg/apiclient/applicationset"
-	projectpkg "github.com/argoproj/argo-cd/v3/pkg/apiclient/project"
-	"github.com/argoproj/argo-cd/v3/pkg/apiclient/settings"
-	argoappv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	argodiff "github.com/argoproj/argo-cd/v3/util/argo/diff"
-	"github.com/argoproj/argo-cd/v3/util/argo/normalizers"
+	"github.com/argoproj/argo-cd/v2/applicationset/utils"
+	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
+	applicationsetpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/applicationset"
+	projectpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/project"
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
+	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
+	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
+	"github.com/argoproj/argo-cd/v2/util/argo/normalizers"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
 	log "github.com/sirupsen/logrus"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd/diff"
@@ -107,6 +107,7 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 			WithDiffSettings(app.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles, ignoreNormalizerOpts).
 			WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
 			WithNoCache().
+			WithStructuredMergeDiff(true).
 			Build()
 		if err != nil {
 			return false, nil, fmt.Errorf("Failed to build diff config: %w", err)
