@@ -1,8 +1,6 @@
 module github.com/wayfair-incubator/telefonistka
 
-go 1.23.0
-
-toolchain go1.23.4
+go 1.24.1
 
 require github.com/alexliesenfeld/health v0.8.0
 
