@@ -10,7 +10,6 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.11.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-test/deep v1.1.1
-	github.com/golang/mock v1.6.0
 	github.com/google/go-github/v62 v62.0.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hexops/gotextdiff v1.0.3
