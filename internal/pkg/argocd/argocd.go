@@ -1,6 +1,7 @@
 package argocd
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1" //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	"encoding/hex"
@@ -24,9 +25,12 @@ import (
 	argodiff "github.com/argoproj/argo-cd/v3/util/argo/diff"
 	"github.com/argoproj/argo-cd/v3/util/argo/normalizers"
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
+	"github.com/gonvenience/ytbx"
+	"github.com/homeport/dyff/pkg/dyff"
 	log "github.com/sirupsen/logrus"
 	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd/diff"
 	yaml2 "gopkg.in/yaml.v2"
+	yaml3 "gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -140,7 +144,7 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 			}
 
 			if keepDiffData {
-				diffElement.Diff, err = diffLiveVsTargetObject(live, target)
+				diffElement.Diff, err = diffLiveVsTargetObject(live, target, false)
 			} else {
 				diffElement.Diff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
 			}
@@ -155,17 +159,86 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 
 // diffLiveVsTargetObject returns the diff of live and target in a format that
 // is compatible with Github markdown diff highlighting.
-func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, error) {
-	a, err := yaml2.Marshal(live)
-	if err != nil {
-		return "", err
+func diffLiveVsTargetObject(live, target *unstructured.Unstructured, useFancyDiff bool) (string, error) {
+	if !useFancyDiff {
+		// Simple diff
+		a, err := yaml2.Marshal(live)
+		if err != nil {
+			return "", err
+		}
+		b, err := yaml2.Marshal(target)
+		if err != nil {
+			return "", err
+		}
+		patch := diff.Diff(ctxLines, "live", a, "target", b)
+		return string(patch), nil
 	}
-	b, err := yaml2.Marshal(target)
-	if err != nil {
-		return "", err
+
+	kind := target.GetKind()
+	name := target.GetName()
+	apiVersion := target.GetAPIVersion()
+
+	// This is the fancy diff
+
+	var liveNode yaml3.Node
+	var targetNode yaml3.Node
+
+	//  unstructured.Unstructured > Byte
+	marsheledLive, _ := live.MarshalJSON()
+	marsheledTarget, _ := target.MarshalJSON()
+
+	// Byte > YAML3
+	_ = yaml3.Unmarshal(marsheledLive, &liveNode)
+	_ = yaml3.Unmarshal(marsheledTarget, &targetNode)
+
+	liveIf := ytbx.InputFile{
+		Location: "live",
+		Documents: []*yaml3.Node{
+			&liveNode,
+		},
 	}
-	patch := diff.Diff(ctxLines, "live", a, "target", b)
-	return string(patch), nil
+
+	targetIf := ytbx.InputFile{
+		Location: "target",
+		Documents: []*yaml3.Node{
+			&targetNode,
+		},
+	}
+
+	cOptions := []dyff.CompareOption{
+		dyff.KubernetesEntityDetection(true),
+	}
+
+	dReport, err := dyff.CompareInputFiles(liveIf, targetIf, cOptions...)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate Dyff report: %w", err)
+	}
+
+	reportWriter := &dyff.DiffSyntaxReport{
+		PathPrefix:            "@@",
+		RootDescriptionPrefix: "#",
+		ChangeTypePrefix:      "!",
+		HumanReport: dyff.HumanReport{
+			Report:                dReport,
+			Indent:                0,
+			DoNotInspectCerts:     true,
+			NoTableStyle:          true,
+			OmitHeader:            false,
+			UseGoPatchPaths:       false,
+			MinorChangeThreshold:  0.1,
+			MultilineContextLines: 4,
+			PrefixMultiline:       true,
+		},
+	}
+
+	out := new(bytes.Buffer)
+
+	err = reportWriter.WriteReport(out)
+	if err != nil {
+		return "", fmt.Errorf("failed to format a Dyff report: %w", err)
+	}
+	header := "apiVersion: " + apiVersion + "\nkind: " + kind + "\nmetadata:\n  name: " + name + "\n"
+	return header + out.String(), nil
 }
 
 func getEnv(key, fallback string) string {
