@@ -309,7 +309,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 
 			// If the app was temporarily created, we should inform the user about it, if not we should inform about "unusual" health and sync status
 			if appDiffResult.AppWasTemporarilyCreated {
-				md.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \nPlease be aware:  \n* The app will only appear in the ArgoCD UI for a few seconds.")
+				md.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \n> Please be aware:  \n> * The app will only appear in the ArgoCD UI for a few seconds.")
 			} else {
 				if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
 					md.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
