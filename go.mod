@@ -231,3 +231,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+// temporarily replace github.com/cyphar/filepath-securejoin to avoid https://github.com/argoproj/argo-cd/issues/22007 should be removed after we move to ArgoCD 3.0
+replace github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.3.6
