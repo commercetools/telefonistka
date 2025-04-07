@@ -28,14 +28,9 @@ import (
 	"github.com/gonvenience/ytbx"
 	"github.com/homeport/dyff/pkg/dyff"
 	log "github.com/sirupsen/logrus"
-	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd/diff"
-	yaml2 "gopkg.in/yaml.v2"
 	yaml3 "gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
-
-// ctxLines is the number of context lines used in application diffs.
-const ctxLines = 10
 
 type argoCdClients struct {
 	app     application.ApplicationServiceClient
@@ -145,7 +140,7 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 			}
 
 			if keepDiffData {
-				diffElement.Diff, err = diffLiveVsTargetObject(live, target, false)
+				diffElement.Diff, err = diffLiveVsTargetObject(live, target)
 			} else {
 				diffElement.Diff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
 			}
@@ -160,26 +155,10 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 
 // diffLiveVsTargetObject returns the diff of live and target in a format that
 // is compatible with Github markdown diff highlighting.
-func diffLiveVsTargetObject(live, target *unstructured.Unstructured, useFancyDiff bool) (string, error) {
-	if !useFancyDiff {
-		// Simple diff
-		a, err := yaml2.Marshal(live)
-		if err != nil {
-			return "", err
-		}
-		b, err := yaml2.Marshal(target)
-		if err != nil {
-			return "", err
-		}
-		patch := diff.Diff(ctxLines, "live", a, "target", b)
-		return string(patch), nil
-	}
-
+func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, error) {
 	kind := target.GetKind()
 	name := target.GetName()
 	apiVersion := target.GetAPIVersion()
-
-	// This is the fancy diff
 
 	var liveNode yaml3.Node
 	var targetNode yaml3.Node
