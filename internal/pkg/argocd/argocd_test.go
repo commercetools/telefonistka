@@ -107,7 +107,7 @@ func TestDiffLiveVsTargetObject(t *testing.T) {
 			}
 
 			if got != want {
-				t.Errorf("got %q, want %q", got, want)
+				t.Errorf("got \n%q\n, want \n%q\n", got, want)
 			}
 		})
 	}
@@ -130,8 +130,9 @@ func TestRenderDiff(t *testing.T) {
 	rendered := renderTemplate(t, tmpl, data)
 
 	if got, want := rendered.String(), want; got != want {
-		t.Errorf("got %q, want %q", got, want)
+		t.Errorf("got \n%q\n, want \n%q\n", got, want)
 	}
+	t.Logf("got: \n%s\n", rendered.String())
 }
 
 func renderTemplate(t *testing.T, tpl string, data any) *bytes.Buffer {

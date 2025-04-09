@@ -1,22 +1,20 @@
 ```diff
-diff live target
---- live
-+++ target
-@@ -21,14 +21,14 @@
-     name: example-baz-bar
-     namespace: gitops-demo-ns2
-     resourceVersion: "2168525640"
-     uid: f845fd72-d6d9-48f2-b0f2-2def6807deb8
-   rbacBindings:
-   - clusterRoleBindings:
-     - clusterRole: view
-     name: security-audit-viewer-vault
-     subjects:
-     - kind: Group
--      name: vault:some-team@domain.tld
-+      name: vault:some-team-name@domain.tld
-   spec:
-     deploymentName: example-baz-bar
--    replicas: 63
-+    replicas: 42
+apiVersion: commercetools.io/v1alpha1
+kind: Bar
+metadata:
+  name: example-baz-bar
+
+@@ rbacBindings.security-audit-viewer-vault.subjects @@
+! - one list entry removed:
+- - name: "vault:some-team@domain.tld"
+-   kind: Group
+! + one list entry added:
++   - name: "vault:some-team-name@domain.tld"
++     kind: Group
+
+@@ spec.replicas @@
+! ± value change
+- 63
++ 42
+
 ```
