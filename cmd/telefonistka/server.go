@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/alexliesenfeld/health"
+	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/wayfair-incubator/telefonistka/internal/pkg/githubapi"
 )
 
 func getCrucialEnv(key string) string {

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/commercetools/telefonistka/internal/pkg/argocd"
 	"github.com/stretchr/testify/assert"
-	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
 )
 
 func TestGenerateSafePromotionBranchName(t *testing.T) {
@@ -466,7 +466,7 @@ func TestCommitStatusTargetURL(t *testing.T) {
 		validTemplate bool
 	}{
 		"Default URL when no env var is set": {
-			expectedURL:   "https://github.com/wayfair-incubator/telefonistka",
+			expectedURL:   "https://github.com/commercetools/telefonistka",
 			templateFile:  "",
 			validTemplate: false,
 		},
@@ -476,7 +476,7 @@ func TestCommitStatusTargetURL(t *testing.T) {
 			validTemplate: true,
 		},
 		"Invalid template": {
-			expectedURL:   "https://github.com/wayfair-incubator/telefonistka",
+			expectedURL:   "https://github.com/commercetools/telefonistka",
 			templateFile:  "./testdata/custom_commit_status_invalid_template.gotmpl",
 			validTemplate: false,
 		},
