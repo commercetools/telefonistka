@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	log "github.com/sirupsen/logrus"
-	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 )
 
 const (

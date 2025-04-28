@@ -22,13 +22,13 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
+	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/nao1215/markdown"
 	log "github.com/sirupsen/logrus"
-	"github.com/commercetools/telefonistka/internal/pkg/argocd"
-	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
-	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"golang.org/x/exp/maps"
 )
 

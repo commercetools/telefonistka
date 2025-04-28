@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGenerateSafePromotionBranchName(t *testing.T) {
