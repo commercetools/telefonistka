@@ -30,6 +30,10 @@ has been discussed in the past, or if the change was already implemented but not
 We expect new pull requests to include tests for any affected behavior, and, as we follow semantic versioning, we may
 reserve breaking changes until the next major version release.
 
+Signed commits are required. Follow [Github
+documentation](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
+to set it up, and sign your commits so that your pull request can be merged.
+
 ## Other Ways to Contribute
 
 We welcome anyone that wants to contribute to Telefonistka to triage and reply to open issues to help troubleshoot
