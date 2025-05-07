@@ -560,6 +560,10 @@ func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bo
 	return allowedPathsRegex.MatchString(path)
 }
 
+func isRetriggerComment(body string) bool {
+	body == "/retrigger"
+}
+
 func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	config, err := GetInRepoConfig(ghPrClientDetails, defaultBranch)
@@ -569,6 +573,12 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 	// Comment events doesn't have Ref/SHA in payload, enriching the object:
 	_, _ = ghPrClientDetails.GetRef()
 	_, _ = ghPrClientDetails.GetSHA()
+
+	retrigger := ce.GetAction() == "created" && isRetriggerComment(ce.GetComment().GetBody())
+	if retrigger {
+		handleChangedPREvent(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair, ghPrClientDetails, eventPayload.GetIssue().GetNumber(), pr.GetIssue().Labels)
+		return
+	}
 
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
 	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity && *ce.Issue.State == "open" {
