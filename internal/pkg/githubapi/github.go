@@ -576,8 +576,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 
 	retrigger := ce.GetAction() == "created" && isRetriggerComment(ce.GetComment().GetBody())
 	if retrigger {
-		handleChangedPREvent(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair, ghPrClientDetails, ce.GetIssue().GetNumber(), ce.GetIssue().Labels)
-		return
+		return handleChangedPREvent(ghPrClientDetails.Ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ce.GetIssue().GetNumber(), ce.GetIssue().Labels)
 	}
 
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
