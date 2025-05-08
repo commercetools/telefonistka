@@ -561,7 +561,7 @@ func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bo
 }
 
 func isRetriggerComment(body string) bool {
-	body == "/retrigger"
+	return body == "/retrigger"
 }
 
 func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string) error {
@@ -576,7 +576,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 
 	retrigger := ce.GetAction() == "created" && isRetriggerComment(ce.GetComment().GetBody())
 	if retrigger {
-		handleChangedPREvent(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair, ghPrClientDetails, eventPayload.GetIssue().GetNumber(), pr.GetIssue().Labels)
+		handleChangedPREvent(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair, ghPrClientDetails, ce.GetIssue().GetNumber(), ce.GetIssue().Labels)
 		return
 	}
 
