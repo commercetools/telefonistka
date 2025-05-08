@@ -155,7 +155,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 	case "merged":
 		err = handleMergedPrEvent(ghPrClientDetails, approverGithubClientPair.v3Client)
 	case "changed":
-		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload)
+		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload.GetNumber(), eventPayload.GetPullRequest().Labels)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails, eventPayload)
 	}
@@ -193,7 +193,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDeta
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, eventPayload *github.PullRequestEvent) error {
+func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, prNumber int, prLabels []*github.Label) error {
 	botIdentity, _ := GetBotGhIdentity(mainGithubClientPair.v4Client, ctx)
 	err := MimizeStalePrComments(ghPrClientDetails, mainGithubClientPair.v4Client, botIdentity)
 	if err != nil {
@@ -236,18 +236,18 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 		ghPrClientDetails.PrLogger.Debugf("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref %s)", ghPrClientDetails.Ref)
 		if !hasComponentDiffErrors && !hasComponentDiff {
 			ghPrClientDetails.PrLogger.Debugf("ArgoCD diff is empty, this PR will not change cluster state\n")
-			prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *eventPayload.PullRequest.Number, []string{"noop"})
+			prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, prNumber, []string{"noop"})
 			prom.InstrumentGhCall(resp)
 			if err != nil {
 				ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
 			} else {
-				ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", *eventPayload.PullRequest.Number, prLables)
+				ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", prNumber, prLables)
 			}
 			// If the PR is a promotion PR and the diff is empty, we can auto-merge it
 			// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
-			if DoesPrHasLabel(eventPayload.PullRequest.Labels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
-				ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff) PR %d", *eventPayload.PullRequest.Number)
-				err := MergePr(ghPrClientDetails, eventPayload.PullRequest.Number)
+			if DoesPrHasLabel(prLabels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
+				ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff) PR %d", prNumber)
+				err := MergePr(ghPrClientDetails, prNumber)
 				if err != nil {
 					return fmt.Errorf("PR auto merge: %w", err)
 				}
@@ -683,7 +683,7 @@ func BumpVersion(ghPrClientDetails GhPrClientDetails, defaultBranch string, file
 
 	if autoMerge {
 		ghPrClientDetails.PrLogger.Infof("Auto-merging PR %d", *pr.Number)
-		err := MergePr(ghPrClientDetails, pr.Number)
+		err := MergePr(ghPrClientDetails, pr.GetNumber())
 		if err != nil {
 			ghPrClientDetails.PrLogger.Errorf("PR auto merge failed: err=%v", err)
 			return err
@@ -780,7 +780,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 					return err
 				}
 
-				err = MergePr(ghPrClientDetails, pull.Number)
+				err = MergePr(ghPrClientDetails, pull.GetNumber())
 				if err != nil {
 					ghPrClientDetails.PrLogger.Errorf("PR auto merge failed: err=%v", err)
 					return err
@@ -829,7 +829,7 @@ func firstN(str string, n int) string {
 	return string(v[:n])
 }
 
-func MergePr(details GhPrClientDetails, number *int) error {
+func MergePr(details GhPrClientDetails, number int) error {
 	operation := func() error {
 		err := tryMergePR(details, number)
 		if err != nil {
@@ -854,8 +854,8 @@ func MergePr(details GhPrClientDetails, number *int) error {
 	return err
 }
 
-func tryMergePR(details GhPrClientDetails, number *int) error {
-	_, resp, err := details.GhClientPair.v3Client.PullRequests.Merge(details.Ctx, details.Owner, details.Repo, *number, "Auto-merge", nil)
+func tryMergePR(details GhPrClientDetails, number int) error {
+	_, resp, err := details.GhClientPair.v3Client.PullRequests.Merge(details.Ctx, details.Owner, details.Repo, number, "Auto-merge", nil)
 	prom.InstrumentGhCall(resp)
 	return err
 }
