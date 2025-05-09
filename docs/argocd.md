@@ -24,6 +24,15 @@ Example:
 <img width="960" alt="image" src="https://github.com/user-attachments/assets/d821a2b2-0b83-44f3-9875-8dfa4909d6e9" />
 <!-- markdownlint-enable MD033 -->
 
+### Re-trigger the Telefonistka diff
+
+It is possible to trigger a diff comment from Telefonistka by either
+
+* pushing a new, potentially empty, commit; or
+* commenting `/retrigger` on the pull request
+
+Doing this would have Telefonistka add a new comment with the contents of the found diff calculated as per above.
+
 ## Warn user on changes to unhealthy/OutOfSync apps
 
 Telefonistka checks the state of the ArgoCD application and adds warning for this states:
