@@ -3,9 +3,11 @@ package telefonistka
 import (
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/alexliesenfeld/health"
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
@@ -36,9 +38,9 @@ func init() { //nolint:gochecknoinits
 	rootCmd.AddCommand(serveCmd)
 }
 
-func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[string, githubapi.GhClientPair], prApproverGhClientCache *lru.Cache[string, githubapi.GhClientPair]) func(http.ResponseWriter, *http.Request) {
+func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[string, githubapi.GhClientPair], prApproverGhClientCache *lru.Cache[string, githubapi.GhClientPair], argoOpts *apiclient.ClientOptions) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := githubapi.ReciveWebhook(r, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret)
+		err := githubapi.ReciveWebhook(r, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret, argoOpts)
 		if err != nil {
 			log.Errorf("error handling webhook: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -49,6 +51,16 @@ func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[stri
 }
 
 func serve() {
+	plaintext, _ := strconv.ParseBool(getEnv("ARGOCD_PLAINTEXT", "false"))
+	insecure, _ := strconv.ParseBool(getEnv("ARGOCD_INSECURE", "false"))
+	serverAddr := getEnv("ARGOCD_SERVER_ADDR", "localhost:8080")
+	token := getEnv("ARGOCD_TOKEN", "")
+	argoOpts := apiclient.ClientOptions{
+		ServerAddr: serverAddr,
+		AuthToken:  token,
+		PlainText:  plaintext,
+		Insecure:   insecure,
+	}
 	githubWebhookSecret := []byte(getCrucialEnv("GITHUB_WEBHOOK_SECRET"))
 	livenessChecker := health.NewChecker() // No checks for the moment, other then the http server availability
 	readinessChecker := health.NewChecker()
@@ -60,7 +72,7 @@ func serve() {
 	go githubapi.MainGhMetricsLoop(mainGhClientCache)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/webhook", handleWebhook(githubWebhookSecret, mainGhClientCache, prApproverGhClientCache))
+	mux.HandleFunc("/webhook", handleWebhook(githubWebhookSecret, mainGhClientCache, prApproverGhClientCache, &argoOpts))
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.Handle("/live", health.NewHandler(livenessChecker))
 	mux.Handle("/ready", health.NewHandler(readinessChecker))
