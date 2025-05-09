@@ -125,12 +125,6 @@ func shouldSyncBranchCheckBoxBeDisplayed(componentPathList []string, allowSyncfr
 }
 
 func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			ghPrClientDetails.PrLogger.Errorf("Recovered: %v", r)
-		}
-	}()
-
 	ghPrClientDetails.getPrMetadata(eventPayload.PullRequest.GetBody())
 
 	stat, ok := eventToHandle(eventPayload)
@@ -438,6 +432,12 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 }
 
 func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Recovered: %v", r)
+		}
+	}()
+
 	// We don't use the request context as it might have a short deadline and we don't want to stop event handling based on that
 	// But we do want to stop the event handling after a certain point, so:
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
