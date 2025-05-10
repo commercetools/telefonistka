@@ -2,6 +2,7 @@ package githubapi
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -10,7 +11,6 @@ import (
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
 	"github.com/migueleliasweb/go-github-mock/src/mock"
-	log "github.com/sirupsen/logrus"
 )
 
 func TestGenerateFlatMapfromFileTree(t *testing.T) {
@@ -68,10 +68,10 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 		Repo:         "Arepo",
 		PrNumber:     120,
 		Ref:          "Abranch",
-		PrLogger: log.WithFields(log.Fields{
-			"repo":     "AnOwner/Arepo",
-			"prNumber": 120,
-		}),
+		PrLogger: slog.Default().With(
+			"repo", "AnOwner/Arepo",
+			"prNumber", 120,
+		),
 	}
 	expectedFilesSHAs := map[string]string{
 		"file1":                  "fffff1",
@@ -115,10 +115,10 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 		Repo:         "Arepo",
 		PrNumber:     120,
 		Ref:          "Abranch",
-		PrLogger: log.WithFields(log.Fields{
-			"repo":     "AnOwner/Arepo",
-			"prNumber": 120,
-		}),
+		PrLogger: slog.Default().With(
+			"repo", "AnOwner/Arepo",
+			"prNumber", 120,
+		),
 	}
 
 	// TODO move this to file
@@ -169,10 +169,10 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 		Repo:         "Arepo",
 		PrNumber:     120,
 		Ref:          "Abranch",
-		PrLogger: log.WithFields(log.Fields{
-			"repo":     "AnOwner/Arepo",
-			"prNumber": 120,
-		}),
+		PrLogger: slog.Default().With(
+			"repo", "AnOwner/Arepo",
+			"prNumber", 120,
+		),
 	}
 
 	var sourceFilesSHAs map[string]string
@@ -216,10 +216,10 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 		Repo:         "Arepo",
 		PrNumber:     120,
 		Ref:          "Abranch",
-		PrLogger: log.WithFields(log.Fields{
-			"repo":     "AnOwner/Arepo",
-			"prNumber": 120,
-		}),
+		PrLogger: slog.Default().With(
+			"repo", "AnOwner/Arepo",
+			"prNumber", 120,
+		),
 	}
 
 	expectedDiffOutput := "\n```" + `diff
@@ -268,10 +268,10 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 		Repo:         "Arepo",
 		PrNumber:     120,
 		Ref:          "Abranch",
-		PrLogger: log.WithFields(log.Fields{
-			"repo":     "AnOwner/Arepo",
-			"prNumber": 120,
-		}),
+		PrLogger: slog.Default().With(
+			"repo", "AnOwner/Arepo",
+			"prNumber", 120,
+		),
 	}
 
 	expectedDiffOutput := "\n```" + `diff

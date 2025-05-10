@@ -2,6 +2,7 @@ package telefonistka
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -47,7 +47,7 @@ func init() { //nolint:gochecknoinits
 func bumpVersionOverwrite(targetRepo string, targetFile string, file string, githubHost string, triggeringRepo string, triggeringRepoSHA string, triggeringActor string, autoMerge bool) {
 	b, err := os.ReadFile(file)
 	if err != nil {
-		log.Errorf("Failed to read file %s, %v", file, err)
+		slog.Error("Failed to read file", "file", file, "err", err)
 		os.Exit(1)
 	}
 	newFileContent := string(b)
@@ -57,7 +57,7 @@ func bumpVersionOverwrite(targetRepo string, targetFile string, file string, git
 
 	if githubHost != "" {
 		githubRestAltURL = "https://" + githubHost + "/api/v3"
-		log.Infof("Github REST API endpoint is configured to %s", githubRestAltURL)
+		slog.Info("Github REST API endpoint is configured", "url", githubRestAltURL)
 	}
 	var mainGithubClientPair githubapi.GhClientPair
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
@@ -70,23 +70,23 @@ func bumpVersionOverwrite(targetRepo string, targetFile string, file string, git
 	ghPrClientDetails.Ctx = ctx
 	ghPrClientDetails.Owner = strings.Split(targetRepo, "/")[0]
 	ghPrClientDetails.Repo = strings.Split(targetRepo, "/")[1]
-	ghPrClientDetails.PrLogger = log.WithFields(log.Fields{}) // TODO what fields should be here?
+	ghPrClientDetails.PrLogger = slog.Default() // TODO what fields should be here?
 
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	initialFileContent, statusCode, err := githubapi.GetFileContent(ghPrClientDetails, defaultBranch, targetFile)
 	if statusCode == 404 {
-		ghPrClientDetails.PrLogger.Infof("File %s was not found\n", targetFile)
+		ghPrClientDetails.PrLogger.Info("File was not found", "file", targetFile)
 	} else if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Fail to fetch file content:%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Fail to fetch file content", "err", err)
 		os.Exit(1)
 	}
 
 	edits := myers.ComputeEdits(span.URIFromPath(""), initialFileContent, newFileContent)
-	ghPrClientDetails.PrLogger.Infof("Diff:\n%s", gotextdiff.ToUnified("Before", "After", initialFileContent, edits))
+	ghPrClientDetails.PrLogger.Info("Diff", "diff", gotextdiff.ToUnified("Before", "After", initialFileContent, edits))
 
 	err = githubapi.BumpVersion(ghPrClientDetails, "main", targetFile, newFileContent, triggeringRepo, triggeringRepoSHA, triggeringActor, autoMerge)
 	if err != nil {
-		log.Errorf("Failed to bump version: %v", err)
+		slog.Error("Failed to bump version", "err", err)
 		os.Exit(1)
 	}
 }

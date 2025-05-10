@@ -1,6 +1,7 @@
 package telefonistka
 
 import (
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -9,7 +10,6 @@ import (
 	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func getCrucialEnv(key string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
 	}
-	log.Fatalf("%s environment variable is required", key)
+	slog.Error("Environment variable is required", "key", key)
 	os.Exit(3)
 	return ""
 }
@@ -40,7 +40,7 @@ func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[stri
 	return func(w http.ResponseWriter, r *http.Request) {
 		err := githubapi.ReciveWebhook(r, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret)
 		if err != nil {
-			log.Errorf("error handling webhook: %v", err)
+			slog.Error("error handling webhook", "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -72,6 +72,9 @@ func serve() {
 		WriteTimeout: 10 * time.Second,
 	}
 
-	log.Infoln("server started")
-	log.Fatal(srv.ListenAndServe())
+	slog.Info("server started")
+	if err := srv.ListenAndServe(); err != nil {
+		slog.Error("ListenAndServe", "err", err)
+		os.Exit(1)
+	}
 }
