@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/commercetools/telefonistka/internal/pkg/configuration"
 	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
 )
 
@@ -63,7 +63,7 @@ func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *
 	client := &http.Client{Transport: tr}
 	req, err := http.NewRequestWithContext(ctx, originalHttpRequest.Method, endpoint, bytes.NewBuffer(body))
 	if err != nil {
-		log.Errorf("Error creating request to %s: %v", endpoint, err)
+		slog.Error("Error creating request to endpoint", "endpoint", endpoint, "err", err)
 		responses <- fmt.Sprintf("Failed to create request to %s", endpoint)
 		return
 	}
@@ -72,11 +72,11 @@ func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("Error proxying request to %s: %v", endpoint, err)
+		slog.Error("Error proxying request to endpoint", "endpoint", endpoint, "err", err)
 		responses <- fmt.Sprintf("Failed to proxy request to %s", endpoint)
 		return
 	} else {
-		log.Debugf("Webhook successfully forwarded to %s", endpoint)
+		slog.Debug("Webhook successfully forwarded to endpoint", "endpoint", endpoint)
 	}
 	defer resp.Body.Close()
 
@@ -85,11 +85,11 @@ func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *
 	respBody, err := io.ReadAll(resp.Body)
 
 	if !strings.HasPrefix(resp.Status, "2") {
-		log.Errorf("Got non 2XX HTTP status from  %s: status=%s body=%v", endpoint, resp.Status, body)
+		slog.Error("Got non 2XX HTTP status from endpoint", "endpoint", endpoint, "status", resp.Status, "body", body)
 	}
 
 	if err != nil {
-		log.Errorf("Error reading response body from %s: %v", endpoint, err)
+		slog.Error("Error reading response body from endpoint", "endpoint", endpoint, "err", err)
 		responses <- fmt.Sprintf("Failed to read response from %s", endpoint)
 		return
 	}
@@ -99,7 +99,7 @@ func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *
 
 func handlePushEvent(ctx context.Context, eventPayload *github.PushEvent, httpRequest *http.Request, payload []byte, ghPrClientDetails GhPrClientDetails) {
 	listOfChangedFiles := generateListOfChangedFiles(eventPayload)
-	log.Debugf("Changed files in push event: %v", listOfChangedFiles)
+	slog.Debug("Changed files in push event", "files", listOfChangedFiles)
 
 	defaultBranch := eventPayload.Repo.DefaultBranch
 
