@@ -42,7 +42,7 @@ func (t testLogger) Errorf(format string, args ...interface{}) {
 	}
 }
 
-// Errorf implements log.Logger and returns itself as it also implements log.InfoLogger.
+// V implements log.Logger and returns an InfoLogger for the specified verbosity level.
 func (t testLogger) V(log.Level) log.InfoLogger { return &t }
 
 // Info implements log.InfoLogger and logs the message using the test instance.
@@ -60,6 +60,9 @@ func (t testLogger) Infof(format string, args ...interface{}) {
 // Enabled implements log.InfoLogger and always return true.
 func (t testLogger) Enabled() bool { return true }
 
+// ioLogger implements io.Writer and logs written bytes using t.Logf.
+// Unlike testLogger, which is designed for structured logging in tests,
+// ioLogger is focused on handling raw byte streams.
 type ioLogger struct {
 	*testing.T
 }
