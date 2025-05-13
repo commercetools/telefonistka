@@ -70,6 +70,6 @@ type ioLogger struct {
 // Implements io.Writer but logs written bytes to t.Logf.
 func (t ioLogger) Write(b []byte) (int, error) {
 	t.Helper()
-	t.Logf("%s", b)
+	t.Log(string(b))
 	return len(b), nil
 }
