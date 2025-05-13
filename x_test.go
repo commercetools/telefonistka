@@ -1,44 +1,31 @@
 package main
 
 import (
-	"errors"
-	"net"
-	"os/exec"
-	"os/signal"
-	"strconv"
-	"syscall"
-
-	"github.com/google/go-github/v62/github"
-	"github.com/gorilla/websocket"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
-
 	"bytes"
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
+	"os/exec"
+	"os/signal"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
-
+	"github.com/argoproj/argo-cd/v2/pkg/apiclient/session"
+	"github.com/google/go-github/v62/github"
+	"github.com/gorilla/websocket"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -49,11 +36,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
 	"sigs.k8s.io/kind/pkg/cluster"
-
-	"github.com/argoproj/argo-cd/v2/pkg/apiclient/session"
 )
 
 // TestTelefonistka spins up a full integration environment. It requires that
@@ -79,8 +73,9 @@ import (
 // When printing logging information, details about a saved kubeconfig copy,
 // and Argo CD login details are shown. They can be used to connect to the
 // cluster or to login to the Argo CD web UI.
+//
+//nolint:paralleltest // let us skip running this in parallel for now since it requires a human
 func TestTelefonistka(t *testing.T) {
-
 	if enabled, _ := strconv.ParseBool(os.Getenv("INTEGRATE")); !enabled {
 		t.Skip("This is an interactive test; set INTEGRATE explicitly to run it")
 	}
@@ -109,14 +104,16 @@ func TestTelefonistka(t *testing.T) {
 	createNamespace(t, client.CoreV1().Namespaces(), argoNamespace)
 
 	// TODO: install using helm SDK
-	installRes, err := http.DefaultClient.Get("https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml")
+	//nolint:noctx // let us leave http.Get for now; this is a test
+	installRes, err := http.Get("https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml")
 	checkErr(t, err)
 	installYamlFile, err := os.CreateTemp(t.TempDir(), "")
 	checkErr(t, err)
 	t.Cleanup(func() {
 		checkErr(t, os.Remove(installYamlFile.Name()))
 	})
-	io.Copy(installYamlFile, installRes.Body)
+	io.Copy(installYamlFile, installRes.Body) //nolint:errcheck
+	checkErr(t, installRes.Body.Close())
 
 	applyResource(t, cl.Config, argoNamespace, installYamlFile.Name()) // TODO: install with external helm chart using SDK
 
@@ -154,7 +151,7 @@ func TestTelefonistka(t *testing.T) {
 	// TODO: use the token to setup separate identity and get a token for that
 	// instead.
 	argoAdmin := "admin"
-	argoInitialPasswordSecretName, argoInitialPasswordSecretKey := "argocd-initial-admin-secret", "password"
+	argoInitialPasswordSecretName, argoInitialPasswordSecretKey := "argocd-initial-admin-secret", "password" //nolint:gosec // not a password
 	adminPassword := getDecodedSecret(t, client.CoreV1(), argoNamespace, argoInitialPasswordSecretName, argoInitialPasswordSecretKey)
 	sessc := session.NewSessionServiceClient(conn)
 	createRequest := session.SessionCreateRequest{
@@ -188,6 +185,7 @@ func (c jwtCredentials) GetRequestMetadata(context.Context, ...string) (map[stri
 	}, nil
 }
 
+//nolint:thelper // want to get the line where the error occurs here
 func testTelefonistkaClient(t *testing.T, token, argoServerAddr string) {
 	// TODO: pull some of these configurable things so that they can be chosen
 	// in the top-level test.
@@ -220,7 +218,7 @@ func testTelefonistkaClient(t *testing.T, token, argoServerAddr string) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			io.Copy(os.Stderr, stderr)
+			io.Copy(os.Stderr, stderr) //nolint:errcheck
 		}()
 		checkErr(t, cmd.Start())
 	}()
@@ -246,8 +244,8 @@ func testTelefonistkaClient(t *testing.T, token, argoServerAddr string) {
 	})
 }
 
+//nolint:thelper // want to get the line where the error occurs here
 func forwardData(t *testing.T, fwd, wsURL string) {
-
 	var wg sync.WaitGroup
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -255,8 +253,9 @@ func forwardData(t *testing.T, fwd, wsURL string) {
 	header := http.Header{}
 	header.Set("Authorization", os.Getenv("GITHUB_TOKEN")) // TODO: pull out to top-level
 
-	c, _, err := websocket.DefaultDialer.Dial(wsURL, header)
+	c, dialRes, err := websocket.DefaultDialer.Dial(wsURL, header)
 	checkErr(t, err)
+	checkErr(t, dialRes.Body.Close())
 
 	// Make sure we appropriately close the connection when we are done.
 	wg.Add(1)
@@ -291,7 +290,7 @@ func forwardData(t *testing.T, fwd, wsURL string) {
 					return
 				}
 			}
-			req, _ := http.NewRequest(http.MethodPost, fwd, bytes.NewReader(v.Body))
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, fwd, bytes.NewReader(v.Body))
 			for k := range v.Header {
 				req.Header.Set(k, v.Header.Get(k))
 			}
@@ -341,9 +340,11 @@ func forwardData(t *testing.T, fwd, wsURL string) {
 }
 
 func createGithubClient(t *testing.T) *github.Client {
+	t.Helper()
 	return github.NewClient(nil).WithAuthToken(os.Getenv("GITHUB_TOKEN"))
 }
 
+//nolint:thelper // want to get the line where the error occurs here
 func createGithubRepo(t *testing.T, c *github.Client) *github.Repository {
 	name := rand.Text()
 	var x github.Repository
@@ -366,6 +367,7 @@ func createGithubRepo(t *testing.T, c *github.Client) *github.Repository {
 	return r
 }
 
+//nolint:thelper // want to get the line where the error occurs here
 func createRepoHook(t *testing.T, c *github.Client, r *github.Repository, webhookSecret string) (ws string) {
 	var x github.Hook
 	x.Name = github.String("cli") // Must be "cli" to get websocket; it has special treatment :(
@@ -401,6 +403,7 @@ func createRepoHook(t *testing.T, c *github.Client, r *github.Repository, webhoo
 }
 
 func getDecodedSecret(t *testing.T, c typedcorev1.CoreV1Interface, namespace, name, key string) *bytes.Buffer {
+	t.Helper()
 	var opts metav1.GetOptions
 	s, err := c.Secrets(namespace).Get(t.Context(), name, opts)
 	checkErr(t, err)
@@ -413,10 +416,9 @@ func getDecodedSecret(t *testing.T, c typedcorev1.CoreV1Interface, namespace, na
 }
 
 func createNamespace(t *testing.T, c typedcorev1.NamespaceInterface, name string) {
-
+	t.Helper()
 	var ns corev1.Namespace
 	ns.ObjectMeta.Name = name
-
 	_, err := c.Create(t.Context(), &ns, metav1.CreateOptions{})
 	checkErr(t, err)
 }
@@ -441,6 +443,8 @@ type Cluster struct {
 // Note: we encountered a very dumb error where kind does not run because
 // Docker is not running. There is no error output it just doesn't run, but
 // test execution continues and then fails after timing out.
+//
+//nolint:thelper // want to get the line where the error occurs here
 func newCluster(t *testing.T) *Cluster {
 	clusterName := strings.ToLower(rand.Text())
 
@@ -508,23 +512,20 @@ func checkErr(t *testing.T, err error) {
 	}
 }
 
+//nolint:thelper // want to get the line where the error occurs here
 func portForward(t *testing.T, clientConfig *rest.Config, namespace, podName string, addresses, ports []string) {
 	stopChannel := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func(ctx context.Context) {
 		defer wg.Done()
+		//nolint:gosimple // TBD how to handle this
 		select {
 		case <-ctx.Done():
 		}
 		t.Log("Stopping portforward")
 		close(stopChannel)
 	}(t.Context())
-
-	//masterURL, explicitKubeconfigPath := "", kubeconfigName
-
-	//clientConfig, err := clientcmd.BuildConfigFromFlags(masterURL, explicitKubeconfigPath)
-	//checkErr(t, err)
 
 	client, err := kubernetes.NewForConfig(clientConfig)
 	checkErr(t, err)
@@ -563,8 +564,8 @@ func portForward(t *testing.T, clientConfig *rest.Config, namespace, podName str
 	<-readyChannel
 }
 
+//nolint:thelper // want to get the line where the error occurs here
 func waitForReady(t *testing.T, client rest.Interface, namespace, res, labelSelector, selector string, callback func(any)) {
-
 	// TODO: pull this out and figure out if all defaults are registered somewhere in the SDK already
 	s := runtime.NewScheme()
 	checkErr(t, appsv1.AddToScheme(s))
@@ -649,8 +650,8 @@ func isReady(o any) bool {
 	return false
 }
 
-func applyResource(t *testing.T, config *rest.Config, ns, filePath string) error {
-
+//nolint:thelper // want to get the line where the error occurs here
+func applyResource(t *testing.T, config *rest.Config, ns, filePath string) {
 	// 2. Prepare a REST mapper to find resource GVR
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	checkErr(t, err)
@@ -698,10 +699,7 @@ func applyResource(t *testing.T, config *rest.Config, ns, filePath string) error
 		if k8serrors.IsNotFound(err) {
 			_, err = dr.Create(t.Context(), u, metav1.CreateOptions{FieldManager: "x"})
 			checkErr(t, err)
-
 		}
 		t.Logf("Resource %q applied successfully", u.GetName())
 	}
-
-	return nil
 }

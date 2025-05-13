@@ -37,7 +37,9 @@ func (t testLogger) Error(message string) {
 // Errorf implements log.Logger and logs the message using the test instance.
 func (t testLogger) Errorf(format string, args ...interface{}) {
 	t.Helper()
-	t.Errorf(format, args...)
+	if t.T != nil {
+		t.T.Errorf(format, args...)
+	}
 }
 
 // Errorf implements log.Logger and returns itself as it also implements log.InfoLogger.
@@ -57,13 +59,6 @@ func (t testLogger) Infof(format string, args ...interface{}) {
 
 // Enabled implements log.InfoLogger and always return true.
 func (t testLogger) Enabled() bool { return true }
-
-func helmLogFunc(t *testing.T) func(format string, values ...interface{}) {
-	return func(format string, v ...interface{}) {
-		t.Helper()
-		t.Logf(format, v...)
-	}
-}
 
 type ioLogger struct {
 	*testing.T
