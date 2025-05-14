@@ -564,15 +564,32 @@ func isRetriggerComment(body string) bool {
 	return body == "/retrigger"
 }
 
+func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo string, number int) (*github.PullRequest, error) {
+	pr, res, err := c.Get(ctx, owner, repo, number)
+	prom.InstrumentGhCall(res)
+	return pr, err
+}
+
 func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	config, err := GetInRepoConfig(ghPrClientDetails, defaultBranch)
 	if err != nil {
 		return err
 	}
+
+	issue := ce.GetIssue()
+	repo := ghPrClientDetails.Repo
+
+	// Check if this comment has an attached PR. If it does not we want to skip moving along.
+	pr, err := getPR(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair.v3Client.PullRequests, issue.GetUser().GetLogin(), repo, issue.GetNumber())
+	if pr == nil || err != nil {
+		// log not a pr
+		return nil
+	}
+
 	// Comment events doesn't have Ref/SHA in payload, enriching the object:
-	_, _ = ghPrClientDetails.GetRef()
-	_, _ = ghPrClientDetails.GetSHA()
+	ghPrClientDetails.Ref = pr.GetHead().GetRef()
+	ghPrClientDetails.PrSHA = pr.GetHead().GetSHA()
 
 	retrigger := ce.GetAction() == "created" && isRetriggerComment(ce.GetComment().GetBody())
 	if retrigger {
@@ -962,36 +979,6 @@ func SetCommitStatus(ghPrClientDetails GhPrClientDetails, state string) {
 	prom.IncCommitStatusUpdateCounter(repoSlug, state)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Failed to set commit status: err=%s\n%v", err, resp)
-	}
-}
-
-func (p *GhPrClientDetails) GetSHA() (string, error) {
-	if p.PrSHA == "" {
-		prObject, resp, err := p.GhClientPair.v3Client.PullRequests.Get(p.Ctx, p.Owner, p.Repo, p.PrNumber)
-		prom.InstrumentGhCall(resp)
-		if err != nil {
-			p.PrLogger.Errorf("Could not get pr data: err=%s\n%v\n", err, resp)
-			return "", err
-		}
-		p.PrSHA = *prObject.Head.SHA
-		return p.PrSHA, err
-	} else {
-		return p.PrSHA, nil
-	}
-}
-
-func (p *GhPrClientDetails) GetRef() (string, error) {
-	if p.Ref == "" {
-		prObject, resp, err := p.GhClientPair.v3Client.PullRequests.Get(p.Ctx, p.Owner, p.Repo, p.PrNumber)
-		prom.InstrumentGhCall(resp)
-		if err != nil {
-			p.PrLogger.Errorf("Could not get pr data: err=%s\n%v\n", err, resp)
-			return "", err
-		}
-		p.Ref = *prObject.Head.Ref
-		return p.Ref, err
-	} else {
-		return p.Ref, nil
 	}
 }
 
