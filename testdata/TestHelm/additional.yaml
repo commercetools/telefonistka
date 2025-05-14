@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-operator-crds
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: "{{.RepoURL}}"
+    path: crd
+    targetRevision: main
+    plugin:
+      name: helmfile
+      env:
+        - name: HELMFILE_TEMPLATE_OPTIONS
+          value: '--include-crds'
+  destination:
+    namespace: prometheus
+    name: in-cluster
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 15m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus-operator
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: "{{.RepoURL}}"
+    path: operator
+    targetRevision: main
+    plugin:
+      name: helmfile
+      env:
+        - name: HELMFILE_TEMPLATE_OPTIONS
+          value: '--include-crds'
+  destination:
+    namespace: prometheus
+    name: in-cluster
+  syncPolicy:
+    automated: {}
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 1m
+        factor: 2
+        maxDuration: 15m

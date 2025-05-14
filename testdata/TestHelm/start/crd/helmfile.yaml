@@ -1,0 +1,10 @@
+repositories:
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+
+releases:
+  - name: prometheus-operator-crds
+    chart: prometheus-community/prometheus-operator-crds
+    version: 12.0.0
+    missingFileHandler: Warn
+    namespace: prometheus
