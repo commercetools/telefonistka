@@ -561,7 +561,7 @@ func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bo
 }
 
 func isRetriggerComment(body string) bool {
-	return body == "/retrigger"
+	return strings.TrimSpace(body) == "/retrigger"
 }
 
 func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo string, number int) (*github.PullRequest, error) {
