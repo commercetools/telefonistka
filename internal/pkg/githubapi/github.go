@@ -22,13 +22,13 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
+	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/nao1215/markdown"
 	log "github.com/sirupsen/logrus"
-	"github.com/wayfair-incubator/telefonistka/internal/pkg/argocd"
-	cfg "github.com/wayfair-incubator/telefonistka/internal/pkg/configuration"
-	prom "github.com/wayfair-incubator/telefonistka/internal/pkg/prometheus"
 	"golang.org/x/exp/maps"
 )
 
@@ -1393,7 +1393,7 @@ func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath
 // it returns a default URL.
 // passed parameter commitTime can be used in the template as .CommitTime
 func commitStatusTargetURL(commitTime time.Time, tmplFile string) string {
-	const targetURL string = "https://github.com/wayfair-incubator/telefonistka"
+	const targetURL string = "https://github.com/commercetools/telefonistka"
 
 	tmplName := filepath.Base(tmplFile)
 
