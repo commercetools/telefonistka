@@ -8,9 +8,35 @@ import (
 	"testing"
 	"time"
 
+
 	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	"github.com/google/go-github/v62/github"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestGetPR(t *testing.T) {
+	t.Parallel()
+	token := os.Getenv("GITHUB_TOKEN")
+	if token == "" {
+		t.Skip("Set GITHUB_TOKEN to run integration test")
+	}
+	c := github.NewClient(nil).WithAuthToken(token)
+
+	t.Run("Issue number returns error (404)", func(t *testing.T) {
+		t.Parallel()
+		pr, err := getPR(t.Context(), c.PullRequests, "commercetools", "telefonistka", 105)
+		if pr != nil || err == nil {
+			t.Errorf("Expected to get a 404 for issue")
+		}
+	})
+	t.Run("PR number returns object", func(t *testing.T) {
+		t.Parallel()
+		pr, err := getPR(t.Context(), c.PullRequests, "commercetools", "telefonistka", 115)
+		if pr == nil || err != nil {
+			t.Errorf("Expected to get a PR object")
+		}
+	})
+}
 
 func TestGenerateSafePromotionBranchName(t *testing.T) {
 	t.Parallel()
