@@ -125,12 +125,6 @@ func shouldSyncBranchCheckBoxBeDisplayed(componentPathList []string, allowSyncfr
 }
 
 func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			ghPrClientDetails.PrLogger.Errorf("Recovered: %v", r)
-		}
-	}()
-
 	ghPrClientDetails.getPrMetadata(eventPayload.PullRequest.GetBody())
 
 	stat, ok := eventToHandle(eventPayload)
@@ -155,7 +149,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 	case "merged":
 		err = handleMergedPrEvent(ghPrClientDetails, approverGithubClientPair.v3Client)
 	case "changed":
-		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload)
+		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload.GetNumber(), eventPayload.GetPullRequest().Labels)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails, eventPayload)
 	}
@@ -193,7 +187,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDeta
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, eventPayload *github.PullRequestEvent) error {
+func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, prNumber int, prLabels []*github.Label) error {
 	botIdentity, _ := GetBotGhIdentity(mainGithubClientPair.v4Client, ctx)
 	err := MimizeStalePrComments(ghPrClientDetails, mainGithubClientPair.v4Client, botIdentity)
 	if err != nil {
@@ -236,18 +230,18 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 		ghPrClientDetails.PrLogger.Debugf("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref %s)", ghPrClientDetails.Ref)
 		if !hasComponentDiffErrors && !hasComponentDiff {
 			ghPrClientDetails.PrLogger.Debugf("ArgoCD diff is empty, this PR will not change cluster state\n")
-			prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *eventPayload.PullRequest.Number, []string{"noop"})
+			prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, prNumber, []string{"noop"})
 			prom.InstrumentGhCall(resp)
 			if err != nil {
 				ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
 			} else {
-				ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", *eventPayload.PullRequest.Number, prLables)
+				ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", prNumber, prLables)
 			}
 			// If the PR is a promotion PR and the diff is empty, we can auto-merge it
 			// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
-			if DoesPrHasLabel(eventPayload.PullRequest.Labels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
-				ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff) PR %d", *eventPayload.PullRequest.Number)
-				err := MergePr(ghPrClientDetails, eventPayload.PullRequest.Number)
+			if DoesPrHasLabel(prLabels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
+				ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff) PR %d", prNumber)
+				err := MergePr(ghPrClientDetails, prNumber)
 				if err != nil {
 					return fmt.Errorf("PR auto merge: %w", err)
 				}
@@ -438,6 +432,12 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 }
 
 func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Recovered: %v", r)
+		}
+	}()
+
 	// We don't use the request context as it might have a short deadline and we don't want to stop event handling based on that
 	// But we do want to stop the event handling after a certain point, so:
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -560,15 +560,41 @@ func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bo
 	return allowedPathsRegex.MatchString(path)
 }
 
+func isRetriggerComment(body string) bool {
+	return strings.TrimSpace(body) == "/retrigger"
+}
+
+func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo string, number int) (*github.PullRequest, error) {
+	pr, res, err := c.Get(ctx, owner, repo, number)
+	prom.InstrumentGhCall(res)
+	return pr, err
+}
+
 func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	config, err := GetInRepoConfig(ghPrClientDetails, defaultBranch)
 	if err != nil {
 		return err
 	}
+
+	issue := ce.GetIssue()
+	repo := ghPrClientDetails.Repo
+
+	// Check if this comment has an attached PR. If it does not we want to skip moving along.
+	pr, err := getPR(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair.v3Client.PullRequests, issue.GetUser().GetLogin(), repo, issue.GetNumber())
+	if pr == nil || err != nil {
+		ghPrClientDetails.PrLogger.Debug("Issue is not a PR")
+		return nil
+	}
+
 	// Comment events doesn't have Ref/SHA in payload, enriching the object:
-	_, _ = ghPrClientDetails.GetRef()
-	_, _ = ghPrClientDetails.GetSHA()
+	ghPrClientDetails.Ref = pr.GetHead().GetRef()
+	ghPrClientDetails.PrSHA = pr.GetHead().GetSHA()
+
+	retrigger := ce.GetAction() == "created" && isRetriggerComment(ce.GetComment().GetBody())
+	if retrigger {
+		return handleChangedPREvent(ghPrClientDetails.Ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ce.GetIssue().GetNumber(), ce.GetIssue().Labels)
+	}
 
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
 	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity && *ce.Issue.State == "open" {
@@ -674,7 +700,7 @@ func BumpVersion(ghPrClientDetails GhPrClientDetails, defaultBranch string, file
 
 	if autoMerge {
 		ghPrClientDetails.PrLogger.Infof("Auto-merging PR %d", *pr.Number)
-		err := MergePr(ghPrClientDetails, pr.Number)
+		err := MergePr(ghPrClientDetails, pr.GetNumber())
 		if err != nil {
 			ghPrClientDetails.PrLogger.Errorf("PR auto merge failed: err=%v", err)
 			return err
@@ -771,7 +797,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 					return err
 				}
 
-				err = MergePr(ghPrClientDetails, pull.Number)
+				err = MergePr(ghPrClientDetails, pull.GetNumber())
 				if err != nil {
 					ghPrClientDetails.PrLogger.Errorf("PR auto merge failed: err=%v", err)
 					return err
@@ -820,7 +846,7 @@ func firstN(str string, n int) string {
 	return string(v[:n])
 }
 
-func MergePr(details GhPrClientDetails, number *int) error {
+func MergePr(details GhPrClientDetails, number int) error {
 	operation := func() error {
 		err := tryMergePR(details, number)
 		if err != nil {
@@ -845,8 +871,8 @@ func MergePr(details GhPrClientDetails, number *int) error {
 	return err
 }
 
-func tryMergePR(details GhPrClientDetails, number *int) error {
-	_, resp, err := details.GhClientPair.v3Client.PullRequests.Merge(details.Ctx, details.Owner, details.Repo, *number, "Auto-merge", nil)
+func tryMergePR(details GhPrClientDetails, number int) error {
+	_, resp, err := details.GhClientPair.v3Client.PullRequests.Merge(details.Ctx, details.Owner, details.Repo, number, "Auto-merge", nil)
 	prom.InstrumentGhCall(resp)
 	return err
 }
@@ -953,36 +979,6 @@ func SetCommitStatus(ghPrClientDetails GhPrClientDetails, state string) {
 	prom.IncCommitStatusUpdateCounter(repoSlug, state)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("Failed to set commit status: err=%s\n%v", err, resp)
-	}
-}
-
-func (p *GhPrClientDetails) GetSHA() (string, error) {
-	if p.PrSHA == "" {
-		prObject, resp, err := p.GhClientPair.v3Client.PullRequests.Get(p.Ctx, p.Owner, p.Repo, p.PrNumber)
-		prom.InstrumentGhCall(resp)
-		if err != nil {
-			p.PrLogger.Errorf("Could not get pr data: err=%s\n%v\n", err, resp)
-			return "", err
-		}
-		p.PrSHA = *prObject.Head.SHA
-		return p.PrSHA, err
-	} else {
-		return p.PrSHA, nil
-	}
-}
-
-func (p *GhPrClientDetails) GetRef() (string, error) {
-	if p.Ref == "" {
-		prObject, resp, err := p.GhClientPair.v3Client.PullRequests.Get(p.Ctx, p.Owner, p.Repo, p.PrNumber)
-		prom.InstrumentGhCall(resp)
-		if err != nil {
-			p.PrLogger.Errorf("Could not get pr data: err=%s\n%v\n", err, resp)
-			return "", err
-		}
-		p.Ref = *prObject.Head.Ref
-		return p.Ref, err
-	} else {
-		return p.Ref, nil
 	}
 }
 
