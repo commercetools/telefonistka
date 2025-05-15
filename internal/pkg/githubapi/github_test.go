@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/commercetools/telefonistka/internal/pkg/argocd"
 	"github.com/google/go-github/v62/github"
 	"github.com/stretchr/testify/assert"
