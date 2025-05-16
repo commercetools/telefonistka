@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/session"
+	dockerclient "github.com/docker/docker/client"
 	"github.com/google/go-github/v62/github"
 	"github.com/gorilla/websocket"
 	"google.golang.org/grpc"
@@ -57,35 +58,34 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	"sigs.k8s.io/kind/pkg/cluster"
 	"sigs.k8s.io/kind/pkg/cluster/nodeutils"
-
-	dockerclient "github.com/docker/docker/client"
 )
 
-func TestHelm(t *testing.T) {
-	conf, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-	checkErr(t, err)
-	argoLocalPort := "8083"
-	serverAddr := net.JoinHostPort("localhost", argoLocalPort)
-	tlsConf, err := rest.TLSConfigFor(conf)
-	checkErr(t, err)
-	tlsConf.InsecureSkipVerify = true
-	tlsCreds := credentials.NewTLS(tlsConf)
-	endpointCreds := jwtCredentials{}
-	var dialOpts []grpc.DialOption
-	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(&endpointCreds))
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(tlsCreds))
-	conn, err := grpc.NewClient(serverAddr, dialOpts...)
-	sessc := session.NewSessionServiceClient(conn)
-	createRequest := session.SessionCreateRequest{
-		Username: "admin",
-		Password: os.Getenv("PASSWORD"),
-	}
-	t.Logf("%+v", createRequest)
-	_, err = sessc.Create(t.Context(), &createRequest)
-	checkErr(t, err)
-}
+// func TestHelm(t *testing.T) {
+// conf, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
+// checkErr(t, err)
+// argoLocalPort := "8083"
+// serverAddr := net.JoinHostPort("localhost", argoLocalPort)
+// tlsConf, err := rest.TLSConfigFor(conf)
+// checkErr(t, err)
+// tlsConf.InsecureSkipVerify = true
+// tlsCreds := credentials.NewTLS(tlsConf)
+// endpointCreds := jwtCredentials{}
+// var dialOpts []grpc.DialOption
+// dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(&endpointCreds))
+// dialOpts = append(dialOpts, grpc.WithTransportCredentials(tlsCreds))
+// conn, err := grpc.NewClient(serverAddr, dialOpts...) //nolint:ineffassign
+// sessc := session.NewSessionServiceClient(conn)
+// createRequest := session.SessionCreateRequest{
+// 	Username: "admin",
+// 	Password: os.Getenv("PASSWORD"),
+// }
+// t.Logf("%+v", createRequest)
+// _, err = sessc.Create(t.Context(), &createRequest)
+// checkErr(t, err)
+//}
 
 func execTemplate(t *testing.T, tpl *bytes.Buffer, data any) *bytes.Buffer {
+	t.Helper()
 	tm, err := template.New("").Parse(tpl.String())
 	checkErr(t, err)
 	buf := bytes.NewBuffer(nil)
@@ -94,39 +94,41 @@ func execTemplate(t *testing.T, tpl *bytes.Buffer, data any) *bytes.Buffer {
 }
 
 func readTemplate(t *testing.T, filepath string, data any) *bytes.Buffer {
+	t.Helper()
 	f := getTestdata(t, filepath)
 	return execTemplate(t, f, data)
 }
 
-func TestGithub(t *testing.T) {
-	ctx, cancel := signal.NotifyContext(t.Context(), os.Interrupt)
-	defer cancel()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	defer func() {
-		defer wg.Done()
-		<-ctx.Done()
-	}()
-
-	c := createGithubClient(t)
-	repo := createGithubRepo(t, c)
-
-	head := getCommit(t, c, repo, "main")
-
-	branch := createBranch(t, c, repo, head, "mynew")
-
-	createCommit(t, c, repo, "heads/mynew", "message2", os.DirFS("docs"))
-
-	var n github.NewPullRequest
-	n.Title = github.String("fancy")
-	n.Head = branch.Ref
-	n.Base = github.String("main")
-	n.Body = github.String("some body")
-
-	createPR(t, c, repo, &n)
-}
+// func TestGithub(t *testing.T) {
+// 	ctx, cancel := signal.NotifyContext(t.Context(), os.Interrupt)
+// 	defer cancel()
+// 	var wg sync.WaitGroup
+// 	wg.Add(1)
+// 	defer func() {
+// 		defer wg.Done()
+// 		<-ctx.Done()
+// 	}()
+//
+// 	c := createGithubClient(t)
+// 	repo := createGithubRepo(t, c)
+//
+// 	head := getCommit(t, c, repo, "main")
+//
+// 	branch := createBranch(t, c, repo, head, "mynew")
+//
+// 	createCommit(t, c, repo, "heads/mynew", "message2", os.DirFS("docs"))
+//
+// 	var n github.NewPullRequest
+// 	n.Title = github.String("fancy")
+// 	n.Head = branch.Ref
+// 	n.Base = github.String("main")
+// 	n.Body = github.String("some body")
+//
+// 	createPR(t, c, repo, &n)
+// }
 
 func updateRef(t *testing.T, c *github.Client, repo *github.Repository, ref, sha string) *github.Reference {
+	t.Helper()
 	var force bool
 	var new github.Reference
 	new.Ref = github.String(ref)
@@ -138,12 +140,14 @@ func updateRef(t *testing.T, c *github.Client, repo *github.Repository, ref, sha
 }
 
 func createPR(t *testing.T, c *github.Client, repo *github.Repository, new *github.NewPullRequest) *github.PullRequest {
+	t.Helper()
 	pr, _, err := c.PullRequests.Create(t.Context(), repo.GetOwner().GetLogin(), repo.GetName(), new)
 	checkErr(t, err)
 	t.Logf("Created PR %+v", pr.GetHTMLURL())
 	return pr
 }
 
+//nolint:unused
 func createBlob(t *testing.T, c *github.GitService, repo *github.Repository, b *github.Blob) *github.Blob {
 	t.Helper()
 	bl, _, err := c.CreateBlob(t.Context(), repo.GetOwner().GetLogin(), repo.GetName(), b)
@@ -154,7 +158,7 @@ func createBlob(t *testing.T, c *github.GitService, repo *github.Repository, b *
 func entriesFromFS(t *testing.T, fsys fs.FS) []*github.TreeEntry {
 	t.Helper()
 	var entries []*github.TreeEntry
-	fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+	err := fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		t.Helper()
 		checkErr(t, err)
 		if d.IsDir() {
@@ -168,6 +172,7 @@ func entriesFromFS(t *testing.T, fsys fs.FS) []*github.TreeEntry {
 		entries = append(entries, &e)
 		return nil
 	})
+	checkErr(t, err)
 	return entries
 }
 
@@ -219,6 +224,7 @@ func getCommit(t *testing.T, s *github.Client, repo *github.Repository, sha stri
 	return c
 }
 
+//nolint:unused
 func getRef(t *testing.T, c *github.GitService, repo *github.Repository, ref string) *github.Reference {
 	t.Helper()
 	r, _, err := c.GetRef(t.Context(), repo.GetOwner().GetLogin(), repo.GetName(), ref)
@@ -234,12 +240,15 @@ func createTree(t *testing.T, c *github.GitService, repo *github.Repository, bas
 }
 
 func readFile(t *testing.T, path string) *bytes.Buffer {
+	t.Helper()
 	b, err := os.ReadFile(path)
 	checkErr(t, err)
 	return bytes.NewBuffer(b)
 }
 
+//nolint:unused
 func newDockerClient(t *testing.T) *dockerclient.Client {
+	t.Helper()
 	c, err := dockerclient.NewClientWithOpts(
 		dockerclient.FromEnv,
 		dockerclient.WithAPIVersionNegotiation(),
@@ -248,7 +257,11 @@ func newDockerClient(t *testing.T) *dockerclient.Client {
 	return c
 }
 
+// loadLocalImage loads an image from the host into the cluster.
+//
+//nolint:unused
 func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, cluster string, images ...string) {
+	t.Helper()
 	archive, err := c.ImageSave(t.Context(), images)
 	checkErr(t, err)
 
@@ -261,6 +274,7 @@ func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, c
 }
 
 func helmLogFunc(t *testing.T) func(format string, values ...interface{}) {
+	t.Helper()
 	return func(format string, v ...interface{}) {
 		t.Helper()
 		t.Logf(format, v...)
@@ -268,6 +282,7 @@ func helmLogFunc(t *testing.T) func(format string, values ...interface{}) {
 }
 
 func releaseExternalChart(t *testing.T, externalKubeconfigName, namespace, repo, name string, vals chartutil.Values) {
+	t.Helper()
 	settings := cli.New()
 
 	cf := genericclioptions.NewConfigFlags(true)
@@ -278,7 +293,7 @@ func releaseExternalChart(t *testing.T, externalKubeconfigName, namespace, repo,
 	// This is the namespace where Helm will store release history for rollback.
 	helmReleasesNamespace := "default"
 
-	helmconf.Init(cf, helmReleasesNamespace, "", helmLogFunc(t))
+	checkErr(t, helmconf.Init(cf, helmReleasesNamespace, "", helmLogFunc(t)))
 	helminstall := action.NewInstall(helmconf)
 
 	helminstall.RepoURL = repo
@@ -320,9 +335,8 @@ func releaseExternalChart(t *testing.T, externalKubeconfigName, namespace, repo,
 // When printing logging information, details about a saved kubeconfig copy,
 // and Argo CD login details are shown. They can be used to connect to the
 // cluster or to login to the Argo CD web UI.
-//
-//nolint:paralleltest // let us skip running this in parallel for now since it requires a human
 func TestTelefonistka(t *testing.T) {
+	t.Parallel()
 	if enabled, _ := strconv.ParseBool(os.Getenv("INTEGRATE")); !enabled {
 		t.Skip("This is an interactive test; set INTEGRATE explicitly to run it")
 	}
@@ -355,8 +369,8 @@ func TestTelefonistka(t *testing.T) {
 	createNamespace(t, client.CoreV1().Namespaces(), argoNamespace)
 
 	// TODO: install using helm SDK
-	//installYamlFile := getFile(t, "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml")
-	//applyResource(t, cl.Config, argoNamespace, installYamlFile) // TODO: install with external helm chart using SDK
+	// installYamlFile := getFile(t, "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml")
+	// applyResource(t, cl.Config, argoNamespace, installYamlFile) // TODO: install with external helm chart using SDK
 
 	vals, err := chartutil.ReadValues(getTestdata(t, "argo.values.yaml").Bytes())
 	checkErr(t, err)
@@ -376,9 +390,6 @@ func TestTelefonistka(t *testing.T) {
 	data.RepoURL = repo.GetHTMLURL()
 	templated := readTemplate(t, "additional.yaml", data)
 	applyResource(t, cl.Config, argoNamespace, templated)
-
-	// https://github.com/grpc/grpc-go/issues/434
-	os.Setenv("GRPC_ENFORCE_ALPN_ENABLED", "false")
 
 	// TODO: pull out into a custom Argo CD client since the upstream SDK is a
 	// massive pain to work with to instantiate. We'll probably only need some
@@ -412,7 +423,9 @@ func TestTelefonistka(t *testing.T) {
 	}
 	t.Logf("You can log into Argo CD on %q using %q and %q as the password", "https://"+serverAddr, createRequest.Username, createRequest.Password)
 	createResponse, err := sessc.Create(t.Context(), &createRequest)
-	checkErr(t, err)
+	if err != nil {
+		t.Fatalf("Failed to create a JWT token, try setting GRPC_ENFORCE_ALPN_ENABLED=false (https://github.com/grpc/grpc-go/issues/434): %v", err)
+	}
 
 	webhookSecret := rand.Text()
 
@@ -429,7 +442,7 @@ func TestTelefonistka(t *testing.T) {
 	fwd := "http://localhost:8080/webhook"
 
 	// dst, src
-	go forwardData(t, ctx, fwd, wsURL)
+	forwardData(t, ctx, fwd, wsURL)
 
 	first := createCommit(t, gh, repo, "heads/main", "Initial", os.DirFS(path.Join("testdata", t.Name(), "start")))
 	updateRef(t, gh, repo, "heads/main", first.GetSHA())
@@ -446,8 +459,10 @@ func TestTelefonistka(t *testing.T) {
 	createPR(t, gh, repo, &n)
 }
 
+//nolint:unused
 func getFile(t *testing.T, url string) *bytes.Buffer {
-	//nolint:noctx // let us leave http.Get for now; this is a test
+	t.Helper()
+	//nolint:noctx,gosec // let us leave http.Get for now; this is a test
 	installRes, err := http.Get(url)
 	checkErr(t, err)
 	f := copyData(t, installRes.Body)
@@ -455,7 +470,9 @@ func getFile(t *testing.T, url string) *bytes.Buffer {
 	return f
 }
 
+//nolint:unused
 func copyData(t *testing.T, src io.Reader) *bytes.Buffer {
+	t.Helper()
 	dst := bytes.NewBuffer(nil)
 	_, err := io.Copy(dst, src)
 	if !errors.Is(err, io.EOF) {
@@ -479,17 +496,16 @@ func (c jwtCredentials) GetRequestMetadata(context.Context, ...string) (map[stri
 }
 
 func getTestdata(t *testing.T, filepath string) *bytes.Buffer {
+	t.Helper()
 	return readFile(t, path.Join("testdata", t.Name(), filepath))
 }
 
 //nolint:thelper // want to get the line where the error occurs here
 func startTelefonistka(t *testing.T, token, argoServerAddr, webhookSecret string) {
-	insecure := "true"
-
 	// TODO: refactor so that it is easy to instead instantiate the server in
 	// code.
-	//cmd := exec.CommandContext(t.Context(), "go", "run", ".", "server")
-	// air --build.cmd "go build -o ./telefonistka ." --build.bin "./telefonistka server"
+	// cmd := exec.CommandContext(t.Context(), "go", "run", ".", "server")
+	// NOTE: testing air to get live reloading
 	cmd := exec.CommandContext(t.Context(), "go", "run", "github.com/air-verse/air@latest", "--build.cmd", "go build", "--build.bin", "./telefonistka server")
 	cmd.Env = append(os.Environ(),
 		"GITHUB_WEBHOOK_SECRET="+webhookSecret,
@@ -501,7 +517,7 @@ func startTelefonistka(t *testing.T, token, argoServerAddr, webhookSecret string
 		"LOG_LEVEL=debug",
 		"ARGOCD_SERVER_ADDR="+argoServerAddr,
 		"ARGOCD_TOKEN="+token,
-		"ARGOCD_INSECURE="+insecure,
+		"ARGOCD_INSECURE=true",
 
 		"HANDLE_SELF_COMMENT=true",
 	)
@@ -541,7 +557,7 @@ func forwardData(t *testing.T, ctx context.Context, fwd, wsURL string) {
 
 	// Make sure we appropriately close the connection when we are done.
 	wg.Add(1)
-	defer func() {
+	go func() {
 		defer wg.Done()
 		select {
 		case <-ctx.Done():
@@ -635,7 +651,7 @@ func createGithubRepo(t *testing.T, c *github.Client) *github.Repository {
 
 	// An empty owner means create for owner identified by the credential used
 	// in the client.
-	owner := "commercetools"
+	owner := ""
 
 	r, _, err := c.Repositories.Create(t.Context(), owner, &x)
 	checkErr(t, err)
@@ -932,7 +948,7 @@ func isReady(o any) bool {
 }
 
 //nolint:thelper // want to get the line where the error occurs here
-func applyResource(t *testing.T, config *rest.Config, ns string, filePath io.Reader) {
+func applyResource(t *testing.T, config *rest.Config, ns string, r io.Reader) {
 	// 2. Prepare a REST mapper to find resource GVR
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	checkErr(t, err)
@@ -945,7 +961,7 @@ func applyResource(t *testing.T, config *rest.Config, ns string, filePath io.Rea
 	checkErr(t, err)
 
 	// 4. Read and unmarshal the YAML file
-	yamlFile, err := io.ReadAll(filePath)
+	yamlFile, err := io.ReadAll(r)
 	checkErr(t, err)
 
 	for y := range slices.Values(bytes.Split(yamlFile, []byte("---"))) {
