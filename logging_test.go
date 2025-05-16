@@ -6,6 +6,14 @@ import (
 	"sigs.k8s.io/kind/pkg/log"
 )
 
+func helmLogFunc(t *testing.T) func(format string, values ...interface{}) {
+	t.Helper()
+	return func(format string, v ...interface{}) {
+		t.Helper()
+		t.Logf(format, v...)
+	}
+}
+
 // testLogger implements a logger to use when running kind in a test.
 type testLogger struct{ *testing.T }
 
