@@ -578,10 +578,11 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 	}
 
 	issue := ce.GetIssue()
+	owner := ghPrClientDetails.Owner
 	repo := ghPrClientDetails.Repo
 
 	// Check if this comment has an attached PR. If it does not we want to skip moving along.
-	pr, err := getPR(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair.v3Client.PullRequests, issue.GetUser().GetLogin(), repo, issue.GetNumber())
+	pr, err := getPR(ghPrClientDetails.Ctx, ghPrClientDetails.GhClientPair.v3Client.PullRequests, owner, repo, issue.GetNumber())
 	if pr == nil || err != nil {
 		ghPrClientDetails.PrLogger.Debug("Issue is not a PR")
 		return nil
