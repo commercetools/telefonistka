@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -508,7 +509,8 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			"event_type": "issue_comment",
 		})
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
-		if *eventPayload.Sender.Login != botIdentity {
+		handleSelf, _ := strconv.ParseBool(os.Getenv("HANDLE_SELF_COMMENT"))
+		if handleSelf || *eventPayload.Sender.Login != botIdentity {
 			ghPrClientDetails := GhPrClientDetails{
 				Ctx:          ctx,
 				GhClientPair: &mainGithubClientPair,

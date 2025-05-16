@@ -502,6 +502,8 @@ func startTelefonistka(t *testing.T, token, argoServerAddr, webhookSecret string
 		"ARGOCD_SERVER_ADDR="+argoServerAddr,
 		"ARGOCD_TOKEN="+token,
 		"ARGOCD_INSECURE="+insecure,
+
+		"HANDLE_SELF_COMMENT=true",
 	)
 
 	// Make sure we get output from the executed command above.
