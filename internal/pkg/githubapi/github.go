@@ -509,6 +509,10 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			"event_type": "issue_comment",
 		})
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
+		//
+		// Allowing override makes it easier to test locally using a personal
+		// token. In those cases Telefonistka can be run with
+		// HANDLE_SELF_COMMENT=true to handle comments made manually.
 		handleSelf, _ := strconv.ParseBool(os.Getenv("HANDLE_SELF_COMMENT"))
 		if handleSelf || *eventPayload.Sender.Login != botIdentity {
 			ghPrClientDetails := GhPrClientDetails{

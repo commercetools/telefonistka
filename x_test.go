@@ -60,30 +60,6 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster/nodeutils"
 )
 
-// func TestHelm(t *testing.T) {
-// conf, err := clientcmd.BuildConfigFromFlags("", os.Getenv("KUBECONFIG"))
-// checkErr(t, err)
-// argoLocalPort := "8083"
-// serverAddr := net.JoinHostPort("localhost", argoLocalPort)
-// tlsConf, err := rest.TLSConfigFor(conf)
-// checkErr(t, err)
-// tlsConf.InsecureSkipVerify = true
-// tlsCreds := credentials.NewTLS(tlsConf)
-// endpointCreds := jwtCredentials{}
-// var dialOpts []grpc.DialOption
-// dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(&endpointCreds))
-// dialOpts = append(dialOpts, grpc.WithTransportCredentials(tlsCreds))
-// conn, err := grpc.NewClient(serverAddr, dialOpts...) //nolint:ineffassign
-// sessc := session.NewSessionServiceClient(conn)
-// createRequest := session.SessionCreateRequest{
-// 	Username: "admin",
-// 	Password: os.Getenv("PASSWORD"),
-// }
-// t.Logf("%+v", createRequest)
-// _, err = sessc.Create(t.Context(), &createRequest)
-// checkErr(t, err)
-//}
-
 func execTemplate(t *testing.T, tpl *bytes.Buffer, data any) *bytes.Buffer {
 	t.Helper()
 	tm, err := template.New("").Parse(tpl.String())
@@ -98,34 +74,6 @@ func readTemplate(t *testing.T, filepath string, data any) *bytes.Buffer {
 	f := getTestdata(t, filepath)
 	return execTemplate(t, f, data)
 }
-
-// func TestGithub(t *testing.T) {
-// 	ctx, cancel := signal.NotifyContext(t.Context(), os.Interrupt)
-// 	defer cancel()
-// 	var wg sync.WaitGroup
-// 	wg.Add(1)
-// 	defer func() {
-// 		defer wg.Done()
-// 		<-ctx.Done()
-// 	}()
-//
-// 	c := createGithubClient(t)
-// 	repo := createGithubRepo(t, c)
-//
-// 	head := getCommit(t, c, repo, "main")
-//
-// 	branch := createBranch(t, c, repo, head, "mynew")
-//
-// 	createCommit(t, c, repo, "heads/mynew", "message2", os.DirFS("docs"))
-//
-// 	var n github.NewPullRequest
-// 	n.Title = github.String("fancy")
-// 	n.Head = branch.Ref
-// 	n.Base = github.String("main")
-// 	n.Body = github.String("some body")
-//
-// 	createPR(t, c, repo, &n)
-// }
 
 func updateRef(t *testing.T, c *github.Client, repo *github.Repository, ref, sha string) *github.Reference {
 	t.Helper()
@@ -315,11 +263,14 @@ func releaseExternalChart(t *testing.T, externalKubeconfigName, namespace, repo,
 // TestTelefonistka spins up a full integration environment. It requires that
 // INTEGRATE=1 is set in the environment.
 //
-// 1. Creates a cluster running in Docker
-// 2. Installs Argo CD
-// 3. Creates a Github repository
-// 4. Starts an up-to-date version of Telefonistka server, connecting it to Argo CD and Github
-// 5. Forwards webhook requests from the Github repository to Telefonistka
+// * Creates a cluster running in Docker
+// * Installs Argo CD
+// * Creates a Github repository
+// * Creates initial commits setting the state of main branch
+// * Adds a tracked demo application to Argo CD
+// * Creates a pull request with a change to the demo application
+// * Starts an up-to-date version of Telefonistka server, connecting it to Argo CD and Github
+// * Forwards webhook requests from the Github repository to Telefonistka
 //
 // Note that it is currently interactive meaning it will run until receiving an
 // interrupt signal, or it times out but in this case it will not gracefully
@@ -368,7 +319,8 @@ func TestTelefonistka(t *testing.T) {
 
 	createNamespace(t, client.CoreV1().Namespaces(), argoNamespace)
 
-	// TODO: install using helm SDK
+	// Alternatively install without Helm.
+	//
 	// installYamlFile := getFile(t, "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml")
 	// applyResource(t, cl.Config, argoNamespace, installYamlFile) // TODO: install with external helm chart using SDK
 
@@ -386,6 +338,7 @@ func TestTelefonistka(t *testing.T) {
 	gh := createGithubClient(t)
 	repo := createGithubRepo(t, gh)
 
+	// Template a demo application, setting it to track the created repository.
 	var data struct{ RepoURL string }
 	data.RepoURL = repo.GetHTMLURL()
 	templated := readTemplate(t, "additional.yaml", data)
@@ -410,9 +363,6 @@ func TestTelefonistka(t *testing.T) {
 
 	// At this point we have an initial connection to use, so let's get the
 	// default password, and login so we get a token we can use.
-	//
-	// TODO: use the token to setup separate identity and get a token for that
-	// instead.
 	argoAdmin := "admin"
 	argoInitialPasswordSecretName, argoInitialPasswordSecretKey := "argocd-initial-admin-secret", "password" //nolint:gosec // not a password
 	adminPassword := getDecodedSecret(t, client.CoreV1(), argoNamespace, argoInitialPasswordSecretName, argoInitialPasswordSecretKey)
@@ -444,9 +394,11 @@ func TestTelefonistka(t *testing.T) {
 	// dst, src
 	forwardData(t, ctx, fwd, wsURL)
 
+	//  Setup initial state of repository based on testdata.
 	first := createCommit(t, gh, repo, "heads/main", "Initial", os.DirFS(path.Join("testdata", t.Name(), "start")))
 	updateRef(t, gh, repo, "heads/main", first.GetSHA())
 
+	// Create a PR with some changes based on testdata.
 	branch := createBranch(t, gh, repo, first, "upgrade")
 	createCommit(t, gh, repo, "heads/upgrade", "Upgrade application", os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
