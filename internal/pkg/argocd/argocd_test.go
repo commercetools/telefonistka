@@ -111,6 +111,15 @@ func TestDiffLiveVsTargetObject(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("no panic on nil inputs", func(t *testing.T) {
+		defer func() {
+			if err := recover(); err != nil {
+				t.Errorf("got panic: %v", err)
+			}
+		}()
+		diffLiveVsTargetObject(nil, nil) //nolint:errcheck // only interested in panic
+	})
 }
 
 func TestRenderDiff(t *testing.T) {
