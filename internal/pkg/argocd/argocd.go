@@ -156,6 +156,12 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 // diffLiveVsTargetObject returns the diff of live and target in a format that
 // is compatible with Github markdown diff highlighting.
 func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, error) {
+	if live == nil {
+		live = &unstructured.Unstructured{}
+	}
+	if target == nil {
+		target = &unstructured.Unstructured{}
+	}
 	kind := target.GetKind()
 	name := target.GetName()
 	apiVersion := target.GetAPIVersion()
