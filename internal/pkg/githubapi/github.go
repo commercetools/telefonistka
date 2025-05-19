@@ -414,7 +414,7 @@ func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *
 func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
 	payload, err := github.ValidatePayload(r, githubWebhookSecret)
 	if err != nil {
-		slog.Errorf("error reading request body", "err", err)
+		slog.Error("error reading request body", "err", err)
 		prom.InstrumentWebhookHit("validation_failed")
 		return err
 	}
