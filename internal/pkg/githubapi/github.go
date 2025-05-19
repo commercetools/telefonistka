@@ -189,7 +189,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDeta
 }
 
 func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, prNumber int, prLabels []*github.Label) error {
-	botIdentity, _ := GetBotGhIdentity(mainGithubClientPair.v4Client, ctx)
+	botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
 	err := MimizeStalePrComments(ghPrClientDetails, mainGithubClientPair.v4Client, botIdentity)
 	if err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
@@ -502,7 +502,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		repoOwner := *eventPayload.Repo.Owner.Login
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
-		botIdentity, _ := GetBotGhIdentity(mainGithubClientPair.v4Client, ctx)
+		botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
 		prLogger := slog.Default().With(
 			"repo", *eventPayload.Repo.Owner.Login+"/"+*eventPayload.Repo.Name,
 			"prNumber", *eventPayload.Issue.Number,

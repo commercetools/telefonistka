@@ -2,28 +2,28 @@ package githubapi
 
 import (
 	"context"
-	"log/slog"
 	"strings"
 
 	"github.com/shurcooL/githubv4"
 )
 
-// go-github is my peffered way to interact with GitHub because of the better developer expirience(pre made types, easy API mocking).
-// But some functionality is not availalble in GH V3 rest API, like PR comment minimization, so here we are:
-func GetBotGhIdentity(githubGraphQlClient *githubv4.Client, ctx context.Context) (string, error) {
-	var getBotGhIdentityQuery struct {
+// GetBotGhIdentity retrieves the self identity of the used credentials.
+//
+// Note that go-github is the preferred way of interacting with GitHub because
+// of types and easy API mocking, however some functionality is not available
+// in GH V3 rest API.
+func GetBotGhIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
+	var query struct {
 		Viewer struct {
 			Login githubv4.String
 		}
 	}
 
-	err := githubGraphQlClient.Query(ctx, &getBotGhIdentityQuery, nil)
-	botIdentity := getBotGhIdentityQuery.Viewer.Login
+	err := c.Query(ctx, &query, nil)
 	if err != nil {
-		slog.Error("Failed to fetch token owner name", "err", err)
 		return "", err
 	}
-	return string(botIdentity), nil
+	return string(query.Viewer.Login), nil
 }
 
 func MimizeStalePrComments(ghPrClientDetails GhPrClientDetails, githubGraphQlClient *githubv4.Client, botIdentity string) error {
