@@ -190,7 +190,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDeta
 
 func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, prNumber int, prLabels []*github.Label) error {
 	botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
-	err := MimizeStalePrComments(ghPrClientDetails, mainGithubClientPair.v4Client, botIdentity)
+	err := MimizeStalePrComments(ghPrClientDetails.Ctx, ghPrClientDetails, botIdentity)
 	if err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
 	}

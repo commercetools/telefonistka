@@ -26,7 +26,7 @@ func GetBotGhIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
 	return string(query.Viewer.Login), nil
 }
 
-func MimizeStalePrComments(ghPrClientDetails GhPrClientDetails, githubGraphQlClient *githubv4.Client, botIdentity string) error {
+func MimizeStalePrComments(ctx context.Context, ghPrClientDetails GhPrClientDetails, botIdentity string) error {
 	var getCommentNodeIdsQuery struct {
 		Repository struct {
 			PullRequest struct {
@@ -64,7 +64,7 @@ func MimizeStalePrComments(ghPrClientDetails GhPrClientDetails, githubGraphQlCli
 		} `graphql:"minimizeComment(input: $input)"`
 	}
 
-	err := githubGraphQlClient.Query(ghPrClientDetails.Ctx, &getCommentNodeIdsQuery, getCommentNodeIdsParams)
+	err := ghPrClientDetails.GhClientPair.v4Client.Query(ctx, &getCommentNodeIdsQuery, getCommentNodeIdsParams)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Failed to minimize stale comments", "err", err)
 	}
@@ -78,7 +78,7 @@ func MimizeStalePrComments(ghPrClientDetails GhPrClientDetails, githubGraphQlCli
 					Classifier:       githubv4.ReportedContentClassifiers("OUTDATED"),
 					ClientMutationID: &bi,
 				}
-				err := githubGraphQlClient.Mutate(ghPrClientDetails.Ctx, &minimizeCommentMutation, minimizeCommentInput, nil)
+				err := ghPrClientDetails.GhClientPair.v4Client.Mutate(ctx, &minimizeCommentMutation, minimizeCommentInput, nil)
 				// As far as I can tell minimizeComment Github's grpahQL method doesn't accept list do doing one call per comment
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("Failed to minimize comment", "comment_id", prComment.Node.Id, "err", err)
