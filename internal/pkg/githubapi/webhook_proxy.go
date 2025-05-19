@@ -107,7 +107,7 @@ func handlePushEvent(ctx context.Context, eventPayload *github.PushEvent, httpRe
 		// TODO this need to be cached with TTL + invalidate if configfile in listOfChangedFiles?
 		// This is possible because these webhooks are defined as "best effort" for the designed use case:
 		// Speeding up ArgoCD reconcile loops
-		config, _ := GetInRepoConfig(ghPrClientDetails, *defaultBranch)
+		config, _ := GetInRepoConfig(ctx, ghPrClientDetails, *defaultBranch)
 		endpoints := generateListOfEndpoints(listOfChangedFiles, config)
 
 		// Create a channel to receive responses from the goroutines

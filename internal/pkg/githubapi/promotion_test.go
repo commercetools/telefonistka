@@ -1,7 +1,6 @@
 package githubapi
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -15,12 +14,10 @@ import (
 
 func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, expectedPromotion map[string]PromotionInstance, mockedHTTPClient *http.Client) {
 	t.Helper()
-	ctx := context.Background()
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 	labelName := "fast-promotion"
 
 	ghPrClientDetails := GhPrClientDetails{
-		Ctx:          ctx,
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -35,7 +32,7 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 		},
 	}
 
-	promotionPlan, err := GeneratePromotionPlan(ghPrClientDetails, config, "main")
+	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, config, "main")
 	if err != nil {
 		t.Fatalf("Failed to generate promotion plan: err=%s", err)
 	}
@@ -51,12 +48,10 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 
 func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTTPClient *http.Client, expectedPromotions ...map[string]PromotionInstance) {
 	t.Helper()
-	ctx := context.Background()
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 	labelName := "fast-promotion"
 
 	ghPrClientDetails := GhPrClientDetails{
-		Ctx:          ctx,
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -71,7 +66,7 @@ func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTT
 		},
 	}
 
-	promotionPlan, err := GeneratePromotionPlan(ghPrClientDetails, config, "main")
+	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, config, "main")
 	if err != nil {
 		t.Fatalf("Failed to generate promotion plan: err=%s", err)
 	}

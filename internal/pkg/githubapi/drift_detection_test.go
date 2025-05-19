@@ -1,7 +1,6 @@
 package githubapi
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 
@@ -15,7 +14,6 @@ import (
 
 func TestGenerateFlatMapfromFileTree(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	filesSHAs := make(map[string]string)
 
 	mockedHTTPClient := mock.NewMockedHTTPClient(
@@ -62,7 +60,6 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := GhPrClientDetails{
-		Ctx:          ctx,
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -82,7 +79,7 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 
 	defaultBranch := "main"
 	targetPath := "some/path"
-	generateFlatMapfromFileTree(&ghPrClientDetails, &targetPath, &targetPath, &defaultBranch, filesSHAs)
+	generateFlatMapfromFileTree(t.Context(), &ghPrClientDetails, &targetPath, &targetPath, &defaultBranch, filesSHAs)
 	if diff := deep.Equal(expectedFilesSHAs, filesSHAs); diff != nil {
 		for _, l := range diff {
 			t.Error(l)
@@ -92,7 +89,6 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 
 func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 
 	mockedHTTPClient := mock.NewMockedHTTPClient(
 		mock.WithRequestMatch(
@@ -109,7 +105,6 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := GhPrClientDetails{
-		Ctx:          ctx,
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -140,7 +135,7 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 	sourceFilesSHAs["file-1.text"] = "000001"
 	targetFilesSHAs["file-1.text"] = "000002"
 
-	isDiff, diffOutput, err := generateDiffOutput(ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}
@@ -156,14 +151,12 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 
 func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 
 	mockedHTTPClient := mock.NewMockedHTTPClient()
 
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := GhPrClientDetails{
-		Ctx:          ctx,
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -184,7 +177,7 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 	sourceFilesSHAs["file-1.text"] = "000001"
 	targetFilesSHAs["file-1.text"] = "000001"
 
-	isDiff, _, err := generateDiffOutput(ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, _, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}
@@ -196,7 +189,6 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 
 func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 
 	mockedHTTPClient := mock.NewMockedHTTPClient(
 		mock.WithRequestMatch(
@@ -210,7 +202,6 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := GhPrClientDetails{
-		Ctx:          ctx,
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -233,7 +224,7 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 
 	targetFilesSHAs["file-1.text"] = "000001"
 
-	isDiff, diffOutput, err := generateDiffOutput(ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}
@@ -248,7 +239,6 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 
 func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 
 	mockedHTTPClient := mock.NewMockedHTTPClient(
 		mock.WithRequestMatch(
@@ -262,7 +252,6 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := GhPrClientDetails{
-		Ctx:          ctx,
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -285,7 +274,7 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 
 	sourceFilesSHAs["file-1.text"] = "000001"
 
-	isDiff, diffOutput, err := generateDiffOutput(ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}

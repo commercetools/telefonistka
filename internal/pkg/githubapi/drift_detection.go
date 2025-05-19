@@ -2,6 +2,7 @@ package githubapi
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 	"github.com/hexops/gotextdiff/span"
 )
 
-func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch string, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
+func generateDiffOutput(ctx context.Context, ghPrClientDetails GhPrClientDetails, defaultBranch string, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
 	var hasDiff bool
 	var diffOutput bytes.Buffer
 	var filesWithDiff []string
@@ -25,8 +26,8 @@ func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch strin
 			if sha != targetPathfileSha {
 				ghPrClientDetails.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
 				hasDiff = true
-				sourceFileContent, _, _ := GetFileContent(ghPrClientDetails, defaultBranch, sourcePath+"/"+filename)
-				targetFileContent, _, _ := GetFileContent(ghPrClientDetails, defaultBranch, targetPath+"/"+filename)
+				sourceFileContent, _, _ := GetFileContent(ctx, ghPrClientDetails, defaultBranch, sourcePath+"/"+filename)
+				targetFileContent, _, _ := GetFileContent(ctx, ghPrClientDetails, defaultBranch, targetPath+"/"+filename)
 
 				edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
 				diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))
@@ -52,7 +53,7 @@ func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch strin
 
 	if len(filesWithDiff) != 0 {
 		diffOutput.WriteString("\n### Blame Links:\n")
-		blameUrlPrefix := ghPrClientDetails.getBlameURLPrefix()
+		blameUrlPrefix := ghPrClientDetails.getBlameURLPrefix(ctx)
 
 		for _, f := range filesWithDiff {
 			diffOutput.WriteString("[" + f + "](" + blameUrlPrefix + "/HEAD/" + f + ")\n") // TODO consider switching HEAD to specific SHA
@@ -62,16 +63,16 @@ func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch strin
 	return hasDiff, diffOutput.String(), nil
 }
 
-func CompareRepoDirectories(ghPrClientDetails GhPrClientDetails, sourcePath string, targetPath string, defaultBranch string) (bool, string, error) {
+func CompareRepoDirectories(ctx context.Context, ghPrClientDetails GhPrClientDetails, sourcePath string, targetPath string, defaultBranch string) (bool, string, error) {
 	// Compares two directories content
 
 	// comparing sourcePath targetPath Git object SHA to avoid costly tree compare:
-	sourcePathGitObjectSha, err := getDirecotyGitObjectSha(ghPrClientDetails, sourcePath, defaultBranch)
+	sourcePathGitObjectSha, err := getDirecotyGitObjectSha(ctx, ghPrClientDetails, sourcePath, defaultBranch)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Couldn't get source, Git object sha", "path", sourcePath, "err", err)
 		return false, "", err
 	}
-	targetPathGitObjectSha, err := getDirecotyGitObjectSha(ghPrClientDetails, targetPath, defaultBranch)
+	targetPathGitObjectSha, err := getDirecotyGitObjectSha(ctx, ghPrClientDetails, targetPath, defaultBranch)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Couldn't get targetv, Git object sha", "target", targetPath, "err", err)
 		return false, "", err
@@ -87,27 +88,27 @@ func CompareRepoDirectories(ghPrClientDetails GhPrClientDetails, sourcePath stri
 		targetFilesSHAs := make(map[string]string)
 		hasDiff := false
 
-		generateFlatMapfromFileTree(&ghPrClientDetails, &sourcePath, &sourcePath, &defaultBranch, sourceFilesSHAs)
-		generateFlatMapfromFileTree(&ghPrClientDetails, &targetPath, &targetPath, &defaultBranch, targetFilesSHAs)
+		generateFlatMapfromFileTree(ctx, &ghPrClientDetails, &sourcePath, &sourcePath, &defaultBranch, sourceFilesSHAs)
+		generateFlatMapfromFileTree(ctx, &ghPrClientDetails, &targetPath, &targetPath, &defaultBranch, targetFilesSHAs)
 		// ghPrClientDetails.PrLogger.Infoln(sourceFilesSHAs)
-		hasDiff, diffOutput, err := generateDiffOutput(ghPrClientDetails, defaultBranch, sourceFilesSHAs, targetFilesSHAs, sourcePath, targetPath)
+		hasDiff, diffOutput, err := generateDiffOutput(ctx, ghPrClientDetails, defaultBranch, sourceFilesSHAs, targetFilesSHAs, sourcePath, targetPath)
 
 		return hasDiff, diffOutput, err
 	}
 }
 
-func generateFlatMapfromFileTree(ghPrClientDetails *GhPrClientDetails, workingPath *string, rootPath *string, branch *string, listOfFiles map[string]string) {
+func generateFlatMapfromFileTree(ctx context.Context, ghPrClientDetails *GhPrClientDetails, workingPath *string, rootPath *string, branch *string, listOfFiles map[string]string) {
 	getContentOpts := &github.RepositoryContentGetOptions{
 		Ref: *branch,
 	}
-	_, directoryContent, resp, _ := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *workingPath, getContentOpts)
+	_, directoryContent, resp, _ := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *workingPath, getContentOpts)
 	prom.InstrumentGhCall(resp)
 	for _, elementInDir := range directoryContent {
 		if *elementInDir.Type == "file" {
 			relativeName := strings.TrimPrefix(*elementInDir.Path, *rootPath+"/")
 			listOfFiles[relativeName] = *elementInDir.SHA
 		} else if *elementInDir.Type == "dir" {
-			generateFlatMapfromFileTree(ghPrClientDetails, elementInDir.Path, rootPath, branch, listOfFiles)
+			generateFlatMapfromFileTree(ctx, ghPrClientDetails, elementInDir.Path, rootPath, branch, listOfFiles)
 		} else {
 			ghPrClientDetails.PrLogger.Info("Ignoring type for path", "type", *elementInDir.Type, "path", *elementInDir.Path)
 		}

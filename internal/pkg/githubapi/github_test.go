@@ -42,7 +42,7 @@ func TestGenerateSafePromotionBranchName(t *testing.T) {
 	prNumber := 11
 	originBranch := "originBranch"
 	targetPaths := []string{"targetPath1", "targetPath2"}
-	result := generateSafePromotionBranchName(prNumber, originBranch, targetPaths)
+	result := generateSafePromotionBranchName(t.Context(), prNumber, originBranch, targetPaths)
 	expectedResult := "promotions/11-originBranch-676f02019f18"
 	if result != expectedResult {
 		t.Errorf("Expected %s, got %s", expectedResult, result)
@@ -56,7 +56,7 @@ func TestGenerateSafePromotionBranchNameLongBranchName(t *testing.T) {
 
 	originBranch := string(bytes.Repeat([]byte("originBranch"), 100))
 	targetPaths := []string{"targetPath1", "targetPath2"}
-	result := generateSafePromotionBranchName(prNumber, originBranch, targetPaths)
+	result := generateSafePromotionBranchName(t.Context(), prNumber, originBranch, targetPaths)
 	if len(result) > 250 {
 		t.Errorf("Expected branch name to be less than 250 characters, got %d", len(result))
 	}
@@ -89,7 +89,7 @@ func TestGenerateSafePromotionBranchNameLongTargets(t *testing.T) {
 		"loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong/target/path/19",
 		"loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong/target/path/20",
 	}
-	result := generateSafePromotionBranchName(prNumber, originBranch, targetPaths)
+	result := generateSafePromotionBranchName(t.Context(), prNumber, originBranch, targetPaths)
 	if len(result) > 250 {
 		t.Errorf("Expected branch name to be less than 250 characters, got %d", len(result))
 	}
@@ -409,7 +409,7 @@ func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 	for _, tc := range tests {
 		os.Setenv("GITHUB_HOST", tc.Host)
 		ghPrClientDetails := &GhPrClientDetails{Owner: tc.Owner, Repo: tc.Repo}
-		blameURLPrefix := ghPrClientDetails.getBlameURLPrefix()
+		blameURLPrefix := ghPrClientDetails.getBlameURLPrefix(t.Context())
 		assert.Equal(t, tc.ExpectURL, blameURLPrefix)
 	}
 }
@@ -477,7 +477,7 @@ func TestShouldSyncBranchCheckBoxBeDisplayed(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		result := shouldSyncBranchCheckBoxBeDisplayed(tc.componentPathList, tc.allowSyncfromBranchPathRegex, tc.diffOfChangedComponents)
+		result := shouldSyncBranchCheckBoxBeDisplayed(t.Context(), tc.componentPathList, tc.allowSyncfromBranchPathRegex, tc.diffOfChangedComponents)
 		assert.Equal(t, tc.expected, result, i)
 	}
 }

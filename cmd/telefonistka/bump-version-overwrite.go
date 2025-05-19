@@ -67,13 +67,12 @@ func bumpVersionOverwrite(targetRepo string, targetFile string, file string, git
 	var ghPrClientDetails githubapi.GhPrClientDetails
 
 	ghPrClientDetails.GhClientPair = &mainGithubClientPair
-	ghPrClientDetails.Ctx = ctx
 	ghPrClientDetails.Owner = strings.Split(targetRepo, "/")[0]
 	ghPrClientDetails.Repo = strings.Split(targetRepo, "/")[1]
 	ghPrClientDetails.PrLogger = slog.Default() // TODO what fields should be here?
 
-	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
-	initialFileContent, statusCode, err := githubapi.GetFileContent(ghPrClientDetails, defaultBranch, targetFile)
+	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
+	initialFileContent, statusCode, err := githubapi.GetFileContent(ctx, ghPrClientDetails, defaultBranch, targetFile)
 	if statusCode == 404 {
 		ghPrClientDetails.PrLogger.Info("File was not found", "file", targetFile)
 	} else if err != nil {
@@ -84,7 +83,7 @@ func bumpVersionOverwrite(targetRepo string, targetFile string, file string, git
 	edits := myers.ComputeEdits(span.URIFromPath(""), initialFileContent, newFileContent)
 	ghPrClientDetails.PrLogger.Info("Diff", "diff", gotextdiff.ToUnified("Before", "After", initialFileContent, edits))
 
-	err = githubapi.BumpVersion(ghPrClientDetails, "main", targetFile, newFileContent, triggeringRepo, triggeringRepoSHA, triggeringActor, autoMerge)
+	err = githubapi.BumpVersion(ctx, ghPrClientDetails, "main", targetFile, newFileContent, triggeringRepo, triggeringRepoSHA, triggeringActor, autoMerge)
 	if err != nil {
 		slog.Error("Failed to bump version", "err", err)
 		os.Exit(1)

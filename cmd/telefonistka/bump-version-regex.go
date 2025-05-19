@@ -63,15 +63,14 @@ func bumpVersionRegex(targetRepo string, targetFile string, regex string, replac
 	var ghPrClientDetails githubapi.GhPrClientDetails
 
 	ghPrClientDetails.GhClientPair = &mainGithubClientPair
-	ghPrClientDetails.Ctx = ctx
 	ghPrClientDetails.Owner = strings.Split(targetRepo, "/")[0]
 	ghPrClientDetails.Repo = strings.Split(targetRepo, "/")[1]
 	ghPrClientDetails.PrLogger = slog.Default() // TODO what fields should be here?
 
 	r := regexp.MustCompile(regex)
-	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
+	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
 
-	initialFileContent, _, err := githubapi.GetFileContent(ghPrClientDetails, defaultBranch, targetFile)
+	initialFileContent, _, err := githubapi.GetFileContent(ctx, ghPrClientDetails, defaultBranch, targetFile)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Fail to fetch file content", "err", err)
 		os.Exit(1)
@@ -81,7 +80,7 @@ func bumpVersionRegex(targetRepo string, targetFile string, regex string, replac
 	edits := myers.ComputeEdits(span.URIFromPath(""), initialFileContent, newFileContent)
 	ghPrClientDetails.PrLogger.Info("Diff", "diff", gotextdiff.ToUnified("Before", "After", initialFileContent, edits))
 
-	err = githubapi.BumpVersion(ghPrClientDetails, "main", targetFile, newFileContent, triggeringRepo, triggeringRepoSHA, triggeringActor, autoMerge)
+	err = githubapi.BumpVersion(ctx, ghPrClientDetails, "main", targetFile, newFileContent, triggeringRepo, triggeringRepoSHA, triggeringActor, autoMerge)
 	if err != nil {
 		slog.Error("Failed to bump version", "err", err)
 		os.Exit(1)
