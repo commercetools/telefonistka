@@ -105,6 +105,8 @@ https://custom-url.com?time={{.CommitTime}}
 
 `ARGOCD_INSECURE` Allow disabeling server certificate validation. (default: `false`)
 
+`HANDLE_SELF_COMMENT` Configure Telefonistka to handle comments made by its own Github identity. This is useful when testing locally using a personal token. (default: `false`)
+
 Behavior of the bot is configured by YAML files **in the target repo**:
 
 ## Repo Configuration
