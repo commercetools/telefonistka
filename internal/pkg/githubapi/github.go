@@ -483,7 +483,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		ghPrClientDetails := Context{
 			GhClientPair:  &mainGithubClientPair,
-			Labels:        eventPayload.PullRequest.Labels,
+			Labels:        eventPayload.GetPullRequest().Labels,
 			Owner:         repoOwner,
 			Repo:          eventPayload.GetRepo().GetName(),
 			RepoURL:       eventPayload.GetRepo().GetHTMLURL(),
