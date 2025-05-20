@@ -149,7 +149,7 @@ func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, g
 	case "merged":
 		err = handleMergedPrEvent(ctx, ghPrClientDetails, approverGithubClientPair.v3Client, config)
 	case "changed":
-		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload.GetNumber(), eventPayload.GetPullRequest().Labels, config)
+		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, ghPrClientDetails.PrNumber, ghPrClientDetails.Labels, config)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails, config)
 	}
