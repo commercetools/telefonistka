@@ -50,6 +50,7 @@ func replaceAttr(groups []string, a slog.Attr) slog.Attr {
 func Execute() {
 	level := logLevels[getEnv("LOG_LEVEL", "info")]
 	handlerOpts := slog.HandlerOptions{}
+	handlerOpts.AddSource = true
 	handlerOpts.Level = level
 	handlerOpts.ReplaceAttr = replaceAttr
 	logHandler := slog.NewJSONHandler(os.Stderr, &handlerOpts)
