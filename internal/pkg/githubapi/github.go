@@ -633,10 +633,9 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *gi
 			err := ghPrClientDetails.ToggleCommitStatus(ctx, commitStatusContext, ce.GetSender().GetName())
 			if err != nil {
 				ghPrClientDetails.PrLogger.Error("Failed to toggle s context", "context", commitStatusContext, "err", err)
-				break
-			} else {
-				ghPrClientDetails.PrLogger.Info("Toggled status", "context", commitStatusContext)
+				return err
 			}
+			ghPrClientDetails.PrLogger.Info("Toggled status", "context", commitStatusContext)
 		}
 	}
 
