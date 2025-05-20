@@ -520,20 +520,20 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		// token. In those cases Telefonistka can be run with
 		// HANDLE_SELF_COMMENT=true to handle comments made manually.
 		handleSelf, _ := strconv.ParseBool(os.Getenv("HANDLE_SELF_COMMENT"))
-		if handleSelf || *eventPayload.Sender.Login != botIdentity {
-			ghPrClientDetails := GhPrClientDetails{
-				GhClientPair: &mainGithubClientPair,
-				Owner:        repoOwner,
-				Repo:         *eventPayload.Repo.Name,
-				RepoURL:      *eventPayload.Repo.HTMLURL,
-				PrNumber:     *eventPayload.Issue.Number,
-				PrAuthor:     *eventPayload.Issue.User.Login,
-				PrLogger:     prLogger,
-			}
-			_ = handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity)
-		} else {
+		if !handleSelf || eventPayload.GetSender().GetLogin() == botIdentity {
 			slog.Debug("Ignoring self comment")
+			return
 		}
+		ghPrClientDetails := GhPrClientDetails{
+			GhClientPair: &mainGithubClientPair,
+			Owner:        repoOwner,
+			Repo:         *eventPayload.Repo.Name,
+			RepoURL:      *eventPayload.Repo.HTMLURL,
+			PrNumber:     *eventPayload.Issue.Number,
+			PrAuthor:     *eventPayload.Issue.User.Login,
+			PrLogger:     prLogger,
+		}
+		_ = handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity)
 	default:
 		return
 	}
