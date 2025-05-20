@@ -524,6 +524,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			prLogger.Error("Failed to get config", "err", err)
 			return
 		}
+		ghPrClientDetails.getPrMetadata(ctx, eventPayload.GetIssue().GetBody())
 		_ = handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity, config)
 	default:
 		return
@@ -599,7 +600,6 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *gi
 		if !checkboxWaschecked && checkboxIsChecked {
 			ghPrClientDetails.PrLogger.Info("Sync Checkbox was checked")
 			if config.Argocd.AllowSyncfromBranchPathRegex != "" {
-				ghPrClientDetails.getPrMetadata(ctx, ce.Issue.GetBody())
 				componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails, config)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("Failed to get list of changed components", "err", err)
