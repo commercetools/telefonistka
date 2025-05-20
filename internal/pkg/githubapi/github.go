@@ -402,7 +402,7 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 	return nil
 }
 
-func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
+func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("Recovered", "err", r)
@@ -416,45 +416,45 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 	var mainGithubClientPair GhClientPair
 	var approverGithubClientPair GhClientPair
 
-	slog.Info("Handling event type", "type", fmt.Sprintf("%T", eventPayloadInterface))
+	slog.Info("Handling event type", "type", fmt.Sprintf("%T", e))
 
-	switch eventPayload := eventPayloadInterface.(type) {
+	switch event := e.(type) {
 	case *github.PushEvent:
 		// this is a commit push, do something with it?
-		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
+		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		prLogger := slog.Default().With(
-			"event", eventPayload,
+			"event", event,
 		)
 
 		ghPrClientDetails := Context{
 			GhClientPair: &mainGithubClientPair,
 			Owner:        repoOwner,
-			Repo:         eventPayload.GetRepo().GetName(),
-			RepoURL:      eventPayload.GetRepo().GetHTMLURL(),
+			Repo:         event.GetRepo().GetName(),
+			RepoURL:      event.GetRepo().GetHTMLURL(),
 			PrLogger:     prLogger,
 		}
 
-		defaultBranch := eventPayload.GetRepo().GetDefaultBranch()
+		defaultBranch := event.GetRepo().GetDefaultBranch()
 
-		if eventPayload.GetRef() != "refs/heads/"+defaultBranch {
+		if event.GetRef() != "refs/heads/"+defaultBranch {
 			return
 		}
 
 		config, _ := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
-		listOfChangedFiles := generateListOfChangedFiles(eventPayload)
+		listOfChangedFiles := generateListOfChangedFiles(event)
 
 		handleProxyForward(ctx, config, listOfChangedFiles, r, payload)
 	case *github.PullRequestEvent:
-		slog.Info("is PullRequestEvent", "action", eventPayload.GetAction())
+		slog.Info("is PullRequestEvent", "action", event.GetAction())
 
 		prLogger := slog.Default().With(
-			"event", eventPayload,
+			"event", event,
 		)
 
-		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
+		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
@@ -462,16 +462,16 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		ghPrClientDetails := Context{
 			GhClientPair:  &mainGithubClientPair,
 			Approver:      &approverGithubClientPair,
-			Labels:        eventPayload.GetPullRequest().Labels,
+			Labels:        event.GetPullRequest().Labels,
 			Owner:         repoOwner,
-			Repo:          eventPayload.GetRepo().GetName(),
-			RepoURL:       eventPayload.GetRepo().GetHTMLURL(),
-			PrNumber:      eventPayload.GetPullRequest().GetNumber(),
-			Ref:           eventPayload.GetPullRequest().GetHead().GetRef(),
-			PrAuthor:      eventPayload.GetPullRequest().GetUser().GetLogin(),
+			Repo:          event.GetRepo().GetName(),
+			RepoURL:       event.GetRepo().GetHTMLURL(),
+			PrNumber:      event.GetPullRequest().GetNumber(),
+			Ref:           event.GetPullRequest().GetHead().GetRef(),
+			PrAuthor:      event.GetPullRequest().GetUser().GetLogin(),
 			PrLogger:      prLogger,
-			PrSHA:         eventPayload.GetPullRequest().GetHead().GetSHA(),
-			DefaultBranch: eventPayload.GetRepo().GetDefaultBranch(),
+			PrSHA:         event.GetPullRequest().GetHead().GetSHA(),
+			DefaultBranch: event.GetRepo().GetDefaultBranch(),
 		}
 
 		config, err := GetInRepoConfig(ctx, ghPrClientDetails, ghPrClientDetails.DefaultBranch)
@@ -481,25 +481,25 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			return
 		}
 
-		ghPrClientDetails.getPrMetadata(ctx, eventPayload.GetPullRequest().GetBody())
+		ghPrClientDetails.getPrMetadata(ctx, event.GetPullRequest().GetBody())
 
 		switch {
-		case eventPayload.GetAction() == "closed" && eventPayload.GetPullRequest().GetMerged():
+		case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
 			HandlePREvent(ctx, "merged", ghPrClientDetails, config)
-		case eventPayload.GetAction() == "opened" || eventPayload.GetAction() == "reopened" || eventPayload.GetAction() == "synchronize":
+		case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
 			HandlePREvent(ctx, "changed", ghPrClientDetails, config)
-		case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.GetPullRequest().Labels, "show-plan"):
+		case event.GetAction() == "labeled" && DoesPrHasLabel(event.GetPullRequest().Labels, "show-plan"):
 			HandlePREvent(ctx, "show-plan", ghPrClientDetails, config)
 		}
 
 	case *github.IssueCommentEvent:
-		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
+		repoOwner := event.GetRepo().GetOwner().GetLogin()
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
 		prLogger := slog.Default().With(
-			"event", eventPayload,
+			"event", event,
 		)
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 		//
@@ -507,7 +507,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		// token. In those cases Telefonistka can be run with
 		// HANDLE_SELF_COMMENT=true to handle comments made manually.
 		handleSelf, _ := strconv.ParseBool(os.Getenv("HANDLE_SELF_COMMENT"))
-		if !handleSelf || eventPayload.GetSender().GetLogin() == botIdentity {
+		if !handleSelf || event.GetSender().GetLogin() == botIdentity {
 			slog.Debug("Ignoring self comment")
 			return
 		}
@@ -515,12 +515,12 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			GhClientPair: &mainGithubClientPair,
 			Approver:     &approverGithubClientPair,
 			Owner:        repoOwner,
-			Repo:         eventPayload.GetRepo().GetName(),
-			RepoURL:      eventPayload.GetRepo().GetHTMLURL(),
-			PrNumber:     eventPayload.GetIssue().GetNumber(),
-			PrAuthor:     eventPayload.GetIssue().GetUser().GetLogin(),
+			Repo:         event.GetRepo().GetName(),
+			RepoURL:      event.GetRepo().GetHTMLURL(),
+			PrNumber:     event.GetIssue().GetNumber(),
+			PrAuthor:     event.GetIssue().GetUser().GetLogin(),
 			PrLogger:     prLogger,
-			Labels:       eventPayload.GetIssue().Labels,
+			Labels:       event.GetIssue().Labels,
 		}
 		defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
 		config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
@@ -528,9 +528,9 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			prLogger.Error("Failed to get config", "err", err)
 			return
 		}
-		ghPrClientDetails.getPrMetadata(ctx, eventPayload.GetIssue().GetBody())
+		ghPrClientDetails.getPrMetadata(ctx, event.GetIssue().GetBody())
 
-		issue := eventPayload.GetIssue()
+		issue := event.GetIssue()
 		owner := ghPrClientDetails.Owner
 		repo := ghPrClientDetails.Repo
 
@@ -545,13 +545,13 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		ghPrClientDetails.Ref = pr.GetHead().GetRef()
 		ghPrClientDetails.PrSHA = pr.GetHead().GetSHA()
 
-		retrigger := eventPayload.GetAction() == "created" && isRetriggerComment(eventPayload.GetComment().GetBody())
+		retrigger := event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody())
 		if retrigger {
 			HandlePREvent(ctx, "changed", ghPrClientDetails, config)
 			return
 		}
 
-		if err := handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity, config); err != nil {
+		if err := handleCommentPrEvent(ctx, ghPrClientDetails, event, botIdentity, config); err != nil {
 			prLogger.Error("Failed to handle comment event", "err", err)
 		}
 	default:
