@@ -143,7 +143,7 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, 
 	case "merged":
 		err = handleMergedPrEvent(ctx, ghPrClientDetails, config)
 	case "changed":
-		err = handleChangedPREvent(ctx, ghPrClientDetails, ghPrClientDetails.PrNumber, ghPrClientDetails.Labels, config)
+		err = handleChangedPREvent(ctx, ghPrClientDetails, config)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails, config)
 	}
@@ -163,7 +163,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, confi
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, prNumber int, prLabels []*github.Label, config *configuration.Config) error {
+func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
 	botIdentity, _ := GetBotGhIdentity(ctx, ghPrClientDetails.GhClientPair.v4Client)
 	err := MinimizeStalePRComments(ctx, ghPrClientDetails, botIdentity)
 	if err != nil {
@@ -201,7 +201,7 @@ func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, prNumb
 		ghPrClientDetails.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", ghPrClientDetails.Ref)
 		if !hasComponentDiffErrors && !hasComponentDiff {
 			ghPrClientDetails.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state")
-			prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, prNumber, []string{"noop"})
+			prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, ghPrClientDetails.PrNumber, []string{"noop"})
 			prom.InstrumentGhCall(resp)
 			if err != nil {
 				ghPrClientDetails.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
@@ -210,9 +210,9 @@ func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, prNumb
 			}
 			// If the PR is a promotion PR and the diff is empty, we can auto-merge it
 			// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
-			if DoesPrHasLabel(prLabels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
+			if DoesPrHasLabel(ghPrClientDetails.Labels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
 				ghPrClientDetails.PrLogger.Info("Auto-merging (no diff) PR")
-				err := MergePr(ctx, ghPrClientDetails, prNumber)
+				err := MergePr(ctx, ghPrClientDetails, ghPrClientDetails.PrNumber)
 				if err != nil {
 					return fmt.Errorf("PR auto merge: %w", err)
 				}
