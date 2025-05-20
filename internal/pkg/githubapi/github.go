@@ -517,7 +517,7 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 		// token. In those cases Telefonistka can be run with
 		// HANDLE_SELF_COMMENT=true to handle comments made manually.
 		handleSelf, _ := strconv.ParseBool(os.Getenv("HANDLE_SELF_COMMENT"))
-		if !handleSelf || event.GetSender().GetLogin() == botIdentity {
+		if !handleSelf && event.GetSender().GetLogin() == botIdentity {
 			slog.Debug("Ignoring self comment")
 			return
 		}
