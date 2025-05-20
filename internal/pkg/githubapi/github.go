@@ -25,6 +25,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	"github.com/commercetools/telefonistka/internal/pkg/configuration"
 	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
 	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
@@ -124,7 +125,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, ghPrClientDetails Context, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair) {
+func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, ghPrClientDetails Context, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, config *configuration.Config) {
 	ghPrClientDetails.getPrMetadata(ctx, eventPayload.PullRequest.GetBody())
 
 	stat, ok := eventToHandle(ctx, eventPayload)
@@ -147,11 +148,11 @@ func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, g
 
 	switch stat {
 	case "merged":
-		err = handleMergedPrEvent(ctx, ghPrClientDetails, approverGithubClientPair.v3Client)
+		err = handleMergedPrEvent(ctx, ghPrClientDetails, approverGithubClientPair.v3Client, config)
 	case "changed":
-		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload.GetNumber(), eventPayload.GetPullRequest().Labels)
+		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload.GetNumber(), eventPayload.GetPullRequest().Labels, config)
 	case "show-plan":
-		err = handleShowPlanPREvent(ctx, ghPrClientDetails, eventPayload)
+		err = handleShowPlanPREvent(ctx, ghPrClientDetails, eventPayload, config)
 	}
 
 	if err != nil {
@@ -175,28 +176,18 @@ func eventToHandle(ctx context.Context, eventPayload *github.PullRequestEvent) (
 	}
 }
 
-func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, eventPayload *github.PullRequestEvent) error {
+func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, eventPayload *github.PullRequestEvent, config *configuration.Config) error {
 	ghPrClientDetails.PrLogger.Info("Found show-plan label, posting plan")
-	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
-	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
-	if err != nil {
-		return fmt.Errorf("get in-repo configuration: %w", err)
-	}
 	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, eventPayload.GetPullRequest().GetHead().GetRef())
 	commentPlanInPR(ctx, ghPrClientDetails, promotions)
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails Context, prNumber int, prLabels []*github.Label) error {
+func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails Context, prNumber int, prLabels []*github.Label, config *configuration.Config) error {
 	botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
 	err := MinimizeStalePRComments(ctx, ghPrClientDetails, botIdentity)
 	if err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
-	}
-	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
-	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
-	if err != nil {
-		return fmt.Errorf("get in-repo configuration: %w", err)
 	}
 	if config.Argocd.CommentDiffonPR {
 		componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails, config)
@@ -489,19 +480,27 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		ghPrClientDetails := Context{
-			GhClientPair: &mainGithubClientPair,
-			Labels:       eventPayload.PullRequest.Labels,
-			Owner:        repoOwner,
-			Repo:         eventPayload.GetRepo().GetName(),
-			RepoURL:      eventPayload.GetRepo().GetHTMLURL(),
-			PrNumber:     eventPayload.GetPullRequest().GetNumber(),
-			Ref:          eventPayload.GetPullRequest().GetHead().GetRef(),
-			PrAuthor:     eventPayload.GetPullRequest().GetUser().GetLogin(),
-			PrLogger:     prLogger,
-			PrSHA:        eventPayload.GetPullRequest().GetHead().GetSHA(),
+			GhClientPair:  &mainGithubClientPair,
+			Labels:        eventPayload.PullRequest.Labels,
+			Owner:         repoOwner,
+			Repo:          eventPayload.GetRepo().GetName(),
+			RepoURL:       eventPayload.GetRepo().GetHTMLURL(),
+			PrNumber:      eventPayload.GetPullRequest().GetNumber(),
+			Ref:           eventPayload.GetPullRequest().GetHead().GetRef(),
+			PrAuthor:      eventPayload.GetPullRequest().GetUser().GetLogin(),
+			PrLogger:      prLogger,
+			PrSHA:         eventPayload.GetPullRequest().GetHead().GetSHA(),
+			DefaultBranch: eventPayload.GetRepo().GetDefaultBranch(),
 		}
 
-		HandlePREvent(ctx, eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair)
+		config, err := GetInRepoConfig(ctx, ghPrClientDetails, ghPrClientDetails.DefaultBranch)
+		if err != nil {
+			_ = ghPrClientDetails.CommentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
+			prLogger.Error("Failed to get config", "err", err)
+			return
+		}
+
+		HandlePREvent(ctx, eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
 
 	case *github.IssueCommentEvent:
 		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
@@ -530,7 +529,13 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			PrAuthor:     eventPayload.GetIssue().GetUser().GetLogin(),
 			PrLogger:     prLogger,
 		}
-		_ = handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity)
+		defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
+		config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
+		if err != nil {
+			prLogger.Error("Failed to get config", "err", err)
+			return
+		}
+		_ = handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity, config)
 	default:
 		return
 	}
@@ -577,13 +582,7 @@ func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo strin
 	return pr, err
 }
 
-func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *github.IssueCommentEvent, botIdentity string) error {
-	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
-	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
-	if err != nil {
-		return err
-	}
-
+func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *github.IssueCommentEvent, botIdentity string, config *configuration.Config) error {
 	issue := ce.GetIssue()
 	owner := ghPrClientDetails.Owner
 	repo := ghPrClientDetails.Repo
@@ -601,7 +600,7 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *gi
 
 	retrigger := ce.GetAction() == "created" && isRetriggerComment(ce.GetComment().GetBody())
 	if retrigger {
-		return handleChangedPREvent(ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ce.GetIssue().GetNumber(), ce.GetIssue().Labels)
+		return handleChangedPREvent(ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ce.GetIssue().GetNumber(), ce.GetIssue().Labels, config)
 	}
 
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
@@ -719,17 +718,12 @@ func BumpVersion(ctx context.Context, ghPrClientDetails Context, defaultBranch s
 	return nil
 }
 
-func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prApproverGithubClient *github.Client) error {
-	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
-	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
-	if err != nil {
-		_ = ghPrClientDetails.CommentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
-		return err
-	}
+func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prApproverGithubClient *github.Client, config *configuration.Config) error {
+	var err error
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
 	// If we'l ever want to generate this plan on an unmerged PR the PR branch (ghPrClientDetails.Ref) should be used
-	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, defaultBranch)
+	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.DefaultBranch)
 	if !config.DryRunMode {
 		for _, promotion := range promotions {
 			// TODO this whole part shouldn't be in main, but I need to refactor some circular dep's
@@ -739,7 +733,7 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prAppro
 
 			var treeEntries []*github.TreeEntry
 			for trgt, src := range promotion.ComputedSyncPaths {
-				err = GenerateSyncTreeEntriesForCommit(ctx, &treeEntries, ghPrClientDetails, src, trgt, defaultBranch)
+				err = GenerateSyncTreeEntriesForCommit(ctx, &treeEntries, ghPrClientDetails, src, trgt, ghPrClientDetails.DefaultBranch)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("Failed to generate treeEntries", "source", src, "target", trgt, "err", err)
 				} else {
@@ -752,7 +746,7 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prAppro
 				continue
 			}
 
-			commit, err := createCommit(ctx, ghPrClientDetails, treeEntries, defaultBranch, "Syncing from "+promotion.Metadata.SourcePath)
+			commit, err := createCommit(ctx, ghPrClientDetails, treeEntries, ghPrClientDetails.DefaultBranch, "Syncing from "+promotion.Metadata.SourcePath)
 			if err != nil {
 				ghPrClientDetails.PrLogger.Error("Commit creation failed", "err", err)
 				return err
@@ -780,7 +774,7 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prAppro
 
 			newPrBody := generatePromotionPrBody(ctx, ghPrClientDetails, components, promotion, originalPrAuthor)
 
-			pull, err := createPrObject(ctx, ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, defaultBranch, originalPrAuthor)
+			pull, err := createPrObject(ctx, ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, ghPrClientDetails.DefaultBranch, originalPrAuthor)
 			if err != nil {
 				ghPrClientDetails.PrLogger.Error("PR opening failed", "err", err)
 				return err
