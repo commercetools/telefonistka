@@ -59,7 +59,10 @@ func DetectDrift(ctx context.Context, ghPrClientDetails Context, config *configu
 	}
 	diffOutputMap := make(map[string]string)
 
-	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
+	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
+	if err != nil {
+		return err
+	}
 
 	for _, promotion := range promotions {
 		ghPrClientDetails.PrLogger.Debug("Checking drift for source", "source", promotion.Metadata.SourcePath)
