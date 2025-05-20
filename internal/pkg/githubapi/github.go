@@ -125,7 +125,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, config *configuration.Config) {
+func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, approverGithubClientPair GhClientPair, config *configuration.Config) {
 	SetCommitStatus(ctx, ghPrClientDetails, "pending")
 
 	var err error
@@ -142,7 +142,7 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, 
 	case "merged":
 		err = handleMergedPrEvent(ctx, ghPrClientDetails, approverGithubClientPair.v3Client, config)
 	case "changed":
-		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, ghPrClientDetails.PrNumber, ghPrClientDetails.Labels, config)
+		err = handleChangedPREvent(ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ghPrClientDetails.PrNumber, ghPrClientDetails.Labels, config)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails, config)
 	}
@@ -483,11 +483,11 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		switch {
 		case eventPayload.GetAction() == "closed" && eventPayload.GetPullRequest().GetMerged():
-			HandlePREvent(ctx, "merged", ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
+			HandlePREvent(ctx, "merged", ghPrClientDetails, approverGithubClientPair, config)
 		case eventPayload.GetAction() == "opened" || eventPayload.GetAction() == "reopened" || eventPayload.GetAction() == "synchronize":
-			HandlePREvent(ctx, "changed", ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
+			HandlePREvent(ctx, "changed", ghPrClientDetails, approverGithubClientPair, config)
 		case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.GetPullRequest().Labels, "show-plan"):
-			HandlePREvent(ctx, "show-plan", ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
+			HandlePREvent(ctx, "show-plan", ghPrClientDetails, approverGithubClientPair, config)
 		}
 
 	case *github.IssueCommentEvent:
