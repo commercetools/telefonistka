@@ -143,7 +143,7 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, 
 	case "merged":
 		err = handleMergedPrEvent(ctx, ghPrClientDetails, config)
 	case "changed":
-		err = handleChangedPREvent(ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ghPrClientDetails.PrNumber, ghPrClientDetails.Labels, config)
+		err = handleChangedPREvent(ctx, ghPrClientDetails, ghPrClientDetails.PrNumber, ghPrClientDetails.Labels, config)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails, config)
 	}
@@ -163,8 +163,8 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, confi
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails Context, prNumber int, prLabels []*github.Label, config *configuration.Config) error {
-	botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
+func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, prNumber int, prLabels []*github.Label, config *configuration.Config) error {
+	botIdentity, _ := GetBotGhIdentity(ctx, ghPrClientDetails.GhClientPair.v4Client)
 	err := MinimizeStalePRComments(ctx, ghPrClientDetails, botIdentity)
 	if err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
