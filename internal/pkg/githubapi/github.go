@@ -525,7 +525,9 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			return
 		}
 		ghPrClientDetails.getPrMetadata(ctx, eventPayload.GetIssue().GetBody())
-		_ = handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity, config)
+		if err := handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity, config); err != nil {
+			prLogger.Error("Failed to handle comment event", "err", err)
+		}
 	default:
 		return
 	}
