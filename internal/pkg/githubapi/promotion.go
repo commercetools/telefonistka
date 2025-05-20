@@ -51,26 +51,26 @@ func contains(s []string, str string) bool {
 	return false
 }
 
-func DetectDrift(ctx context.Context, ghPrClientDetails Context) error {
-	ghPrClientDetails.PrLogger.Debug("Checking for Drift")
+func DetectDrift(ctx context.Context, c Context) error {
+	c.PrLogger.Debug("Checking for Drift")
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	diffOutputMap := make(map[string]string)
 
-	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, ghPrClientDetails.Ref)
+	promotions, err := GeneratePromotionPlan(ctx, c, c.Ref)
 	if err != nil {
 		return err
 	}
 
 	for _, promotion := range promotions {
-		ghPrClientDetails.PrLogger.Debug("Checking drift for source", "source", promotion.Metadata.SourcePath)
+		c.PrLogger.Debug("Checking drift for source", "source", promotion.Metadata.SourcePath)
 		for trgt, src := range promotion.ComputedSyncPaths {
-			hasDiff, diffOutput, _ := CompareRepoDirectories(ctx, ghPrClientDetails, src, trgt, ghPrClientDetails.DefaultBranch)
+			hasDiff, diffOutput, _ := CompareRepoDirectories(ctx, c, src, trgt, c.DefaultBranch)
 			if hasDiff {
 				mapKey := fmt.Sprintf("`%s` ↔️  `%s`", src, trgt)
 				diffOutputMap[mapKey] = diffOutput
-				ghPrClientDetails.PrLogger.Debug("Found diff between source and target", "source", src, "target", trgt)
+				c.PrLogger.Debug("Found diff between source and target", "source", src, "target", trgt)
 			}
 		}
 	}
@@ -80,40 +80,40 @@ func DetectDrift(ctx context.Context, ghPrClientDetails Context) error {
 			return err
 		}
 
-		err = commentPR(ctx, ghPrClientDetails, templateOutput)
+		err = commentPR(ctx, c, templateOutput)
 		if err != nil {
 			return err
 		}
 	} else {
-		ghPrClientDetails.PrLogger.Info("No drift found")
+		c.PrLogger.Info("No drift found")
 	}
 
 	return nil
 }
 
-func getComponentConfig(ctx context.Context, ghPrClientDetails Context, componentPath string, branch string) (*cfg.ComponentConfig, error) {
+func getComponentConfig(ctx context.Context, c Context, componentPath string, branch string) (*cfg.ComponentConfig, error) {
 	componentConfig := &cfg.ComponentConfig{}
 	rGetContentOps := &github.RepositoryContentGetOptions{Ref: branch}
-	componentConfigFileContent, _, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, componentPath+"/telefonistka.yaml", rGetContentOps)
+	componentConfigFileContent, _, resp, err := c.GhClientPair.v3Client.Repositories.GetContents(ctx, c.Owner, c.Repo, componentPath+"/telefonistka.yaml", rGetContentOps)
 	prom.InstrumentGhCall(resp)
 	if (err != nil) && (resp.StatusCode != 404) { // The file is optional
-		ghPrClientDetails.PrLogger.Error("could not get file list from GH API", "err", err, "resp", resp)
+		c.PrLogger.Error("could not get file list from GH API", "err", err, "resp", resp)
 		return nil, err
 	} else if resp.StatusCode == 404 {
-		ghPrClientDetails.PrLogger.Debug("No in-component config in path", "path", componentPath)
+		c.PrLogger.Debug("No in-component config in path", "path", componentPath)
 		return &cfg.ComponentConfig{}, nil
 	}
 	componentConfigFileContentString, _ := componentConfigFileContent.GetContent()
 	err = yaml.Unmarshal([]byte(componentConfigFileContentString), componentConfig)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Error("Failed to parse configuration", "err", err) // TODO comment this error to PR
+		c.PrLogger.Error("Failed to parse configuration", "err", err) // TODO comment this error to PR
 		return nil, err
 	}
 	return componentConfig, nil
 }
 
 // This function generates a list of "components" that where changed in the PR and are relevant for promotion)
-func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails Context) (relevantComponents map[relevantComponent]struct{}, err error) {
+func generateListOfRelevantComponents(ctx context.Context, c Context) (relevantComponents map[relevantComponent]struct{}, err error) {
 	relevantComponents = make(map[relevantComponent]struct{})
 
 	// Get the list of files in the PR, with pagination
@@ -121,10 +121,10 @@ func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails Con
 	prFiles := []*github.CommitFile{}
 
 	for {
-		perPagePrFiles, resp, err := ghPrClientDetails.GhClientPair.v3Client.PullRequests.ListFiles(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, ghPrClientDetails.PrNumber, opts)
+		perPagePrFiles, resp, err := c.GhClientPair.v3Client.PullRequests.ListFiles(ctx, c.Owner, c.Repo, c.PrNumber, opts)
 		prom.InstrumentGhCall(resp)
 		if err != nil {
-			ghPrClientDetails.PrLogger.Error("could not get file list from GH API", "err", err, "status_code", resp.Response.Status)
+			c.PrLogger.Error("could not get file list from GH API", "err", err, "status_code", resp.Response.Status)
 			return nil, err
 		}
 		prFiles = append(prFiles, perPagePrFiles...)
@@ -135,7 +135,7 @@ func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails Con
 	}
 
 	for _, changedFile := range prFiles {
-		for _, promotionPathConfig := range ghPrClientDetails.Config.PromotionPaths {
+		for _, promotionPathConfig := range c.Config.PromotionPaths {
 			if match, _ := regexp.MatchString("^"+promotionPathConfig.SourcePath+".*", *changedFile.Filename); match {
 				// "components" here are the sub directories of the SourcePath
 				// but with promotionPathConfig.ComponentPathExtraDepth we can grab multiple levels of subdirectories,
@@ -169,15 +169,15 @@ type relevantComponent struct {
 	AutoMerge     bool
 }
 
-func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails Context) (changedComponentPaths []string, err error) {
+func generateListOfChangedComponentPaths(ctx context.Context, c Context) (changedComponentPaths []string, err error) {
 	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
-	if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
-		changedComponentPaths = ghPrClientDetails.PrMetadata.PromotedPaths
+	if len(c.PrMetadata.PromotedPaths) > 0 {
+		changedComponentPaths = c.PrMetadata.PromotedPaths
 		return changedComponentPaths, nil
 	}
 
 	// If not we will use in-repo config to generate it, and turns the map with struct keys into a list of strings
-	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails)
+	relevantComponents, err := generateListOfRelevantComponents(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -188,20 +188,20 @@ func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails 
 }
 
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
-func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
+func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
 	promotions = make(map[string]PromotionInstance)
 	for componentToPromote := range relevantComponents {
-		componentConfig, err := getComponentConfig(ctx, ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
+		componentConfig, err := getComponentConfig(ctx, c, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
 		if err != nil {
-			ghPrClientDetails.PrLogger.Error("Failed to get in component configuration, skipping component", "err", err, "component", componentToPromote.SourcePath+componentToPromote.ComponentName)
+			c.PrLogger.Error("Failed to get in component configuration, skipping component", "err", err, "component", componentToPromote.SourcePath+componentToPromote.ComponentName)
 		}
 
-		for _, configPromotionPath := range ghPrClientDetails.Config.PromotionPaths {
+		for _, configPromotionPath := range c.Config.PromotionPaths {
 			if match, _ := regexp.MatchString(configPromotionPath.SourcePath, componentToPromote.SourcePath); match {
 				// This section checks if a PromotionPath has a condition and skips it if needed
 				if configPromotionPath.Conditions.PrHasLabels != nil {
 					thisPrHasTheRightLabel := false
-					for _, l := range ghPrClientDetails.Labels {
+					for _, l := range c.Labels {
 						if contains(configPromotionPath.Conditions.PrHasLabels, *l.Name) {
 							thisPrHasTheRightLabel = true
 							break
@@ -217,7 +217,7 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails
 
 					mapKey := configPromotionPath.SourcePath + ">" + strings.Join(ppr.TargetPaths, "|") // This key is used to aggregate the PR based on source and target combination
 					if entry, ok := promotions[mapKey]; !ok {
-						ghPrClientDetails.PrLogger.Debug("Adding key", "key", mapKey)
+						c.PrLogger.Debug("Adding key", "key", mapKey)
 						if ppr.TargetDescription == "" {
 							ppr.TargetDescription = strings.Join(ppr.TargetPaths, " ")
 						}
@@ -263,13 +263,13 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails
 	return promotions, nil
 }
 
-func GeneratePromotionPlan(ctx context.Context, ghPrClientDetails Context, configBranch string) (map[string]PromotionInstance, error) {
-	ghPrClientDetails.PrLogger.Debug("Generating promotion plan plan")
+func GeneratePromotionPlan(ctx context.Context, c Context, configBranch string) (map[string]PromotionInstance, error) {
+	c.PrLogger.Debug("Generating promotion plan plan")
 	// TODO refactor tests to use the two functions below instead of this one
-	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails)
+	relevantComponents, err := generateListOfRelevantComponents(ctx, c)
 	if err != nil {
 		return nil, err
 	}
-	promotions, err := generatePlanBasedOnChangeddComponent(ctx, ghPrClientDetails, relevantComponents, configBranch)
+	promotions, err := generatePlanBasedOnChangeddComponent(ctx, c, relevantComponents, configBranch)
 	return promotions, err
 }

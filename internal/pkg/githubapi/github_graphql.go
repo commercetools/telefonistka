@@ -26,7 +26,7 @@ func GetBotGhIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
 	return string(query.Viewer.Login), nil
 }
 
-func MinimizeStalePRComments(ctx context.Context, ghPrClientDetails Context, botIdentity string) error {
+func MinimizeStalePRComments(ctx context.Context, c Context, botIdentity string) error {
 	var getCommentNodeIdsQuery struct {
 		Repository struct {
 			PullRequest struct {
@@ -50,9 +50,9 @@ func MinimizeStalePRComments(ctx context.Context, ghPrClientDetails Context, bot
 	// but I don't think GH graphQL supports it, so for now I just filter in code, see conditioanl near the end of this function.
 
 	getCommentNodeIdsParams := map[string]interface{}{
-		"owner":    githubv4.String(ghPrClientDetails.Owner),
-		"repo":     githubv4.String(ghPrClientDetails.Repo),
-		"prNumber": githubv4.Int(ghPrClientDetails.PrNumber), //nolint:gosec // G115: type mismatch between shurcooL/githubv4 and google/go-github. Number taken from latter for use in query using former.
+		"owner":    githubv4.String(c.Owner),
+		"repo":     githubv4.String(c.Repo),
+		"prNumber": githubv4.Int(c.PrNumber), //nolint:gosec // G115: type mismatch between shurcooL/githubv4 and google/go-github. Number taken from latter for use in query using former.
 	}
 
 	var minimizeCommentMutation struct {
@@ -64,28 +64,28 @@ func MinimizeStalePRComments(ctx context.Context, ghPrClientDetails Context, bot
 		} `graphql:"minimizeComment(input: $input)"`
 	}
 
-	err := ghPrClientDetails.GhClientPair.v4Client.Query(ctx, &getCommentNodeIdsQuery, getCommentNodeIdsParams)
+	err := c.GhClientPair.v4Client.Query(ctx, &getCommentNodeIdsQuery, getCommentNodeIdsParams)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Error("Failed to minimize stale comments", "err", err)
+		c.PrLogger.Error("Failed to minimize stale comments", "err", err)
 	}
 	bi := githubv4.String(strings.TrimSuffix(botIdentity, "[bot]"))
 	for _, prComment := range getCommentNodeIdsQuery.Repository.PullRequest.Comments.Edges {
 		if !prComment.Node.IsMinimized && prComment.Node.Author.Login == bi {
 			if strings.Contains(string(prComment.Node.Body), "<!-- telefonistka_tag -->") {
-				ghPrClientDetails.PrLogger.Info("Minimizing Comment", "comment_id", prComment.Node.Id)
+				c.PrLogger.Info("Minimizing Comment", "comment_id", prComment.Node.Id)
 				minimizeCommentInput := githubv4.MinimizeCommentInput{
 					SubjectID:        prComment.Node.Id,
 					Classifier:       githubv4.ReportedContentClassifiers("OUTDATED"),
 					ClientMutationID: &bi,
 				}
-				err := ghPrClientDetails.GhClientPair.v4Client.Mutate(ctx, &minimizeCommentMutation, minimizeCommentInput, nil)
+				err := c.GhClientPair.v4Client.Mutate(ctx, &minimizeCommentMutation, minimizeCommentInput, nil)
 				// As far as I can tell minimizeComment Github's grpahQL method doesn't accept list do doing one call per comment
 				if err != nil {
-					ghPrClientDetails.PrLogger.Error("Failed to minimize comment", "comment_id", prComment.Node.Id, "err", err)
+					c.PrLogger.Error("Failed to minimize comment", "comment_id", prComment.Node.Id, "err", err)
 					// Handle error.
 				}
 			} else {
-				ghPrClientDetails.PrLogger.Debug("Ignoring comment without identification tag")
+				c.PrLogger.Debug("Ignoring comment without identification tag")
 			}
 		}
 	}
