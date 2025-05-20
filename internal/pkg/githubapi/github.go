@@ -962,7 +962,7 @@ func (p *GhPrClientDetails) ToggleCommitStatus(ctx context.Context, context stri
 	return r
 }
 
-func SetCommitStatus(ctx context.Context, ghPrClientDetails GhPrClientDetails, state string) {
+func SetCommitStatus(_ context.Context, ghPrClientDetails GhPrClientDetails, state string) {
 	// TODO change all these values
 	tcontext := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
