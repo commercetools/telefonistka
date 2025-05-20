@@ -178,7 +178,10 @@ func eventToHandle(ctx context.Context, eventPayload *github.PullRequestEvent) (
 
 func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
 	ghPrClientDetails.PrLogger.Info("Found show-plan label, posting plan")
-	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
+	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
+	if err != nil {
+		return err
+	}
 	commentPlanInPR(ctx, ghPrClientDetails, promotions)
 	return nil
 }
