@@ -516,6 +516,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			PrNumber:     eventPayload.GetIssue().GetNumber(),
 			PrAuthor:     eventPayload.GetIssue().GetUser().GetLogin(),
 			PrLogger:     prLogger,
+			Labels:       eventPayload.GetIssue().Labels,
 		}
 		defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
 		config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
