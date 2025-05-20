@@ -51,8 +51,8 @@ type promotionInstanceMetaData struct {
 }
 
 type Context struct {
-	GhClientPair *GhClientPair
-	Approver     *GhClientPair
+	GhClientPair *GhClientPair `json:"-"`
+	Approver     *GhClientPair `json:"-"`
 	// This whole struct describe the metadata of the PR, so it makes sense to share the context with everything to generate HTTP calls related to that PR, right?
 	DefaultBranch string
 	Owner         string
@@ -62,7 +62,7 @@ type Context struct {
 	PrSHA         string
 	Ref           string
 	RepoURL       string
-	PrLogger      *slog.Logger
+	PrLogger      *slog.Logger `json:"-"`
 	Labels        []*github.Label
 	PrMetadata    prMetadata
 	Config        *configuration.Config
