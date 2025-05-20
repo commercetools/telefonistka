@@ -13,27 +13,8 @@ import (
 
 	"github.com/commercetools/telefonistka/internal/pkg/configuration"
 	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
-	"github.com/google/go-github/v62/github"
 	"golang.org/x/exp/maps"
 )
-
-func generateListOfChangedFiles(eventPayload *github.PushEvent) []string {
-	fileList := map[string]bool{} // using map for uniqueness
-
-	for _, commit := range eventPayload.Commits {
-		for _, file := range commit.Added {
-			fileList[file] = true
-		}
-		for _, file := range commit.Modified {
-			fileList[file] = true
-		}
-		for _, file := range commit.Removed {
-			fileList[file] = true
-		}
-	}
-
-	return maps.Keys(fileList)
-}
 
 func generateListOfEndpoints(listOfChangedFiles []string, config *configuration.Config) []string {
 	endpoints := map[string]bool{} // using map for uniqueness
@@ -97,20 +78,12 @@ func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *
 	responses <- string(respBody)
 }
 
-func handlePushEvent(ctx context.Context, eventPayload *github.PushEvent, httpRequest *http.Request, payload []byte, ghPrClientDetails GhPrClientDetails) {
-	listOfChangedFiles := generateListOfChangedFiles(eventPayload)
+func handleProxyForward(ctx context.Context, config *configuration.Config, listOfChangedFiles []string, httpRequest *http.Request, payload []byte) {
 	slog.Debug("Changed files in push event", "files", listOfChangedFiles)
-
-	defaultBranch := eventPayload.GetRepo().GetDefaultBranch()
-
-	if eventPayload.GetRef() != "refs/heads/"+defaultBranch {
-		return
-	}
 
 	// TODO this need to be cached with TTL + invalidate if configfile in listOfChangedFiles?
 	// This is possible because these webhooks are defined as "best effort" for the designed use case:
 	// Speeding up ArgoCD reconcile loops
-	config, _ := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
 	endpoints := generateListOfEndpoints(listOfChangedFiles, config)
 
 	// Create a channel to receive responses from the goroutines

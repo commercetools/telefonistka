@@ -465,7 +465,16 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			PrLogger:     prLogger,
 		}
 
-		handlePushEvent(ctx, eventPayload, r, payload, ghPrClientDetails)
+		defaultBranch := eventPayload.GetRepo().GetDefaultBranch()
+
+		if eventPayload.GetRef() != "refs/heads/"+defaultBranch {
+			return
+		}
+
+		config, _ := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
+		listOfChangedFiles := generateListOfChangedFiles(eventPayload)
+
+		handleProxyForward(ctx, config, listOfChangedFiles, r, payload)
 	case *github.PullRequestEvent:
 		slog.Info("is PullRequestEvent", "action", *eventPayload.Action)
 
@@ -1388,6 +1397,24 @@ func GetFileContent(ctx context.Context, ghPrClientDetails GhPrClientDetails, br
 		return "", resp.StatusCode, err
 	}
 	return fileContentString, resp.StatusCode, nil
+}
+
+func generateListOfChangedFiles(eventPayload *github.PushEvent) []string {
+	fileList := map[string]bool{} // using map for uniqueness
+
+	for _, commit := range eventPayload.Commits {
+		for _, file := range commit.Added {
+			fileList[file] = true
+		}
+		for _, file := range commit.Modified {
+			fileList[file] = true
+		}
+		for _, file := range commit.Removed {
+			fileList[file] = true
+		}
+	}
+
+	return maps.Keys(fileList)
 }
 
 // commitStatusTargetURL generates a target URL based on an optional
