@@ -451,6 +451,7 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 		}
 
 		config, _ := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
+		ghPrClientDetails.Config = config
 		listOfChangedFiles := generateListOfChangedFiles(event)
 
 		ghPrClientDetails.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
