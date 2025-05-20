@@ -264,6 +264,7 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails
 }
 
 func GeneratePromotionPlan(ctx context.Context, ghPrClientDetails Context, configBranch string) (map[string]PromotionInstance, error) {
+	ghPrClientDetails.PrLogger.Debug("Generating promotion plan plan")
 	// TODO refactor tests to use the two functions below instead of this one
 	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails)
 	if err != nil {

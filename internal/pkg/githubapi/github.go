@@ -155,7 +155,6 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context) 
 }
 
 func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context) error {
-	ghPrClientDetails.PrLogger.Info("Found show-plan label, posting plan")
 	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, ghPrClientDetails.Ref)
 	if err != nil {
 		return err
