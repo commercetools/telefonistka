@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/commercetools/telefonistka/internal/pkg/configuration"
 	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
 	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
@@ -52,14 +51,14 @@ func contains(s []string, str string) bool {
 	return false
 }
 
-func DetectDrift(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
+func DetectDrift(ctx context.Context, ghPrClientDetails Context) error {
 	ghPrClientDetails.PrLogger.Debug("Checking for Drift")
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	diffOutputMap := make(map[string]string)
 
-	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
+	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, ghPrClientDetails.Ref)
 	if err != nil {
 		return err
 	}
@@ -114,7 +113,7 @@ func getComponentConfig(ctx context.Context, ghPrClientDetails Context, componen
 }
 
 // This function generates a list of "components" that where changed in the PR and are relevant for promotion)
-func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails Context, config *cfg.Config) (relevantComponents map[relevantComponent]struct{}, err error) {
+func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails Context) (relevantComponents map[relevantComponent]struct{}, err error) {
 	relevantComponents = make(map[relevantComponent]struct{})
 
 	// Get the list of files in the PR, with pagination
@@ -136,7 +135,7 @@ func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails Con
 	}
 
 	for _, changedFile := range prFiles {
-		for _, promotionPathConfig := range config.PromotionPaths {
+		for _, promotionPathConfig := range ghPrClientDetails.Config.PromotionPaths {
 			if match, _ := regexp.MatchString("^"+promotionPathConfig.SourcePath+".*", *changedFile.Filename); match {
 				// "components" here are the sub directories of the SourcePath
 				// but with promotionPathConfig.ComponentPathExtraDepth we can grab multiple levels of subdirectories,
@@ -170,7 +169,7 @@ type relevantComponent struct {
 	AutoMerge     bool
 }
 
-func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails Context, config *cfg.Config) (changedComponentPaths []string, err error) {
+func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails Context) (changedComponentPaths []string, err error) {
 	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
 	if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
 		changedComponentPaths = ghPrClientDetails.PrMetadata.PromotedPaths
@@ -178,7 +177,7 @@ func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails 
 	}
 
 	// If not we will use in-repo config to generate it, and turns the map with struct keys into a list of strings
-	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails, config)
+	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +188,7 @@ func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails 
 }
 
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
-func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails Context, config *cfg.Config, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
+func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
 	promotions = make(map[string]PromotionInstance)
 	for componentToPromote := range relevantComponents {
 		componentConfig, err := getComponentConfig(ctx, ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
@@ -197,7 +196,7 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails
 			ghPrClientDetails.PrLogger.Error("Failed to get in component configuration, skipping component", "err", err, "component", componentToPromote.SourcePath+componentToPromote.ComponentName)
 		}
 
-		for _, configPromotionPath := range config.PromotionPaths {
+		for _, configPromotionPath := range ghPrClientDetails.Config.PromotionPaths {
 			if match, _ := regexp.MatchString(configPromotionPath.SourcePath, componentToPromote.SourcePath); match {
 				// This section checks if a PromotionPath has a condition and skips it if needed
 				if configPromotionPath.Conditions.PrHasLabels != nil {
@@ -264,12 +263,12 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails
 	return promotions, nil
 }
 
-func GeneratePromotionPlan(ctx context.Context, ghPrClientDetails Context, config *cfg.Config, configBranch string) (map[string]PromotionInstance, error) {
+func GeneratePromotionPlan(ctx context.Context, ghPrClientDetails Context, configBranch string) (map[string]PromotionInstance, error) {
 	// TODO refactor tests to use the two functions below instead of this one
-	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails, config)
+	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails)
 	if err != nil {
 		return nil, err
 	}
-	promotions, err := generatePlanBasedOnChangeddComponent(ctx, ghPrClientDetails, config, relevantComponents, configBranch)
+	promotions, err := generatePlanBasedOnChangeddComponent(ctx, ghPrClientDetails, relevantComponents, configBranch)
 	return promotions, err
 }

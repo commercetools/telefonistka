@@ -65,6 +65,7 @@ type Context struct {
 	PrLogger      *slog.Logger
 	Labels        []*github.Label
 	PrMetadata    prMetadata
+	Config        *configuration.Config
 }
 
 type prMetadata struct {
@@ -126,7 +127,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, config *configuration.Config) {
+func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context) {
 	SetCommitStatus(ctx, ghPrClientDetails, "pending")
 
 	var err error
@@ -141,11 +142,11 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, 
 
 	switch stat {
 	case "merged":
-		err = handleMergedPrEvent(ctx, ghPrClientDetails, config)
+		err = handleMergedPrEvent(ctx, ghPrClientDetails)
 	case "changed":
-		err = handleChangedPREvent(ctx, ghPrClientDetails, config)
+		err = handleChangedPREvent(ctx, ghPrClientDetails)
 	case "show-plan":
-		err = handleShowPlanPREvent(ctx, ghPrClientDetails, config)
+		err = handleShowPlanPREvent(ctx, ghPrClientDetails)
 	}
 
 	if err != nil {
@@ -153,9 +154,9 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, 
 	}
 }
 
-func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
+func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context) error {
 	ghPrClientDetails.PrLogger.Info("Found show-plan label, posting plan")
-	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
+	promotions, err := GeneratePromotionPlan(ctx, ghPrClientDetails, ghPrClientDetails.Ref)
 	if err != nil {
 		return err
 	}
@@ -163,26 +164,26 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, confi
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
+func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context) error {
 	botIdentity, _ := GetBotGhIdentity(ctx, ghPrClientDetails.GhClientPair.v4Client)
 	err := MinimizeStalePRComments(ctx, ghPrClientDetails, botIdentity)
 	if err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
 	}
 
-	if err := CommentDiff(ctx, ghPrClientDetails, config); err != nil {
+	if err := CommentDiff(ctx, ghPrClientDetails); err != nil {
 		return fmt.Errorf("failed to comment diff: %w", err)
 	}
-	err = DetectDrift(ctx, ghPrClientDetails, config)
+	err = DetectDrift(ctx, ghPrClientDetails)
 	if err != nil {
 		return fmt.Errorf("detecting drift: %w", err)
 	}
 	return nil
 }
 
-func CommentDiff(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
-	if config.Argocd.CommentDiffonPR {
-		componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails, config)
+func CommentDiff(ctx context.Context, ghPrClientDetails Context) error {
+	if ghPrClientDetails.Config.Argocd.CommentDiffonPR {
+		componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails)
 		if err != nil {
 			return fmt.Errorf("generate list of changed components: %w", err)
 		}
@@ -206,7 +207,7 @@ func CommentDiff(ctx context.Context, ghPrClientDetails Context, config *configu
 			return fmt.Errorf("error creating ArgoCD clients: %w", err)
 		}
 
-		hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery, config.Argocd.CreateTempAppObjectFroNewApps, argoClients)
+		hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, ghPrClientDetails.Config.Argocd.UseSHALabelForAppDiscovery, ghPrClientDetails.Config.Argocd.CreateTempAppObjectFroNewApps, argoClients)
 		if err != nil {
 			return fmt.Errorf("getting diff information: %w", err)
 		}
@@ -222,7 +223,7 @@ func CommentDiff(ctx context.Context, ghPrClientDetails Context, config *configu
 			}
 			// If the PR is a promotion PR and the diff is empty, we can auto-merge it
 			// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
-			if DoesPrHasLabel(ghPrClientDetails.Labels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
+			if DoesPrHasLabel(ghPrClientDetails.Labels, "promotion") && ghPrClientDetails.Config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
 				ghPrClientDetails.PrLogger.Info("Auto-merging (no diff) PR")
 				err := MergePr(ctx, ghPrClientDetails, ghPrClientDetails.PrNumber)
 				if err != nil {
@@ -237,7 +238,7 @@ func CommentDiff(ctx context.Context, ghPrClientDetails Context, config *configu
 				BranchName:              ghPrClientDetails.Ref,
 			}
 
-			diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(ctx, componentPathList, config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
+			diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(ctx, componentPathList, ghPrClientDetails.Config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
 			componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
 			slog.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(diffCommentData.DiffOfChangedComponents))
 			comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
@@ -489,15 +490,17 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 			return
 		}
 
+		ghPrClientDetails.Config = config
+
 		ghPrClientDetails.getPrMetadata(ctx, event.GetPullRequest().GetBody())
 
 		switch {
 		case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
-			HandlePREvent(ctx, "merged", ghPrClientDetails, config)
+			HandlePREvent(ctx, "merged", ghPrClientDetails)
 		case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
-			HandlePREvent(ctx, "changed", ghPrClientDetails, config)
+			HandlePREvent(ctx, "changed", ghPrClientDetails)
 		case event.GetAction() == "labeled" && DoesPrHasLabel(event.GetPullRequest().Labels, "show-plan"):
-			HandlePREvent(ctx, "show-plan", ghPrClientDetails, config)
+			HandlePREvent(ctx, "show-plan", ghPrClientDetails)
 		}
 
 	case *github.IssueCommentEvent:
@@ -536,6 +539,7 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 			prLogger.Error("Failed to get config", "err", err)
 			return
 		}
+		ghPrClientDetails.Config = config
 		ghPrClientDetails.getPrMetadata(ctx, event.GetIssue().GetBody())
 
 		issue := event.GetIssue()
@@ -555,11 +559,11 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 
 		retrigger := event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody())
 		if retrigger {
-			HandlePREvent(ctx, "changed", ghPrClientDetails, config)
+			HandlePREvent(ctx, "changed", ghPrClientDetails)
 			return
 		}
 
-		if err := handleCommentPrEvent(ctx, ghPrClientDetails, event, botIdentity, config); err != nil {
+		if err := handleCommentPrEvent(ctx, ghPrClientDetails, event, botIdentity); err != nil {
 			prLogger.Error("Failed to handle comment event", "err", err)
 		}
 	default:
@@ -608,7 +612,7 @@ func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo strin
 	return pr, err
 }
 
-func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *github.IssueCommentEvent, botIdentity string, config *configuration.Config) error {
+func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *github.IssueCommentEvent, botIdentity string) error {
 	var err error
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
 	if ce.GetAction() == "edited" && ce.GetComment().GetUser().GetLogin() == botIdentity && ce.GetIssue().GetState() == "open" {
@@ -616,15 +620,15 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *gi
 		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(ce.GetComment().GetBody(), ce.GetChanges().GetBody().GetFrom(), checkboxIdentifier)
 		if !checkboxWaschecked && checkboxIsChecked {
 			ghPrClientDetails.PrLogger.Info("Sync Checkbox was checked")
-			if config.Argocd.AllowSyncfromBranchPathRegex != "" {
-				componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails, config)
+			if ghPrClientDetails.Config.Argocd.AllowSyncfromBranchPathRegex != "" {
+				componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("Failed to get list of changed components", "err", err)
 				}
 
 				for _, componentPath := range componentPathList {
-					if isSyncFromBranchAllowedForThisPath(config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-						err := argocd.SetArgoCDAppRevision(ctx, componentPath, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery)
+					if isSyncFromBranchAllowedForThisPath(ghPrClientDetails.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
+						err := argocd.SetArgoCDAppRevision(ctx, componentPath, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, ghPrClientDetails.Config.Argocd.UseSHALabelForAppDiscovery)
 						if err != nil {
 							ghPrClientDetails.PrLogger.Error("Failed to sync ArgoCD app from branch", "err", err)
 						}
@@ -636,7 +640,7 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *gi
 
 	// I should probably deprecated this whole part altogether - it was designed to solve a *very* specific problem that is probably no longer relevant with GitHub Rulesets
 	// The only reason I'm keeping it is that I don't have a clear feature depreciation policy and if I do remove it should be in a distinct PR
-	for commentSubstring, commitStatusContext := range config.ToggleCommitStatus {
+	for commentSubstring, commitStatusContext := range ghPrClientDetails.Config.ToggleCommitStatus {
 		if strings.Contains(ce.GetComment().GetBody(), "/"+commentSubstring) {
 			err := ghPrClientDetails.ToggleCommitStatus(ctx, commitStatusContext, ce.GetSender().GetName())
 			if err != nil {
@@ -723,13 +727,13 @@ func BumpVersion(ctx context.Context, ghPrClientDetails Context, defaultBranch s
 	return nil
 }
 
-func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
+func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context) error {
 	var err error
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
 	// If we'l ever want to generate this plan on an unmerged PR the PR branch (ghPrClientDetails.Ref) should be used
-	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.DefaultBranch)
-	if !config.DryRunMode {
+	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, ghPrClientDetails.DefaultBranch)
+	if !ghPrClientDetails.Config.DryRunMode {
 		for _, promotion := range promotions {
 			// TODO this whole part shouldn't be in main, but I need to refactor some circular dep's
 
@@ -784,7 +788,7 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, config 
 				ghPrClientDetails.PrLogger.Error("PR opening failed", "err", err)
 				return err
 			}
-			if config.AutoApprovePromotionPrs {
+			if ghPrClientDetails.Config.AutoApprovePromotionPrs {
 				err := ApprovePr(ctx, ghPrClientDetails, pull.GetNumber())
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("PR auto approval failed", "err", err)
@@ -816,15 +820,15 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, config 
 		commentPlanInPR(ctx, ghPrClientDetails, promotions)
 	}
 
-	if config.Argocd.AllowSyncfromBranchPathRegex != "" {
-		componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails, config)
+	if ghPrClientDetails.Config.Argocd.AllowSyncfromBranchPathRegex != "" {
+		componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails)
 		if err != nil {
 			ghPrClientDetails.PrLogger.Error("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD", "err", err)
 		}
 		for _, componentPath := range componentPathList {
-			if isSyncFromBranchAllowedForThisPath(config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
+			if isSyncFromBranchAllowedForThisPath(ghPrClientDetails.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
 				ghPrClientDetails.PrLogger.Info("Ensuring ArgoCD app is set to HEAD", "path", componentPath)
-				err := argocd.SetArgoCDAppRevision(ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery)
+				err := argocd.SetArgoCDAppRevision(ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, ghPrClientDetails.Config.Argocd.UseSHALabelForAppDiscovery)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("Failed to set ArgoCD app to HEAD", "path", componentPath, "err", err)
 				}

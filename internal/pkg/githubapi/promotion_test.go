@@ -30,9 +30,10 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 		Labels: []*github.Label{
 			{Name: &labelName},
 		},
+		Config: config,
 	}
 
-	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, config, "main")
+	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, "main")
 	if err != nil {
 		t.Fatalf("Failed to generate promotion plan: err=%s", err)
 	}
@@ -64,9 +65,10 @@ func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTT
 		Labels: []*github.Label{
 			{Name: &labelName},
 		},
+		Config: config,
 	}
 
-	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, config, "main")
+	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, "main")
 	if err != nil {
 		t.Fatalf("Failed to generate promotion plan: err=%s", err)
 	}
