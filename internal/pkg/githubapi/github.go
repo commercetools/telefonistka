@@ -125,14 +125,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, ghPrClientDetails Context, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, config *configuration.Config) {
-
-	stat, ok := eventToHandle(ctx, eventPayload)
-	if !ok {
-		// nothing to do
-		return
-	}
-
+func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, config *configuration.Config) {
 	SetCommitStatus(ctx, ghPrClientDetails, "pending")
 
 	var err error
@@ -156,22 +149,6 @@ func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, g
 
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Handling of PR event failed", "err", err)
-	}
-}
-
-// eventToHandle returns the event to be handled, translated from a Github
-// world into the Telefonistka world. If no event should be handled, ok is
-// false.
-func eventToHandle(ctx context.Context, eventPayload *github.PullRequestEvent) (event string, ok bool) {
-	switch {
-	case eventPayload.GetAction() == "closed" && eventPayload.GetPullRequest().GetMerged():
-		return "merged", true
-	case eventPayload.GetAction() == "opened" || eventPayload.GetAction() == "reopened" || eventPayload.GetAction() == "synchronize":
-		return "changed", true
-	case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.GetPullRequest().Labels, "show-plan"):
-		return "show-plan", true
-	default:
-		return "", false
 	}
 }
 
@@ -503,7 +480,15 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		}
 
 		ghPrClientDetails.getPrMetadata(ctx, eventPayload.GetPullRequest().GetBody())
-		HandlePREvent(ctx, eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
+
+		switch {
+		case eventPayload.GetAction() == "closed" && eventPayload.GetPullRequest().GetMerged():
+			HandlePREvent(ctx, "merged", ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
+		case eventPayload.GetAction() == "opened" || eventPayload.GetAction() == "reopened" || eventPayload.GetAction() == "synchronize":
+			HandlePREvent(ctx, "changed", ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
+		case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.GetPullRequest().Labels, "show-plan"):
+			HandlePREvent(ctx, "show-plan", ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
+		}
 
 	case *github.IssueCommentEvent:
 		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
