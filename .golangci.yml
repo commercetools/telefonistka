@@ -30,7 +30,6 @@ linters:
     - nosprintfhostport
     - paralleltest
     - staticcheck
-    - tenv
     - thelper
     - tparallel
     - typecheck
