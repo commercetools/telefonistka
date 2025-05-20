@@ -424,8 +424,6 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 	var mainGithubClientPair GhClientPair
 	var approverGithubClientPair GhClientPair
 
-	slog.Info("Handling event type", "type", fmt.Sprintf("%T", e))
-
 	switch event := e.(type) {
 	case *github.PushEvent:
 		// this is a commit push, do something with it?
@@ -455,10 +453,9 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 		config, _ := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
 		listOfChangedFiles := generateListOfChangedFiles(event)
 
+		ghPrClientDetails.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 		handleProxyForward(ctx, config, listOfChangedFiles, r, payload)
 	case *github.PullRequestEvent:
-		slog.Info("is PullRequestEvent", "action", event.GetAction())
-
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
@@ -495,6 +492,7 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 
 		ghPrClientDetails.getPrMetadata(ctx, event.GetPullRequest().GetBody())
 
+		ghPrClientDetails.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 		switch {
 		case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
 			HandlePREvent(ctx, "merged", ghPrClientDetails)
@@ -562,6 +560,7 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 		ghPrClientDetails.Ref = pr.GetHead().GetRef()
 		ghPrClientDetails.PrSHA = pr.GetHead().GetSHA()
 
+		ghPrClientDetails.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 		retrigger := event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody())
 		if retrigger {
 			HandlePREvent(ctx, "changed", ghPrClientDetails)
