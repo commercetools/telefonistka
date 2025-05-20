@@ -152,7 +152,7 @@ func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, g
 	case "changed":
 		err = handleChangedPREvent(ctx, mainGithubClientPair, ghPrClientDetails, eventPayload.GetNumber(), eventPayload.GetPullRequest().Labels, config)
 	case "show-plan":
-		err = handleShowPlanPREvent(ctx, ghPrClientDetails, eventPayload, config)
+		err = handleShowPlanPREvent(ctx, ghPrClientDetails, config)
 	}
 
 	if err != nil {
@@ -176,9 +176,9 @@ func eventToHandle(ctx context.Context, eventPayload *github.PullRequestEvent) (
 	}
 }
 
-func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, eventPayload *github.PullRequestEvent, config *configuration.Config) error {
+func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
 	ghPrClientDetails.PrLogger.Info("Found show-plan label, posting plan")
-	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, eventPayload.GetPullRequest().GetHead().GetRef())
+	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
 	commentPlanInPR(ctx, ghPrClientDetails, promotions)
 	return nil
 }
