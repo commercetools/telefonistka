@@ -455,7 +455,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		prLogger := slog.Default().With(
-			"event_type", "push",
+			"event", eventPayload,
 		)
 
 		ghPrClientDetails := GhPrClientDetails{
@@ -480,9 +480,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		slog.Info("is PullRequestEvent", "action", eventPayload.GetAction())
 
 		prLogger := slog.Default().With(
-			"repo", *eventPayload.Repo.Owner.Login+"/"+*eventPayload.Repo.Name,
-			"prNumber", *eventPayload.PullRequest.Number,
-			"event_type", "pr",
+			"event", eventPayload,
 		)
 
 		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
@@ -511,9 +509,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
 		prLogger := slog.Default().With(
-			"repo", *eventPayload.Repo.Owner.Login+"/"+*eventPayload.Repo.Name,
-			"prNumber", *eventPayload.Issue.Number,
-			"event_type", "issue_comment",
+			"event", eventPayload,
 		)
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 		//
