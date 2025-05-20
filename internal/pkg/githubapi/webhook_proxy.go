@@ -101,34 +101,36 @@ func handlePushEvent(ctx context.Context, eventPayload *github.PushEvent, httpRe
 	listOfChangedFiles := generateListOfChangedFiles(eventPayload)
 	slog.Debug("Changed files in push event", "files", listOfChangedFiles)
 
-	defaultBranch := eventPayload.Repo.DefaultBranch
+	defaultBranch := eventPayload.GetRepo().GetDefaultBranch()
 
-	if *eventPayload.Ref == "refs/heads/"+*defaultBranch {
-		// TODO this need to be cached with TTL + invalidate if configfile in listOfChangedFiles?
-		// This is possible because these webhooks are defined as "best effort" for the designed use case:
-		// Speeding up ArgoCD reconcile loops
-		config, _ := GetInRepoConfig(ctx, ghPrClientDetails, *defaultBranch)
-		endpoints := generateListOfEndpoints(listOfChangedFiles, config)
-
-		// Create a channel to receive responses from the goroutines
-		responses := make(chan string)
-
-		// Use a buffered channel with the same size as the number of endpoints
-		// to prevent goroutines from blocking in case of slow endpoints
-		results := make(chan string, len(endpoints))
-
-		// Start a goroutine for each endpoint
-		for _, endpoint := range endpoints {
-			go proxyRequest(ctx, config.WhProxtSkipTLSVerifyUpstream, httpRequest, payload, endpoint, responses)
-		}
-
-		// Wait for all goroutines to finish and collect the responses
-		for i := 0; i < len(endpoints); i++ {
-			result := <-responses
-			results <- result
-		}
-
-		close(responses)
-		close(results)
+	if eventPayload.GetRef() != "refs/heads/"+defaultBranch {
+		return
 	}
+
+	// TODO this need to be cached with TTL + invalidate if configfile in listOfChangedFiles?
+	// This is possible because these webhooks are defined as "best effort" for the designed use case:
+	// Speeding up ArgoCD reconcile loops
+	config, _ := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
+	endpoints := generateListOfEndpoints(listOfChangedFiles, config)
+
+	// Create a channel to receive responses from the goroutines
+	responses := make(chan string)
+
+	// Use a buffered channel with the same size as the number of endpoints
+	// to prevent goroutines from blocking in case of slow endpoints
+	results := make(chan string, len(endpoints))
+
+	// Start a goroutine for each endpoint
+	for _, endpoint := range endpoints {
+		go proxyRequest(ctx, config.WhProxtSkipTLSVerifyUpstream, httpRequest, payload, endpoint, responses)
+	}
+
+	// Wait for all goroutines to finish and collect the responses
+	for i := 0; i < len(endpoints); i++ {
+		result := <-responses
+		results <- result
+	}
+
+	close(responses)
+	close(results)
 }
