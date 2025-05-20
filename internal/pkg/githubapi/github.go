@@ -164,11 +164,11 @@ func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, g
 // false.
 func eventToHandle(ctx context.Context, eventPayload *github.PullRequestEvent) (event string, ok bool) {
 	switch {
-	case *eventPayload.Action == "closed" && *eventPayload.PullRequest.Merged:
+	case eventPayload.GetAction() == "closed" && eventPayload.GetPullRequest().GetMerged():
 		return "merged", true
-	case *eventPayload.Action == "opened" || *eventPayload.Action == "reopened" || *eventPayload.Action == "synchronize":
+	case eventPayload.GetAction() == "opened" || eventPayload.GetAction() == "reopened" || eventPayload.GetAction() == "synchronize":
 		return "changed", true
-	case *eventPayload.Action == "labeled" && DoesPrHasLabel(eventPayload.PullRequest.Labels, "show-plan"):
+	case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.PullRequest.Labels, "show-plan"):
 		return "show-plan", true
 	default:
 		return "", false
@@ -182,7 +182,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDeta
 	if err != nil {
 		return fmt.Errorf("get in-repo configuration: %w", err)
 	}
-	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, *eventPayload.PullRequest.Head.Ref)
+	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, eventPayload.GetPullRequest().GetHead().GetRef())
 	commentPlanInPR(ctx, ghPrClientDetails, promotions)
 	return nil
 }
@@ -450,7 +450,8 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 	switch eventPayload := eventPayloadInterface.(type) {
 	case *github.PushEvent:
 		// this is a commit push, do something with it?
-		repoOwner := *eventPayload.Repo.Owner.Login
+		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
+
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		prLogger := slog.Default().With(
@@ -460,8 +461,8 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		ghPrClientDetails := GhPrClientDetails{
 			GhClientPair: &mainGithubClientPair,
 			Owner:        repoOwner,
-			Repo:         *eventPayload.Repo.Name,
-			RepoURL:      *eventPayload.Repo.HTMLURL,
+			Repo:         eventPayload.GetRepo().GetName(),
+			RepoURL:      eventPayload.GetRepo().GetHTMLURL(),
 			PrLogger:     prLogger,
 		}
 
@@ -476,7 +477,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		handleProxyForward(ctx, config, listOfChangedFiles, r, payload)
 	case *github.PullRequestEvent:
-		slog.Info("is PullRequestEvent", "action", *eventPayload.Action)
+		slog.Info("is PullRequestEvent", "action", eventPayload.GetAction())
 
 		prLogger := slog.Default().With(
 			"repo", *eventPayload.Repo.Owner.Login+"/"+*eventPayload.Repo.Name,
@@ -484,7 +485,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			"event_type", "pr",
 		)
 
-		repoOwner := *eventPayload.Repo.Owner.Login
+		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
 
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
@@ -493,19 +494,19 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			GhClientPair: &mainGithubClientPair,
 			Labels:       eventPayload.PullRequest.Labels,
 			Owner:        repoOwner,
-			Repo:         *eventPayload.Repo.Name,
-			RepoURL:      *eventPayload.Repo.HTMLURL,
-			PrNumber:     *eventPayload.PullRequest.Number,
-			Ref:          *eventPayload.PullRequest.Head.Ref,
-			PrAuthor:     *eventPayload.PullRequest.User.Login,
+			Repo:         eventPayload.GetRepo().GetName(),
+			RepoURL:      eventPayload.GetRepo().GetHTMLURL(),
+			PrNumber:     eventPayload.GetPullRequest().GetNumber(),
+			Ref:          eventPayload.GetPullRequest().GetHead().GetRef(),
+			PrAuthor:     eventPayload.GetPullRequest().GetUser().GetLogin(),
 			PrLogger:     prLogger,
-			PrSHA:        *eventPayload.PullRequest.Head.SHA,
+			PrSHA:        eventPayload.GetPullRequest().GetHead().GetSHA(),
 		}
 
 		HandlePREvent(ctx, eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair)
 
 	case *github.IssueCommentEvent:
-		repoOwner := *eventPayload.Repo.Owner.Login
+		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
@@ -527,10 +528,10 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		ghPrClientDetails := GhPrClientDetails{
 			GhClientPair: &mainGithubClientPair,
 			Owner:        repoOwner,
-			Repo:         *eventPayload.Repo.Name,
-			RepoURL:      *eventPayload.Repo.HTMLURL,
-			PrNumber:     *eventPayload.Issue.Number,
-			PrAuthor:     *eventPayload.Issue.User.Login,
+			Repo:         eventPayload.GetRepo().GetName(),
+			RepoURL:      eventPayload.GetRepo().GetHTMLURL(),
+			PrNumber:     eventPayload.GetIssue().GetNumber(),
+			PrAuthor:     eventPayload.GetIssue().GetUser().GetLogin(),
 			PrLogger:     prLogger,
 		}
 		_ = handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity)
@@ -608,9 +609,9 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails GhPrClientDetai
 	}
 
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
-	if *ce.Action == "edited" && *ce.Comment.User.Login == botIdentity && *ce.Issue.State == "open" {
+	if ce.GetAction() == "edited" && ce.GetComment().GetUser().GetLogin() == botIdentity && ce.GetIssue().GetState() == "open" {
 		const checkboxIdentifier = "telefonistka-argocd-branch-sync"
-		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxIdentifier)
+		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(ce.GetComment().GetBody(), ce.GetChanges().GetBody().GetFrom(), checkboxIdentifier)
 		if !checkboxWaschecked && checkboxIsChecked {
 			ghPrClientDetails.PrLogger.Info("Sync Checkbox was checked")
 			if config.Argocd.AllowSyncfromBranchPathRegex != "" {
@@ -635,8 +636,8 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails GhPrClientDetai
 	// I should probably deprecated this whole part altogether - it was designed to solve a *very* specific problem that is probably no longer relevant with GitHub Rulesets
 	// The only reason I'm keeping it is that I don't have a clear feature depreciation policy and if I do remove it should be in a distinct PR
 	for commentSubstring, commitStatusContext := range config.ToggleCommitStatus {
-		if strings.Contains(*ce.Comment.Body, "/"+commentSubstring) {
-			err := ghPrClientDetails.ToggleCommitStatus(ctx, commitStatusContext, *ce.Sender.Name)
+		if strings.Contains(ce.GetComment().GetBody(), "/"+commentSubstring) {
+			err := ghPrClientDetails.ToggleCommitStatus(ctx, commitStatusContext, ce.GetSender().GetName())
 			if err != nil {
 				ghPrClientDetails.PrLogger.Error("Failed to toggle s context", "context", commitStatusContext, "err", err)
 				break
@@ -708,7 +709,7 @@ func BumpVersion(ctx context.Context, ghPrClientDetails GhPrClientDetails, defau
 		return err
 	}
 
-	ghPrClientDetails.PrLogger.Info("New PR URL", "url", *pr.HTMLURL)
+	ghPrClientDetails.PrLogger.Info("New PR URL", "url", pr.GetHTMLURL())
 
 	if autoMerge {
 		ghPrClientDetails.PrLogger.Info("Auto-merging PR")
@@ -789,7 +790,7 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails GhPrClientDetail
 				return err
 			}
 			if config.AutoApprovePromotionPrs {
-				err := ApprovePr(ctx, prApproverGithubClient, ghPrClientDetails, pull.Number)
+				err := ApprovePr(ctx, prApproverGithubClient, ghPrClientDetails, pull.GetNumber())
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("PR auto approval failed", "err", err)
 					return err
@@ -798,7 +799,7 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails GhPrClientDetail
 			if promotion.Metadata.AutoMerge {
 				ghPrClientDetails.PrLogger.Info("Auto-merging PR")
 				templateData := map[string]interface{}{
-					"prNumber": *pull.Number,
+					"prNumber": pull.GetNumber(),
 				}
 				templateOutput, err := executeTemplate("autoMerge", defaultTemplatesFullPath("auto-merge-comment.gotmpl"), templateData)
 				if err != nil {
@@ -916,7 +917,7 @@ func (p GhPrClientDetails) CommentOnPr(ctx context.Context, commentBody string) 
 
 func DoesPrHasLabel(labels []*github.Label, name string) bool {
 	for _, l := range labels {
-		if *l.Name == name {
+		if l.GetName() == name {
 			return true
 		}
 	}
@@ -935,10 +936,10 @@ func (p *GhPrClientDetails) ToggleCommitStatus(ctx context.Context, context stri
 	}
 
 	for _, commitStatus := range initialStatuses {
-		if *commitStatus.Context == context {
-			if *commitStatus.State != "success" {
-				p.PrLogger.Info("User toggled state to success", "user", user, "context", context, "state", *commitStatus.State)
-				*commitStatus.State = "success"
+		if commitStatus.GetContext() == context {
+			if commitStatus.GetState() != "success" {
+				p.PrLogger.Info("User toggled state to success", "user", user, "context", context, "state", commitStatus.GetState())
+				commitStatus.State = github.String("success")
 				_, resp, err := p.GhClientPair.v3Client.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
 				prom.InstrumentGhCall(resp)
 				if err != nil {
@@ -946,8 +947,8 @@ func (p *GhPrClientDetails) ToggleCommitStatus(ctx context.Context, context stri
 					r = err
 				}
 			} else {
-				p.PrLogger.Info("User toggled state to failure", "user", user, "context", context, "state", *commitStatus.State)
-				*commitStatus.State = "failure"
+				p.PrLogger.Info("User toggled state to failure", "user", user, "context", context, "state", commitStatus.GetState())
+				commitStatus.State = github.String("failure")
 				_, resp, err := p.GhClientPair.v3Client.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
 				prom.InstrumentGhCall(resp)
 				if err != nil {
@@ -1002,8 +1003,8 @@ func (p *GhPrClientDetails) GetDefaultBranch(ctx context.Context) (string, error
 			return "", err
 		}
 		prom.InstrumentGhCall(resp)
-		p.DefaultBranch = *repo.DefaultBranch
-		return *repo.DefaultBranch, err
+		p.DefaultBranch = repo.GetDefaultBranch()
+		return repo.GetDefaultBranch(), err
 	} else {
 		return p.DefaultBranch, nil
 	}
@@ -1025,22 +1026,22 @@ func generateDeletionTreeEntries(ctx context.Context, ghPrClientDetails *GhPrCli
 		return err
 	}
 	for _, elementInDir := range directoryContent {
-		if *elementInDir.Type == "file" {
+		if elementInDir.GetType() == "file" {
 			treeEntry := github.TreeEntry{ // https://docs.github.com/en/rest/git/trees?apiVersion=2022-11-28#create-a-tree
-				Path:    github.String(*elementInDir.Path),
+				Path:    elementInDir.Path,
 				Mode:    github.String("100644"),
 				Type:    github.String("blob"),
 				SHA:     nil,
 				Content: nil,
 			}
 			*treeEntries = append(*treeEntries, &treeEntry)
-		} else if *elementInDir.Type == "dir" {
+		} else if elementInDir.GetType() == "dir" {
 			err := generateDeletionTreeEntries(ctx, ghPrClientDetails, elementInDir.Path, branch, treeEntries)
 			if err != nil {
 				return err
 			}
 		} else {
-			ghPrClientDetails.PrLogger.Info("Ignoring type for path", "type", *elementInDir.Type, "path", *elementInDir.Path)
+			ghPrClientDetails.PrLogger.Info("Ignoring type for path", "type", elementInDir.GetType(), "path", elementInDir.GetPath())
 		}
 	}
 	return nil
@@ -1070,8 +1071,8 @@ func getDirecotyGitObjectSha(ctx context.Context, ghPrClientDetails GhPrClientDe
 		return "", err
 	} else if err == nil { // scaning the parent dir
 		for _, dirElement := range directoryContent {
-			if *dirElement.Path == dirPath {
-				direcotyGitObjectSha = *dirElement.SHA
+			if dirElement.GetPath() == dirPath {
+				direcotyGitObjectSha = dirElement.GetSHA()
 				break
 			}
 		}
@@ -1350,12 +1351,12 @@ func createPrObject(ctx context.Context, ghPrClientDetails GhPrClientDetails, ne
 	return pull, nil // TODO
 }
 
-func ApprovePr(ctx context.Context, approverClient *github.Client, ghPrClientDetails GhPrClientDetails, prNumber *int) error {
+func ApprovePr(ctx context.Context, approverClient *github.Client, ghPrClientDetails GhPrClientDetails, prNumber int) error {
 	reviewRequest := &github.PullRequestReviewRequest{
 		Event: github.String("APPROVE"),
 	}
 
-	_, resp, err := approverClient.PullRequests.CreateReview(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *prNumber, reviewRequest)
+	_, resp, err := approverClient.PullRequests.CreateReview(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, prNumber, reviewRequest)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Could not create review", "err", err, "resp", resp)
