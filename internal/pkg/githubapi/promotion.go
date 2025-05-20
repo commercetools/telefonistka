@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/commercetools/telefonistka/internal/pkg/configuration"
 	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
 	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
@@ -51,25 +52,19 @@ func contains(s []string, str string) bool {
 	return false
 }
 
-func DetectDrift(ctx context.Context, ghPrClientDetails Context) error {
+func DetectDrift(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
 	ghPrClientDetails.PrLogger.Debug("Checking for Drift")
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	diffOutputMap := make(map[string]string)
-	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
-	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
-	if err != nil {
-		_ = ghPrClientDetails.CommentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
-		return err
-	}
 
 	promotions, _ := GeneratePromotionPlan(ctx, ghPrClientDetails, config, ghPrClientDetails.Ref)
 
 	for _, promotion := range promotions {
 		ghPrClientDetails.PrLogger.Debug("Checking drift for source", "source", promotion.Metadata.SourcePath)
 		for trgt, src := range promotion.ComputedSyncPaths {
-			hasDiff, diffOutput, _ := CompareRepoDirectories(ctx, ghPrClientDetails, src, trgt, defaultBranch)
+			hasDiff, diffOutput, _ := CompareRepoDirectories(ctx, ghPrClientDetails, src, trgt, ghPrClientDetails.DefaultBranch)
 			if hasDiff {
 				mapKey := fmt.Sprintf("`%s` ↔️  `%s`", src, trgt)
 				diffOutputMap[mapKey] = diffOutput

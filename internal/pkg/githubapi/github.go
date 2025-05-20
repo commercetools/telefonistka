@@ -242,7 +242,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 			ghPrClientDetails.PrLogger.Debug("Diff not find affected ArogCD apps")
 		}
 	}
-	err = DetectDrift(ctx, ghPrClientDetails)
+	err = DetectDrift(ctx, ghPrClientDetails, config)
 	if err != nil {
 		return fmt.Errorf("detecting drift: %w", err)
 	}
@@ -512,18 +512,18 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 			return
 		}
 		ghPrClientDetails := Context{
-			GhClientPair: &mainGithubClientPair,
-			Approver:     &approverGithubClientPair,
-			Owner:        repoOwner,
-			Repo:         event.GetRepo().GetName(),
-			RepoURL:      event.GetRepo().GetHTMLURL(),
-			PrNumber:     event.GetIssue().GetNumber(),
-			PrAuthor:     event.GetIssue().GetUser().GetLogin(),
-			PrLogger:     prLogger,
-			Labels:       event.GetIssue().Labels,
+			GhClientPair:  &mainGithubClientPair,
+			Approver:      &approverGithubClientPair,
+			Owner:         repoOwner,
+			Repo:          event.GetRepo().GetName(),
+			RepoURL:       event.GetRepo().GetHTMLURL(),
+			PrNumber:      event.GetIssue().GetNumber(),
+			PrAuthor:      event.GetIssue().GetUser().GetLogin(),
+			PrLogger:      prLogger,
+			Labels:        event.GetIssue().Labels,
+			DefaultBranch: event.GetRepo().GetDefaultBranch(),
 		}
-		defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
-		config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
+		config, err := GetInRepoConfig(ctx, ghPrClientDetails, ghPrClientDetails.DefaultBranch)
 		if err != nil {
 			prLogger.Error("Failed to get config", "err", err)
 			return
