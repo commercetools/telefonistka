@@ -126,7 +126,6 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 }
 
 func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, ghPrClientDetails Context, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair, config *configuration.Config) {
-	ghPrClientDetails.getPrMetadata(ctx, eventPayload.PullRequest.GetBody())
 
 	stat, ok := eventToHandle(ctx, eventPayload)
 	if !ok {
@@ -503,6 +502,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			return
 		}
 
+		ghPrClientDetails.getPrMetadata(ctx, eventPayload.GetPullRequest().GetBody())
 		HandlePREvent(ctx, eventPayload, ghPrClientDetails, mainGithubClientPair, approverGithubClientPair, config)
 
 	case *github.IssueCommentEvent:
