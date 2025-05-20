@@ -433,17 +433,18 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
-		prLogger := slog.Default().With(
-			"event", event,
-		)
-
 		ghPrClientDetails := Context{
 			GhClientPair: &mainGithubClientPair,
 			Owner:        repoOwner,
 			Repo:         event.GetRepo().GetName(),
 			RepoURL:      event.GetRepo().GetHTMLURL(),
-			PrLogger:     prLogger,
 		}
+
+		prLogger := slog.Default().With(
+			"context", ghPrClientDetails,
+		)
+
+		ghPrClientDetails.PrLogger = prLogger
 
 		defaultBranch := event.GetRepo().GetDefaultBranch()
 
@@ -457,10 +458,6 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 		handleProxyForward(ctx, config, listOfChangedFiles, r, payload)
 	case *github.PullRequestEvent:
 		slog.Info("is PullRequestEvent", "action", event.GetAction())
-
-		prLogger := slog.Default().With(
-			"event", event,
-		)
 
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
@@ -477,10 +474,15 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 			PrNumber:      event.GetPullRequest().GetNumber(),
 			Ref:           event.GetPullRequest().GetHead().GetRef(),
 			PrAuthor:      event.GetPullRequest().GetUser().GetLogin(),
-			PrLogger:      prLogger,
 			PrSHA:         event.GetPullRequest().GetHead().GetSHA(),
 			DefaultBranch: event.GetRepo().GetDefaultBranch(),
 		}
+
+		prLogger := slog.Default().With(
+			"context", ghPrClientDetails,
+		)
+
+		ghPrClientDetails.PrLogger = prLogger
 
 		config, err := GetInRepoConfig(ctx, ghPrClientDetails, ghPrClientDetails.DefaultBranch)
 		if err != nil {
@@ -508,9 +510,7 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
-		prLogger := slog.Default().With(
-			"event", event,
-		)
+
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 		//
 		// Allowing override makes it easier to test locally using a personal
@@ -529,10 +529,16 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 			RepoURL:       event.GetRepo().GetHTMLURL(),
 			PrNumber:      event.GetIssue().GetNumber(),
 			PrAuthor:      event.GetIssue().GetUser().GetLogin(),
-			PrLogger:      prLogger,
 			Labels:        event.GetIssue().Labels,
 			DefaultBranch: event.GetRepo().GetDefaultBranch(),
 		}
+
+		prLogger := slog.Default().With(
+			"context", ghPrClientDetails,
+		)
+
+		ghPrClientDetails.PrLogger = prLogger
+
 		config, err := GetInRepoConfig(ctx, ghPrClientDetails, ghPrClientDetails.DefaultBranch)
 		if err != nil {
 			prLogger.Error("Failed to get config", "err", err)
