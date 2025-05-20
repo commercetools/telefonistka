@@ -52,6 +52,7 @@ type promotionInstanceMetaData struct {
 
 type Context struct {
 	GhClientPair *GhClientPair
+	Approver     *GhClientPair
 	// This whole struct describe the metadata of the PR, so it makes sense to share the context with everything to generate HTTP calls related to that PR, right?
 	DefaultBranch string
 	Owner         string
@@ -125,7 +126,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, approverGithubClientPair GhClientPair, config *configuration.Config) {
+func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, config *configuration.Config) {
 	SetCommitStatus(ctx, ghPrClientDetails, "pending")
 
 	var err error
@@ -140,7 +141,7 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context, 
 
 	switch stat {
 	case "merged":
-		err = handleMergedPrEvent(ctx, ghPrClientDetails, approverGithubClientPair.v3Client, config)
+		err = handleMergedPrEvent(ctx, ghPrClientDetails, config)
 	case "changed":
 		err = handleChangedPREvent(ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ghPrClientDetails.PrNumber, ghPrClientDetails.Labels, config)
 	case "show-plan":
@@ -460,6 +461,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		ghPrClientDetails := Context{
 			GhClientPair:  &mainGithubClientPair,
+			Approver:      &approverGithubClientPair,
 			Labels:        eventPayload.GetPullRequest().Labels,
 			Owner:         repoOwner,
 			Repo:          eventPayload.GetRepo().GetName(),
@@ -483,11 +485,11 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		switch {
 		case eventPayload.GetAction() == "closed" && eventPayload.GetPullRequest().GetMerged():
-			HandlePREvent(ctx, "merged", ghPrClientDetails, approverGithubClientPair, config)
+			HandlePREvent(ctx, "merged", ghPrClientDetails, config)
 		case eventPayload.GetAction() == "opened" || eventPayload.GetAction() == "reopened" || eventPayload.GetAction() == "synchronize":
-			HandlePREvent(ctx, "changed", ghPrClientDetails, approverGithubClientPair, config)
+			HandlePREvent(ctx, "changed", ghPrClientDetails, config)
 		case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.GetPullRequest().Labels, "show-plan"):
-			HandlePREvent(ctx, "show-plan", ghPrClientDetails, approverGithubClientPair, config)
+			HandlePREvent(ctx, "show-plan", ghPrClientDetails, config)
 		}
 
 	case *github.IssueCommentEvent:
@@ -511,6 +513,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		}
 		ghPrClientDetails := Context{
 			GhClientPair: &mainGithubClientPair,
+			Approver:     &approverGithubClientPair,
 			Owner:        repoOwner,
 			Repo:         eventPayload.GetRepo().GetName(),
 			RepoURL:      eventPayload.GetRepo().GetHTMLURL(),
@@ -544,7 +547,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		retrigger := eventPayload.GetAction() == "created" && isRetriggerComment(eventPayload.GetComment().GetBody())
 		if retrigger {
-			HandlePREvent(ctx, "changed", ghPrClientDetails, approverGithubClientPair, config)
+			HandlePREvent(ctx, "changed", ghPrClientDetails, config)
 			return
 		}
 
@@ -713,7 +716,7 @@ func BumpVersion(ctx context.Context, ghPrClientDetails Context, defaultBranch s
 	return nil
 }
 
-func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prApproverGithubClient *github.Client, config *configuration.Config) error {
+func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
 	var err error
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
@@ -775,7 +778,7 @@ func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prAppro
 				return err
 			}
 			if config.AutoApprovePromotionPrs {
-				err := ApprovePr(ctx, prApproverGithubClient, ghPrClientDetails, pull.GetNumber())
+				err := ApprovePr(ctx, ghPrClientDetails, pull.GetNumber())
 				if err != nil {
 					ghPrClientDetails.PrLogger.Error("PR auto approval failed", "err", err)
 					return err
@@ -1336,12 +1339,12 @@ func createPrObject(ctx context.Context, ghPrClientDetails Context, newBranchRef
 	return pull, nil // TODO
 }
 
-func ApprovePr(ctx context.Context, approverClient *github.Client, ghPrClientDetails Context, prNumber int) error {
+func ApprovePr(ctx context.Context, ghPrClientDetails Context, prNumber int) error {
 	reviewRequest := &github.PullRequestReviewRequest{
 		Event: github.String("APPROVE"),
 	}
 
-	_, resp, err := approverClient.PullRequests.CreateReview(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, prNumber, reviewRequest)
+	_, resp, err := ghPrClientDetails.Approver.v3Client.PullRequests.CreateReview(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, prNumber, reviewRequest)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Could not create review", "err", err, "resp", resp)
