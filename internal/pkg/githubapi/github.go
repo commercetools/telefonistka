@@ -169,6 +169,18 @@ func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, config
 	if err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
 	}
+
+	if err := CommentDiff(ctx, ghPrClientDetails, config); err != nil {
+		return fmt.Errorf("failed to comment diff: %w", err)
+	}
+	err = DetectDrift(ctx, ghPrClientDetails, config)
+	if err != nil {
+		return fmt.Errorf("detecting drift: %w", err)
+	}
+	return nil
+}
+
+func CommentDiff(ctx context.Context, ghPrClientDetails Context, config *configuration.Config) error {
 	if config.Argocd.CommentDiffonPR {
 		componentPathList, err := generateListOfChangedComponentPaths(ctx, ghPrClientDetails, config)
 		if err != nil {
@@ -241,10 +253,6 @@ func handleChangedPREvent(ctx context.Context, ghPrClientDetails Context, config
 		} else {
 			ghPrClientDetails.PrLogger.Debug("Diff not find affected ArogCD apps")
 		}
-	}
-	err = DetectDrift(ctx, ghPrClientDetails, config)
-	if err != nil {
-		return fmt.Errorf("detecting drift: %w", err)
 	}
 	return nil
 }
