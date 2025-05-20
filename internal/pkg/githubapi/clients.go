@@ -186,26 +186,26 @@ func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPa
 		*gcp, keyExist = ghClientCache.Get(repoOwner)
 		if keyExist {
 			slog.Debug("Found cached client for owner", "owner", repoOwner)
-		} else {
-			slog.Info("Did not found cached client for owner, creating one", "owner", repoOwner, "github_app_id_env", ghAppIdEnvVarName, "github_app_key_env", ghAppPKeyPathEnvVarName)
-			githubAppIdint, err := strconv.ParseInt(githubAppId, 10, 64)
-			if err != nil {
-				slog.Error("GITHUB_APP_ID value could not converted to int64", "err", err)
-				os.Exit(1)
-			}
-			*gcp = createGhAppClientPair(ctx, githubAppIdint, repoOwner, ghAppPKeyPathEnvVarName)
-			ghClientCache.Add(repoOwner, *gcp)
+			return
 		}
-	} else {
-		*gcp, keyExist = ghClientCache.Get("global")
-		if keyExist {
-			slog.Debug("Found global cached client")
-		} else {
-			slog.Info("Did not found global cached client, creating one with env var", "env", ghOauthTokenEnvVarName)
-			ghOauthToken := getCrucialEnv(ghOauthTokenEnvVarName)
-
-			*gcp = createGhTokenClientPair(ctx, ghOauthToken)
-			ghClientCache.Add("global", *gcp)
+		slog.Info("Did not found cached client for owner, creating one", "owner", repoOwner, "github_app_id_env", ghAppIdEnvVarName, "github_app_key_env", ghAppPKeyPathEnvVarName)
+		githubAppIdint, err := strconv.ParseInt(githubAppId, 10, 64)
+		if err != nil {
+			slog.Error("GITHUB_APP_ID value could not converted to int64", "err", err)
+			os.Exit(1)
 		}
+		*gcp = createGhAppClientPair(ctx, githubAppIdint, repoOwner, ghAppPKeyPathEnvVarName)
+		ghClientCache.Add(repoOwner, *gcp)
+		return
 	}
+	*gcp, keyExist = ghClientCache.Get("global")
+	if keyExist {
+		slog.Debug("Found global cached client")
+		return
+	}
+	slog.Info("Did not found global cached client, creating one with env var", "env", ghOauthTokenEnvVarName)
+	ghOauthToken := getCrucialEnv(ghOauthTokenEnvVarName)
+
+	*gcp = createGhTokenClientPair(ctx, ghOauthToken)
+	ghClientCache.Add("global", *gcp)
 }
