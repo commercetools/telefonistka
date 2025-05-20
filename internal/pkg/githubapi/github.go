@@ -143,7 +143,7 @@ func HandlePREvent(ctx context.Context, stat string, ghPrClientDetails Context) 
 	switch stat {
 	case "merged":
 		err = handleMergedPrEvent(ctx, ghPrClientDetails)
-	case "changed":
+	case "changed", "retriggered":
 		err = handleChangedPREvent(ctx, ghPrClientDetails)
 	case "show-plan":
 		err = handleShowPlanPREvent(ctx, ghPrClientDetails)
@@ -564,7 +564,7 @@ func handleEvent(e interface{}, mainGhClientCache *lru.Cache[string, GhClientPai
 		ghPrClientDetails.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 		retrigger := event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody())
 		if retrigger {
-			HandlePREvent(ctx, "changed", ghPrClientDetails)
+			HandlePREvent(ctx, "retriggered", ghPrClientDetails)
 			return
 		}
 
