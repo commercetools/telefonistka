@@ -60,7 +60,7 @@ func bumpVersionRegex(targetRepo string, targetFile string, regex string, replac
 
 	mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", strings.Split(targetRepo, "/")[0], ctx)
 
-	var ghPrClientDetails githubapi.GhPrClientDetails
+	var ghPrClientDetails githubapi.Context
 
 	ghPrClientDetails.GhClientPair = &mainGithubClientPair
 	ghPrClientDetails.Owner = strings.Split(targetRepo, "/")[0]

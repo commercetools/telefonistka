@@ -59,7 +59,7 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 	)
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
-	ghPrClientDetails := GhPrClientDetails{
+	ghPrClientDetails := Context{
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -104,7 +104,7 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
-	ghPrClientDetails := GhPrClientDetails{
+	ghPrClientDetails := Context{
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -156,7 +156,7 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
-	ghPrClientDetails := GhPrClientDetails{
+	ghPrClientDetails := Context{
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -201,7 +201,7 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
-	ghPrClientDetails := GhPrClientDetails{
+	ghPrClientDetails := Context{
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -251,7 +251,7 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
-	ghPrClientDetails := GhPrClientDetails{
+	ghPrClientDetails := Context{
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",

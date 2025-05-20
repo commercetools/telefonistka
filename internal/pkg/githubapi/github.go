@@ -49,7 +49,7 @@ type promotionInstanceMetaData struct {
 	TargetPaths []string `json:"targetPaths"`
 }
 
-type GhPrClientDetails struct {
+type Context struct {
 	GhClientPair *GhClientPair
 	// This whole struct describe the metadata of the PR, so it makes sense to share the context with everything to generate HTTP calls related to that PR, right?
 	DefaultBranch string
@@ -80,7 +80,7 @@ func (pm prMetadata) serialize() (string, error) {
 	return base64.StdEncoding.EncodeToString(pmJson), nil
 }
 
-func (ghPrClientDetails *GhPrClientDetails) getPrMetadata(ctx context.Context, prBody string) {
+func (ghPrClientDetails *Context) getPrMetadata(ctx context.Context, prBody string) {
 	prMetadataRegex := regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
 	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
 	if len(serializedPrMetadata) == 2 {
@@ -94,7 +94,7 @@ func (ghPrClientDetails *GhPrClientDetails) getPrMetadata(ctx context.Context, p
 	}
 }
 
-func (ghPrClientDetails *GhPrClientDetails) getBlameURLPrefix(ctx context.Context) string {
+func (ghPrClientDetails *Context) getBlameURLPrefix(ctx context.Context) string {
 	githubHost := getEnv("GITHUB_HOST", "")
 	if githubHost == "" {
 		githubHost = githubPublicBaseURL
@@ -124,7 +124,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, ghPrClientDetails GhPrClientDetails, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair) {
+func HandlePREvent(ctx context.Context, eventPayload *github.PullRequestEvent, ghPrClientDetails Context, mainGithubClientPair GhClientPair, approverGithubClientPair GhClientPair) {
 	ghPrClientDetails.getPrMetadata(ctx, eventPayload.PullRequest.GetBody())
 
 	stat, ok := eventToHandle(ctx, eventPayload)
@@ -175,7 +175,7 @@ func eventToHandle(ctx context.Context, eventPayload *github.PullRequestEvent) (
 	}
 }
 
-func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDetails, eventPayload *github.PullRequestEvent) error {
+func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails Context, eventPayload *github.PullRequestEvent) error {
 	ghPrClientDetails.PrLogger.Info("Found show-plan label, posting plan")
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
 	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
@@ -187,7 +187,7 @@ func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDeta
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails GhPrClientDetails, prNumber int, prLabels []*github.Label) error {
+func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair, ghPrClientDetails Context, prNumber int, prLabels []*github.Label) error {
 	botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
 	err := MinimizeStalePRComments(ctx, ghPrClientDetails, botIdentity)
 	if err != nil {
@@ -458,7 +458,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			"event", eventPayload,
 		)
 
-		ghPrClientDetails := GhPrClientDetails{
+		ghPrClientDetails := Context{
 			GhClientPair: &mainGithubClientPair,
 			Owner:        repoOwner,
 			Repo:         eventPayload.GetRepo().GetName(),
@@ -488,7 +488,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
-		ghPrClientDetails := GhPrClientDetails{
+		ghPrClientDetails := Context{
 			GhClientPair: &mainGithubClientPair,
 			Labels:       eventPayload.PullRequest.Labels,
 			Owner:        repoOwner,
@@ -521,7 +521,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			slog.Debug("Ignoring self comment")
 			return
 		}
-		ghPrClientDetails := GhPrClientDetails{
+		ghPrClientDetails := Context{
 			GhClientPair: &mainGithubClientPair,
 			Owner:        repoOwner,
 			Repo:         eventPayload.GetRepo().GetName(),
@@ -577,7 +577,7 @@ func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo strin
 	return pr, err
 }
 
-func handleCommentPrEvent(ctx context.Context, ghPrClientDetails GhPrClientDetails, ce *github.IssueCommentEvent, botIdentity string) error {
+func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *github.IssueCommentEvent, botIdentity string) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
 	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
 	if err != nil {
@@ -646,7 +646,7 @@ func handleCommentPrEvent(ctx context.Context, ghPrClientDetails GhPrClientDetai
 	return err
 }
 
-func commentPlanInPR(ctx context.Context, ghPrClientDetails GhPrClientDetails, promotions map[string]PromotionInstance) {
+func commentPlanInPR(ctx context.Context, ghPrClientDetails Context, promotions map[string]PromotionInstance) {
 	templateOutput, err := executeTemplate("dryRunMsg", defaultTemplatesFullPath("dry-run-pr-comment.gotmpl"), promotions)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Failed to generate dry-run comment template", "err", err)
@@ -672,7 +672,7 @@ func defaultTemplatesFullPath(templateFile string) string {
 	return filepath.Join(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
 }
 
-func commentPR(ctx context.Context, ghPrClientDetails GhPrClientDetails, commentBody string) error {
+func commentPR(ctx context.Context, ghPrClientDetails Context, commentBody string) error {
 	err := ghPrClientDetails.CommentOnPr(ctx, commentBody)
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Failed to comment in PR", "err", err)
@@ -681,7 +681,7 @@ func commentPR(ctx context.Context, ghPrClientDetails GhPrClientDetails, comment
 	return nil
 }
 
-func BumpVersion(ctx context.Context, ghPrClientDetails GhPrClientDetails, defaultBranch string, filePath string, newFileContent string, triggeringRepo string, triggeringRepoSHA string, triggeringActor string, autoMerge bool) error {
+func BumpVersion(ctx context.Context, ghPrClientDetails Context, defaultBranch string, filePath string, newFileContent string, triggeringRepo string, triggeringRepoSHA string, triggeringActor string, autoMerge bool) error {
 	var treeEntries []*github.TreeEntry
 
 	generateBumpTreeEntiesForCommit(&treeEntries, ghPrClientDetails, defaultBranch, filePath, newFileContent)
@@ -719,7 +719,7 @@ func BumpVersion(ctx context.Context, ghPrClientDetails GhPrClientDetails, defau
 	return nil
 }
 
-func handleMergedPrEvent(ctx context.Context, ghPrClientDetails GhPrClientDetails, prApproverGithubClient *github.Client) error {
+func handleMergedPrEvent(ctx context.Context, ghPrClientDetails Context, prApproverGithubClient *github.Client) error {
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch(ctx)
 	config, err := GetInRepoConfig(ctx, ghPrClientDetails, defaultBranch)
 	if err != nil {
@@ -855,7 +855,7 @@ func firstN(str string, n int) string {
 	return string(v[:n])
 }
 
-func MergePr(ctx context.Context, details GhPrClientDetails, number int) error {
+func MergePr(ctx context.Context, details Context, number int) error {
 	operation := func() error {
 		err := tryMergePR(ctx, details, number)
 		if err != nil {
@@ -880,7 +880,7 @@ func MergePr(ctx context.Context, details GhPrClientDetails, number int) error {
 	return err
 }
 
-func tryMergePR(ctx context.Context, details GhPrClientDetails, number int) error {
+func tryMergePR(ctx context.Context, details Context, number int) error {
 	_, resp, err := details.GhClientPair.v3Client.PullRequests.Merge(ctx, details.Owner, details.Repo, number, "Auto-merge", nil)
 	prom.InstrumentGhCall(resp)
 	return err
@@ -899,7 +899,7 @@ func (pm *prMetadata) DeSerialize(s string) error {
 	return err
 }
 
-func (p GhPrClientDetails) CommentOnPr(ctx context.Context, commentBody string) error {
+func (p Context) CommentOnPr(ctx context.Context, commentBody string) error {
 	commentBody = "<!-- telefonistka_tag -->\n" + commentBody
 
 	comment := &github.IssueComment{Body: &commentBody}
@@ -920,7 +920,7 @@ func DoesPrHasLabel(labels []*github.Label, name string) bool {
 	return false
 }
 
-func (p *GhPrClientDetails) ToggleCommitStatus(ctx context.Context, context string, user string) error {
+func (p *Context) ToggleCommitStatus(ctx context.Context, context string, user string) error {
 	var r error
 	listOpts := &github.ListOptions{}
 
@@ -959,7 +959,7 @@ func (p *GhPrClientDetails) ToggleCommitStatus(ctx context.Context, context stri
 	return r
 }
 
-func SetCommitStatus(_ context.Context, ghPrClientDetails GhPrClientDetails, state string) {
+func SetCommitStatus(_ context.Context, ghPrClientDetails Context, state string) {
 	// TODO change all these values
 	tcontext := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
@@ -991,7 +991,7 @@ func SetCommitStatus(_ context.Context, ghPrClientDetails GhPrClientDetails, sta
 	}
 }
 
-func (p *GhPrClientDetails) GetDefaultBranch(ctx context.Context) (string, error) {
+func (p *Context) GetDefaultBranch(ctx context.Context) (string, error) {
 	if p.DefaultBranch == "" {
 		repo, resp, err := p.GhClientPair.v3Client.Repositories.Get(ctx, p.Owner, p.Repo)
 		if err != nil {
@@ -1006,7 +1006,7 @@ func (p *GhPrClientDetails) GetDefaultBranch(ctx context.Context) (string, error
 	}
 }
 
-func generateDeletionTreeEntries(ctx context.Context, ghPrClientDetails *GhPrClientDetails, path *string, branch *string, treeEntries *[]*github.TreeEntry) error {
+func generateDeletionTreeEntries(ctx context.Context, ghPrClientDetails *Context, path *string, branch *string, treeEntries *[]*github.TreeEntry) error {
 	// GH tree API doesn't allow deletion a whole dir, so this recursive function traverse the whole tree
 	// and create a tree entry array that would delete all the files in that path
 	getContentOpts := &github.RepositoryContentGetOptions{
@@ -1043,7 +1043,7 @@ func generateDeletionTreeEntries(ctx context.Context, ghPrClientDetails *GhPrCli
 	return nil
 }
 
-func generateBumpTreeEntiesForCommit(treeEntries *[]*github.TreeEntry, ghPrClientDetails GhPrClientDetails, defaultBranch string, filePath string, fileContent string) {
+func generateBumpTreeEntiesForCommit(treeEntries *[]*github.TreeEntry, ghPrClientDetails Context, defaultBranch string, filePath string, fileContent string) {
 	treeEntry := github.TreeEntry{
 		Path:    github.String(filePath),
 		Mode:    github.String("100644"),
@@ -1053,7 +1053,7 @@ func generateBumpTreeEntiesForCommit(treeEntries *[]*github.TreeEntry, ghPrClien
 	*treeEntries = append(*treeEntries, &treeEntry)
 }
 
-func getDirecotyGitObjectSha(ctx context.Context, ghPrClientDetails GhPrClientDetails, dirPath string, branch string) (string, error) {
+func getDirecotyGitObjectSha(ctx context.Context, ghPrClientDetails Context, dirPath string, branch string) (string, error) {
 	repoContentGetOptions := github.RepositoryContentGetOptions{
 		Ref: branch,
 	}
@@ -1077,7 +1077,7 @@ func getDirecotyGitObjectSha(ctx context.Context, ghPrClientDetails GhPrClientDe
 	return direcotyGitObjectSha, nil
 }
 
-func GenerateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*github.TreeEntry, ghPrClientDetails GhPrClientDetails, sourcePath string, targetPath string, defaultBranch string) error {
+func GenerateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*github.TreeEntry, ghPrClientDetails Context, sourcePath string, targetPath string, defaultBranch string) error {
 	sourcePathSHA, err := getDirecotyGitObjectSha(ctx, ghPrClientDetails, sourcePath, defaultBranch)
 
 	if sourcePathSHA == "" {
@@ -1122,7 +1122,7 @@ func GenerateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*githu
 	return err
 }
 
-func createCommit(ctx context.Context, ghPrClientDetails GhPrClientDetails, treeEntries []*github.TreeEntry, defaultBranch string, commitMsg string) (*github.Commit, error) {
+func createCommit(ctx context.Context, ghPrClientDetails Context, treeEntries []*github.TreeEntry, defaultBranch string, commitMsg string) (*github.Commit, error) {
 	// To avoid cloning the repo locally, I'm using GitHub low level GIT Tree API to sync the source folder "over" the target folders
 	// This works by getting the source dir git object SHA, and overwriting(Git.CreateTree) the target directory git object SHA with the source's SHA.
 
@@ -1163,7 +1163,7 @@ func createCommit(ctx context.Context, ghPrClientDetails GhPrClientDetails, tree
 	return commit, err
 }
 
-func createBranch(ctx context.Context, ghPrClientDetails GhPrClientDetails, commit *github.Commit, newBranchName string) (string, error) {
+func createBranch(ctx context.Context, ghPrClientDetails Context, commit *github.Commit, newBranchName string) (string, error) {
 	newBranchRef := "refs/heads/" + newBranchName
 	ghPrClientDetails.PrLogger.Info("New branch name", "name", newBranchName)
 
@@ -1186,7 +1186,7 @@ func createBranch(ctx context.Context, ghPrClientDetails GhPrClientDetails, comm
 	return newBranchRef, err
 }
 
-func generatePromotionPrBody(ctx context.Context, ghPrClientDetails GhPrClientDetails, components string, promotion PromotionInstance, originalPrAuthor string) string {
+func generatePromotionPrBody(ctx context.Context, ghPrClientDetails Context, components string, promotion PromotionInstance, originalPrAuthor string) string {
 	// newPrMetadata will be serialized and persisted in the PR body for use when the PR is merged
 	var newPrMetadata prMetadata
 	var newPrBody string
@@ -1309,7 +1309,7 @@ func filterSkipPaths(targetPaths []string, promotionSkipPaths map[string]bool) [
 	return paths
 }
 
-func createPrObject(ctx context.Context, ghPrClientDetails GhPrClientDetails, newBranchRef string, newPrTitle string, newPrBody string, defaultBranch string, assignee string) (*github.PullRequest, error) {
+func createPrObject(ctx context.Context, ghPrClientDetails Context, newBranchRef string, newPrTitle string, newPrBody string, defaultBranch string, assignee string) (*github.PullRequest, error) {
 	newPrConfig := &github.NewPullRequest{
 		Body:  github.String(newPrBody),
 		Title: github.String(newPrTitle),
@@ -1347,7 +1347,7 @@ func createPrObject(ctx context.Context, ghPrClientDetails GhPrClientDetails, ne
 	return pull, nil // TODO
 }
 
-func ApprovePr(ctx context.Context, approverClient *github.Client, ghPrClientDetails GhPrClientDetails, prNumber int) error {
+func ApprovePr(ctx context.Context, approverClient *github.Client, ghPrClientDetails Context, prNumber int) error {
 	reviewRequest := &github.PullRequestReviewRequest{
 		Event: github.String("APPROVE"),
 	}
@@ -1362,7 +1362,7 @@ func ApprovePr(ctx context.Context, approverClient *github.Client, ghPrClientDet
 	return nil
 }
 
-func GetInRepoConfig(ctx context.Context, ghPrClientDetails GhPrClientDetails, defaultBranch string) (*cfg.Config, error) {
+func GetInRepoConfig(ctx context.Context, ghPrClientDetails Context, defaultBranch string) (*cfg.Config, error) {
 	inRepoConfigFileContentString, _, err := GetFileContent(ctx, ghPrClientDetails, defaultBranch, "telefonistka.yaml")
 	if err != nil {
 		ghPrClientDetails.PrLogger.Error("Could not get in-repo configuration", "err", err)
@@ -1375,7 +1375,7 @@ func GetInRepoConfig(ctx context.Context, ghPrClientDetails GhPrClientDetails, d
 	return c, err
 }
 
-func GetFileContent(ctx context.Context, ghPrClientDetails GhPrClientDetails, branch string, filePath string) (string, int, error) {
+func GetFileContent(ctx context.Context, ghPrClientDetails Context, branch string, filePath string) (string, int, error) {
 	rGetContentOps := github.RepositoryContentGetOptions{Ref: branch}
 	fileContent, _, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, filePath, &rGetContentOps)
 	if err != nil {

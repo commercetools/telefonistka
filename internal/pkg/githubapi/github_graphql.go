@@ -26,7 +26,7 @@ func GetBotGhIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
 	return string(query.Viewer.Login), nil
 }
 
-func MinimizeStalePRComments(ctx context.Context, ghPrClientDetails GhPrClientDetails, botIdentity string) error {
+func MinimizeStalePRComments(ctx context.Context, ghPrClientDetails Context, botIdentity string) error {
 	var getCommentNodeIdsQuery struct {
 		Repository struct {
 			PullRequest struct {

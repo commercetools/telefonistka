@@ -51,7 +51,7 @@ func contains(s []string, str string) bool {
 	return false
 }
 
-func DetectDrift(ctx context.Context, ghPrClientDetails GhPrClientDetails) error {
+func DetectDrift(ctx context.Context, ghPrClientDetails Context) error {
 	ghPrClientDetails.PrLogger.Debug("Checking for Drift")
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -94,7 +94,7 @@ func DetectDrift(ctx context.Context, ghPrClientDetails GhPrClientDetails) error
 	return nil
 }
 
-func getComponentConfig(ctx context.Context, ghPrClientDetails GhPrClientDetails, componentPath string, branch string) (*cfg.ComponentConfig, error) {
+func getComponentConfig(ctx context.Context, ghPrClientDetails Context, componentPath string, branch string) (*cfg.ComponentConfig, error) {
 	componentConfig := &cfg.ComponentConfig{}
 	rGetContentOps := &github.RepositoryContentGetOptions{Ref: branch}
 	componentConfigFileContent, _, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, componentPath+"/telefonistka.yaml", rGetContentOps)
@@ -116,7 +116,7 @@ func getComponentConfig(ctx context.Context, ghPrClientDetails GhPrClientDetails
 }
 
 // This function generates a list of "components" that where changed in the PR and are relevant for promotion)
-func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails GhPrClientDetails, config *cfg.Config) (relevantComponents map[relevantComponent]struct{}, err error) {
+func generateListOfRelevantComponents(ctx context.Context, ghPrClientDetails Context, config *cfg.Config) (relevantComponents map[relevantComponent]struct{}, err error) {
 	relevantComponents = make(map[relevantComponent]struct{})
 
 	// Get the list of files in the PR, with pagination
@@ -172,7 +172,7 @@ type relevantComponent struct {
 	AutoMerge     bool
 }
 
-func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails GhPrClientDetails, config *cfg.Config) (changedComponentPaths []string, err error) {
+func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails Context, config *cfg.Config) (changedComponentPaths []string, err error) {
 	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
 	if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
 		changedComponentPaths = ghPrClientDetails.PrMetadata.PromotedPaths
@@ -191,7 +191,7 @@ func generateListOfChangedComponentPaths(ctx context.Context, ghPrClientDetails 
 }
 
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
-func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails GhPrClientDetails, config *cfg.Config, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
+func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails Context, config *cfg.Config, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
 	promotions = make(map[string]PromotionInstance)
 	for componentToPromote := range relevantComponents {
 		componentConfig, err := getComponentConfig(ctx, ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
@@ -266,7 +266,7 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, ghPrClientDetails
 	return promotions, nil
 }
 
-func GeneratePromotionPlan(ctx context.Context, ghPrClientDetails GhPrClientDetails, config *cfg.Config, configBranch string) (map[string]PromotionInstance, error) {
+func GeneratePromotionPlan(ctx context.Context, ghPrClientDetails Context, config *cfg.Config, configBranch string) (map[string]PromotionInstance, error) {
 	// TODO refactor tests to use the two functions below instead of this one
 	relevantComponents, err := generateListOfRelevantComponents(ctx, ghPrClientDetails, config)
 	if err != nil {

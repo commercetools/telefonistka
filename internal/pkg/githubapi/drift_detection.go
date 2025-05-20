@@ -13,7 +13,7 @@ import (
 	"github.com/hexops/gotextdiff/span"
 )
 
-func generateDiffOutput(ctx context.Context, ghPrClientDetails GhPrClientDetails, defaultBranch string, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
+func generateDiffOutput(ctx context.Context, ghPrClientDetails Context, defaultBranch string, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
 	var hasDiff bool
 	var diffOutput bytes.Buffer
 	var filesWithDiff []string
@@ -63,7 +63,7 @@ func generateDiffOutput(ctx context.Context, ghPrClientDetails GhPrClientDetails
 	return hasDiff, diffOutput.String(), nil
 }
 
-func CompareRepoDirectories(ctx context.Context, ghPrClientDetails GhPrClientDetails, sourcePath string, targetPath string, defaultBranch string) (bool, string, error) {
+func CompareRepoDirectories(ctx context.Context, ghPrClientDetails Context, sourcePath string, targetPath string, defaultBranch string) (bool, string, error) {
 	// Compares two directories content
 
 	// comparing sourcePath targetPath Git object SHA to avoid costly tree compare:
@@ -97,7 +97,7 @@ func CompareRepoDirectories(ctx context.Context, ghPrClientDetails GhPrClientDet
 	}
 }
 
-func generateFlatMapfromFileTree(ctx context.Context, ghPrClientDetails *GhPrClientDetails, workingPath *string, rootPath *string, branch *string, listOfFiles map[string]string) {
+func generateFlatMapfromFileTree(ctx context.Context, ghPrClientDetails *Context, workingPath *string, rootPath *string, branch *string, listOfFiles map[string]string) {
 	getContentOpts := &github.RepositoryContentGetOptions{
 		Ref: *branch,
 	}

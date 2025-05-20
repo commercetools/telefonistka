@@ -17,7 +17,7 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 	labelName := "fast-promotion"
 
-	ghPrClientDetails := GhPrClientDetails{
+	ghPrClientDetails := Context{
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
@@ -51,7 +51,7 @@ func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTT
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 	labelName := "fast-promotion"
 
-	ghPrClientDetails := GhPrClientDetails{
+	ghPrClientDetails := Context{
 		GhClientPair: &ghClientPair,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",

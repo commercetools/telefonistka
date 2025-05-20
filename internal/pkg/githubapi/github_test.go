@@ -408,7 +408,7 @@ func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 
 	for _, tc := range tests {
 		os.Setenv("GITHUB_HOST", tc.Host)
-		ghPrClientDetails := &GhPrClientDetails{Owner: tc.Owner, Repo: tc.Repo}
+		ghPrClientDetails := &Context{Owner: tc.Owner, Repo: tc.Repo}
 		blameURLPrefix := ghPrClientDetails.getBlameURLPrefix(t.Context())
 		assert.Equal(t, tc.ExpectURL, blameURLPrefix)
 	}
