@@ -493,6 +493,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 	case *github.IssueCommentEvent:
 		repoOwner := eventPayload.GetRepo().GetOwner().GetLogin()
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
+		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
 		prLogger := slog.Default().With(
@@ -525,6 +526,28 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			return
 		}
 		ghPrClientDetails.getPrMetadata(ctx, eventPayload.GetIssue().GetBody())
+
+		issue := eventPayload.GetIssue()
+		owner := ghPrClientDetails.Owner
+		repo := ghPrClientDetails.Repo
+
+		// Check if this comment has an attached PR. If it does not we want to skip moving along.
+		pr, err := getPR(ctx, ghPrClientDetails.GhClientPair.v3Client.PullRequests, owner, repo, issue.GetNumber())
+		if pr == nil || err != nil {
+			ghPrClientDetails.PrLogger.Debug("Issue is not a PR")
+			return
+		}
+
+		// Comment events doesn't have Ref/SHA in payload, enriching the object:
+		ghPrClientDetails.Ref = pr.GetHead().GetRef()
+		ghPrClientDetails.PrSHA = pr.GetHead().GetSHA()
+
+		retrigger := eventPayload.GetAction() == "created" && isRetriggerComment(eventPayload.GetComment().GetBody())
+		if retrigger {
+			HandlePREvent(ctx, "changed", ghPrClientDetails, approverGithubClientPair, config)
+			return
+		}
+
 		if err := handleCommentPrEvent(ctx, ghPrClientDetails, eventPayload, botIdentity, config); err != nil {
 			prLogger.Error("Failed to handle comment event", "err", err)
 		}
@@ -575,26 +598,7 @@ func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo strin
 }
 
 func handleCommentPrEvent(ctx context.Context, ghPrClientDetails Context, ce *github.IssueCommentEvent, botIdentity string, config *configuration.Config) error {
-	issue := ce.GetIssue()
-	owner := ghPrClientDetails.Owner
-	repo := ghPrClientDetails.Repo
-
-	// Check if this comment has an attached PR. If it does not we want to skip moving along.
-	pr, err := getPR(ctx, ghPrClientDetails.GhClientPair.v3Client.PullRequests, owner, repo, issue.GetNumber())
-	if pr == nil || err != nil {
-		ghPrClientDetails.PrLogger.Debug("Issue is not a PR")
-		return nil
-	}
-
-	// Comment events doesn't have Ref/SHA in payload, enriching the object:
-	ghPrClientDetails.Ref = pr.GetHead().GetRef()
-	ghPrClientDetails.PrSHA = pr.GetHead().GetSHA()
-
-	retrigger := ce.GetAction() == "created" && isRetriggerComment(ce.GetComment().GetBody())
-	if retrigger {
-		return handleChangedPREvent(ctx, *ghPrClientDetails.GhClientPair, ghPrClientDetails, ce.GetIssue().GetNumber(), ce.GetIssue().Labels, config)
-	}
-
+	var err error
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
 	if ce.GetAction() == "edited" && ce.GetComment().GetUser().GetLogin() == botIdentity && ce.GetIssue().GetState() == "open" {
 		const checkboxIdentifier = "telefonistka-argocd-branch-sync"
