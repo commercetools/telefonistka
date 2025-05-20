@@ -239,7 +239,7 @@ func CommentDiff(ctx context.Context, ghPrClientDetails Context) error {
 
 			diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(ctx, componentPathList, ghPrClientDetails.Config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
 			componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
-			slog.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(diffCommentData.DiffOfChangedComponents))
+			ghPrClientDetails.PrLogger.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(diffCommentData.DiffOfChangedComponents))
 			comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
 			if err != nil {
 				return fmt.Errorf("generate diff comment: %w", err)
