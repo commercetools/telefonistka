@@ -168,7 +168,7 @@ func eventToHandle(ctx context.Context, eventPayload *github.PullRequestEvent) (
 		return "merged", true
 	case eventPayload.GetAction() == "opened" || eventPayload.GetAction() == "reopened" || eventPayload.GetAction() == "synchronize":
 		return "changed", true
-	case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.PullRequest.Labels, "show-plan"):
+	case eventPayload.GetAction() == "labeled" && DoesPrHasLabel(eventPayload.GetPullRequest().Labels, "show-plan"):
 		return "show-plan", true
 	default:
 		return "", false
