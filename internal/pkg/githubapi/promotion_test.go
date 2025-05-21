@@ -2,6 +2,7 @@ package githubapi
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"testing"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/go-test/deep"
 	"github.com/google/go-github/v62/github"
 	"github.com/migueleliasweb/go-github-mock/src/mock"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,10 +26,10 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 		Repo:         "Arepo",
 		PrNumber:     120,
 		Ref:          "Abranch",
-		PrLogger: log.WithFields(log.Fields{
-			"repo":     "AnOwner/Arepo",
-			"prNumber": 120,
-		}),
+		PrLogger: slog.Default().With(
+			"repo", "AnOwner/Arepo",
+			"prNumber", 120,
+		),
 		Labels: []*github.Label{
 			{Name: &labelName},
 		},
@@ -62,10 +62,10 @@ func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTT
 		Repo:         "Arepo",
 		PrNumber:     120,
 		Ref:          "Abranch",
-		PrLogger: log.WithFields(log.Fields{
-			"repo":     "AnOwner/Arepo",
-			"prNumber": 120,
-		}),
+		PrLogger: slog.Default().With(
+			"repo", "AnOwner/Arepo",
+			"prNumber", 120,
+		),
 		Labels: []*github.Label{
 			{Name: &labelName},
 		},
