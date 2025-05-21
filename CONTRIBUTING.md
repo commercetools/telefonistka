@@ -39,6 +39,9 @@ to set it up, and sign your commits so that your pull request can be merged.
 Please make sure that generated files are checked in. This is done mainly to
 avoid broken builds and dependency issues. See #126 for more context.
 
+Mocks are generated in [mocks.go](./internal/pkg/mocks/mocks.go). They can be
+generated using `go generate ./...`.
+
 ## Other Ways to Contribute
 
 We welcome anyone that wants to contribute to Telefonistka to triage and reply to open issues to help troubleshoot
