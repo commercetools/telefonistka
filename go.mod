@@ -17,7 +17,7 @@ require (
 	github.com/homeport/dyff v1.9.4
 	github.com/migueleliasweb/go-github-mock v1.1.0
 	github.com/mikefarah/yq/v4 v4.43.1
-	github.com/nao1215/markdown v0.7.0
+	github.com/nao1215/markdown v0.7.1
 	github.com/prometheus/client_golang v1.21.1
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/sirupsen/logrus v1.9.3
