@@ -6,6 +6,7 @@ name: oci-image-publish-on-comment
 # documentation.
 
 on:
+  workflow_dispatch:
   issue_comment:
     types: [created]
 
