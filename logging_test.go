@@ -1,10 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"testing"
 
 	"sigs.k8s.io/kind/pkg/log"
 )
+
+type manifestLogger struct{ *testing.T }
+
+// Run implements Helm postrender.PostRenderer.
+func (l manifestLogger) Run(manifest *bytes.Buffer) (modified *bytes.Buffer, _ error) {
+	l.Logf("%s", manifest.String())
+	return manifest, nil
+}
 
 func helmLogFunc(t *testing.T) func(format string, values ...interface{}) {
 	t.Helper()
