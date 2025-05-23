@@ -1,0 +1,36 @@
+global:
+  image:
+    tag: "v2.11.13"
+  logging:
+    format: "json"
+    level: "debug"
+crds:
+  install: true
+configs:
+  cm:
+    users.anonymous.enabled: true
+  rbac:
+    policy.default: role:admin
+
+repoServer:
+  volumes:
+  - emptyDir: {}
+    name: helmfile-cmp-tmp
+  extraContainers:
+  - name: helmfile-plugin
+    image: gcr.io/ct-services/argo-cd-helmfile:v0.5.0
+    command: [/var/run/argocd/argocd-cmp-server]
+    volumeMounts:
+      - mountPath: /var/run/argocd
+        name: var-files
+      - mountPath: /home/argocd/cmp-server/plugins
+        name: plugins
+      - mountPath: /tmp
+        name: helmfile-cmp-tmp
+    env:
+      - name: COMMERCETOOLS_USERNAME
+        value: {{.GithubUsername}}
+      - name: COMMERCETOOLS_PASSWORD
+        value: {{.GithubToken}}
+      - name: HELMFILE_TEMPLATE_OPTIONS
+        value: '--include-crds'

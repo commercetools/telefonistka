@@ -1,0 +1,19 @@
+repositories:
+  - name: commercetools
+    url: https://raw.githubusercontent.com/commercetools/helm-charts/releases
+  - name: open-telemetry
+    url: https://open-telemetry.github.io/opentelemetry-helm-charts
+releases:
+  - name: opentelemetry-resources
+    chart: commercetools/opentelemetry-resources
+    version: 1.6.0
+    namespace: observability
+    values:
+      - resources.yaml
+  - name: opentelemetry-operator
+    chart: open-telemetry/opentelemetry-operator
+    version: 0.88.3
+    missingFileHandler: Warn
+    namespace: observability
+    values:
+      - operator.yaml

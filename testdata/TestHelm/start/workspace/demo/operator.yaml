@@ -1,0 +1,4 @@
+manager:
+  collectorImage:
+    repository: "otel/opentelemetry-collector-contrib"
+    tag: 0.121.0

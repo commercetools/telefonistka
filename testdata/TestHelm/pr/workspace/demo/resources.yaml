@@ -1,0 +1,28 @@
+collectors:
+  defaults:
+    ports: []
+    config:
+      service:
+        telemetry:
+          logs:
+            level: debug
+        pipelines:
+          traces:
+            receivers: [otlp]
+      exporters:
+        debug: {}
+      receivers:
+        otlp:
+          http: {}
+          #  instances:
+          #    opentelemetry:
+          #      name: opentelemetry
+          #      mode: deployment
+          #      replicas: 1
+          #      terminationGracePeriodSeconds: 300
+          #      podDisruptionBudget:
+          #        maxUnavailable: 1
+          #admissionWebhooks:
+          #  certManager:
+          #    enabled: false
+          #    autoGenerateCert: true
