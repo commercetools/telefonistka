@@ -351,6 +351,11 @@ func releaseExternalChart(t *testing.T, externalKubeconfigName, namespace, repo,
 
 	checkErr(t, helmconf.Init(cf, helmReleasesNamespace, "", helmLogFunc(t)))
 	helminstall := action.NewInstall(helmconf)
+	helminstall.SkipSchemaValidation = true
+	helminstall.IncludeCRDs = true
+	// helminstall.ChartPathOptions.Version
+
+	// helminstall.PostRenderer = &manifestLogger{t}
 
 	helminstall.RepoURL = repo
 	// sadly the helm downloader does not allow customising the logger :(
