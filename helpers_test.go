@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/session"
+	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/filters"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/google/go-github/v62/github"
 	"github.com/gorilla/websocket"
@@ -301,16 +303,33 @@ func newDockerClient(t *testing.T) *dockerclient.Client {
 // loadLocalImage loads an image from the host into the cluster.
 //
 //nolint:unused
-func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, cluster string, images ...string) {
+func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, images ...string) {
 	t.Helper()
-	archive, err := c.ImageSave(t.Context(), images)
+	args := filters.NewArgs()
+	for img := range slices.Values(images) {
+		args.Add("reference", img)
+	}
+	l, err := c.ImageList(t.Context(), dockertypes.ImageListOptions{Filters: args})
 	checkErr(t, err)
 
-	nodes, err := p.ListNodes(cluster)
+	var ids []string
+	for l := range slices.Values(l) {
+		ids = append(ids, l.ID)
+	}
+	archive, err := c.ImageSave(t.Context(), ids)
 	checkErr(t, err)
-	for n := range slices.Values(nodes) {
-		t.Logf("Loading %s into %s", images, n)
-		checkErr(t, nodeutils.LoadImageArchive(n, archive))
+	defer func() { checkErr(t, archive.Close()) }()
+
+	cl, err := p.List()
+	checkErr(t, err)
+
+	for c := range slices.Values(cl) {
+		nodes, err := p.ListInternalNodes(c)
+		checkErr(t, err)
+		for n := range slices.Values(nodes) {
+			t.Logf("Loading %s into %s", images, n)
+			checkErr(t, nodeutils.LoadImageArchive(n, archive))
+		}
 	}
 }
 
