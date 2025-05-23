@@ -56,6 +56,16 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster/nodeutils"
 )
 
+// contextWithGracePeriod returns a new context that with a deadline that is d
+// time before the deadline of ctx.
+func contextWithGracePeriod(ctx context.Context, d time.Duration) (_ context.Context, cancel func()) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return context.WithCancel(ctx)
+	}
+	return context.WithDeadline(ctx, deadline.Add(-d))
+}
+
 func waitFor(ctx context.Context) {
 	<-ctx.Done()
 }
