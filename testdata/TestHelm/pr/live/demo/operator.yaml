@@ -2,3 +2,11 @@ manager:
   collectorImage:
     repository: "otel/opentelemetry-collector-contrib"
     tag: 0.121.0
+admissionWebhooks:
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values:
+      - kube-system
+      - kube-node-lease

@@ -9,20 +9,14 @@ collectors:
         pipelines:
           traces:
             receivers: [otlp]
+            exporters: [otlphttp]
       exporters:
         debug: {}
       receivers:
         otlp:
           http: {}
-          #  instances:
-          #    opentelemetry:
-          #      name: opentelemetry
-          #      mode: deployment
-          #      replicas: 1
-          #      terminationGracePeriodSeconds: 300
-          #      podDisruptionBudget:
-          #        maxUnavailable: 1
-          #admissionWebhooks:
-          #  certManager:
-          #    enabled: false
-          #    autoGenerateCert: true
+  instances:
+    opentelemetry:
+      name: opentelemetry
+      mode: deployment
+      replicas: 1
