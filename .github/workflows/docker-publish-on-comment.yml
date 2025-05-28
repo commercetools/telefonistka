@@ -6,6 +6,7 @@ name: oci-image-publish-on-comment
 # documentation.
 
 on:
+  workflow_dispatch:
   issue_comment:
     types: [created]
 
@@ -17,6 +18,8 @@ env:
 
 jobs:
   build:
+    env:
+      CGO_ENABLED: 0
     runs-on: ubuntu-latest
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/publish')
     permissions:
@@ -43,6 +46,34 @@ jobs:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
+
+      - run: echo epoch=$(date +%s) > $GITHUB_OUTPUT
+        id: time
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-mod-v1-${{ github.ref_name }}-${{ hashFiles('go.mod') }}-${{ steps.time.outputs.epoch }}
+          restore-keys: |
+            go-mod-v1-${{ github.ref_name }}-${{ hashFiles('go.mod') }}
+            go-mod-v1-${{ github.ref_name }}-
+            go-mod-v1-${{ github.event.repository.default_branch }}-${{ hashFiles('go.mod') }}
+            go-mod-v1-${{ github.event.repository.default_branch }}-
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - run: go mod tidy -diff
+      - run: go test -v ./...
+      - run: go test -v -bench . -run "^$" ./...
+      - run: go build -o telefonistka .
+      - uses: actions/cache/save@v4
+        with:
+          key: go-mod-v1-${{ github.ref_name }}-${{ hashFiles('go.mod') }}-${{ steps.time.outputs.epoch }}
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
 
       # Workaround: https://github.com/docker/build-push-action/issues/461
       - name: Setup Docker buildx

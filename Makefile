@@ -12,7 +12,6 @@ VENDOR_DIR = vendor
 get-deps: $(VENDOR_DIR)
 
 $(VENDOR_DIR):
-	go generate $$(go list ./internal/pkg/mocks/...)
 	go mod download
 
 .PHONY: build
