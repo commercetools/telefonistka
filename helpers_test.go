@@ -493,6 +493,7 @@ func forwardData(t *testing.T, ctx context.Context, fwd, wsURL string) {
 				Body   []byte
 			}{}
 			if err := c.ReadJSON(&v); websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
+				t.Logf("Unexpected close from websocket")
 				return
 			} else if err != nil {
 				checkErr(t, err)
