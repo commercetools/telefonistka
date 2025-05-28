@@ -368,7 +368,9 @@ func releaseExternalChart(t *testing.T, externalKubeconfigName, namespace, repo,
 
 	helminstall.ReleaseName = name
 	helminstall.Namespace = namespace
-	release, err := helminstall.Run(chart, vals)
+	ctx, cancel := signal.NotifyContext(t.Context(), os.Interrupt)
+	defer cancel()
+	release, err := helminstall.RunWithContext(ctx, chart, vals)
 	checkErr(t, err)
 	t.Logf("Released %s in %s namespace", release.Name, release.Namespace)
 }
