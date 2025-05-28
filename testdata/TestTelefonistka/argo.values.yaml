@@ -1,0 +1,13 @@
+global:
+  image:
+    tag: "v2.11.13"
+  logging:
+    format: "json"
+    level: "debug"
+crds:
+  install: true
+configs:
+  cm:
+    users.anonymous.enabled: true
+  rbac:
+    policy.default: role:admin
