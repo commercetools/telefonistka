@@ -184,7 +184,8 @@ func TestHelm(t *testing.T) {
 
 	loadLocalImage(t, newDockerClient(t), cluster.Provider, "gcr.io/ct-services/argo-cd-helmfile:v0.5.0") // sha256:ed34582d67cab4fbba9057134858043b64852ba8ace0cc7b45ac995f8d47337c
 
-	vals := readValuesFile(t, "argo.values.yaml")
+	valsData := struct{ GithubUsername, GithubToken string }{repository.GetOwner().GetLogin(), os.Getenv("GITHUB_TOKEN")}
+	vals := readValuesFileTemplate(t, "argo.values.yaml", valsData)
 	releaseExternalChart(t, cluster.TemporaryConfigFile, argoNamespace, "https://argoproj.github.io/argo-helm", "argo-cd", vals)
 
 	waitForReady(t, clientset.CoreV1().RESTClient(), argoNamespace, "Pod", "app.kubernetes.io/name="+argoServer, "", func(o any) {

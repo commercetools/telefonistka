@@ -544,6 +544,13 @@ func newGithubClient(t *testing.T) *github.Client {
 	return github.NewClient(nil).WithAuthToken(os.Getenv("GITHUB_TOKEN"))
 }
 
+func readValuesFileTemplate(t *testing.T, path string, data any) chartutil.Values {
+	t.Helper()
+	vals, err := chartutil.ReadValues(readTemplate(t, "argo.values.yaml", data).Bytes())
+	checkErr(t, err)
+	return vals
+}
+
 func readValuesFile(t *testing.T, path string) chartutil.Values {
 	t.Helper()
 	vals, err := chartutil.ReadValues(getTestdata(t, "argo.values.yaml").Bytes())
