@@ -17,7 +17,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/homeport/dyff v1.9.4
-	github.com/migueleliasweb/go-github-mock v1.1.0
+	github.com/migueleliasweb/go-github-mock v1.3.0
 	github.com/mikefarah/yq/v4 v4.45.4
 	github.com/nao1215/markdown v0.7.0
 	github.com/prometheus/client_golang v1.21.1
@@ -121,8 +121,8 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-github/v64 v64.0.0 // indirect
 	github.com/google/go-github/v69 v69.2.0 // indirect
+	github.com/google/go-github/v71 v71.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/safetext v0.0.0-20220905092116-b49f7bc46da2 // indirect
