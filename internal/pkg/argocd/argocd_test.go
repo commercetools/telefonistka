@@ -18,7 +18,6 @@ import (
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	reposerverApiClient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
 	"github.com/commercetools/telefonistka/internal/pkg/mocks"
-	"github.com/commercetools/telefonistka/internal/pkg/testutils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -333,7 +332,6 @@ func TestFindArgocdAppByPathAnnotationRelative2(t *testing.T) {
 
 func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 	t.Parallel()
-	defer testutils.Quiet()()
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
