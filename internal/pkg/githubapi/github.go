@@ -1307,10 +1307,19 @@ func filterSkipPaths(targetPaths []string, promotionSkipPaths map[string]bool) [
 	return paths
 }
 
+func splitTitleAt250(s string) (string, string) {
+	runes := []rune(s)
+	if len(runes) <= 250 {
+		return s, ""
+	}
+	return string(runes[:250]) + "...", "..." + string(runes[250:]) + "\n"
+}
+
 func createPrObject(ghPrClientDetails GhPrClientDetails, newBranchRef string, newPrTitle string, newPrBody string, defaultBranch string, assignee string) (*github.PullRequest, error) {
+	safeTitle, bodyPrefix := splitTitleAt250(newPrTitle)
 	newPrConfig := &github.NewPullRequest{
-		Body:  github.String(newPrBody),
-		Title: github.String(newPrTitle),
+		Body:  github.String(bodyPrefix + newPrBody),
+		Title: github.String(safeTitle),
 		Base:  github.String(defaultBranch),
 		Head:  github.String(newBranchRef),
 	}

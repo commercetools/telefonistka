@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -588,5 +589,42 @@ func Test_getPromotionSkipPaths(t *testing.T) {
 			got := getPromotionSkipPaths(tt.args.promotion)
 			assert.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func Test_splitTitleAt250(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		input              string
+		expectedTitle      string
+		expectedBodyPrefix string
+	}{
+		"No title, should not change": {
+			input:              "",
+			expectedTitle:      "",
+			expectedBodyPrefix: "",
+		},
+		"Short title, should not change": {
+			input:              strings.Repeat("A", 10),
+			expectedTitle:      strings.Repeat("A", 10),
+			expectedBodyPrefix: "",
+		},
+		"Long title, should be split apart": {
+			input:              strings.Repeat("A", 260),
+			expectedTitle:      strings.Repeat("A", 250) + "...",
+			expectedBodyPrefix: "..." + strings.Repeat("A", 10) + "\n",
+		},
+		"Very long title, should be split apart": {
+			input:              strings.Repeat("A", 1000),
+			expectedTitle:      strings.Repeat("A", 250) + "...",
+			expectedBodyPrefix: "..." + strings.Repeat("A", 750) + "\n",
+		},
+	}
+
+	for i, tc := range tests {
+		safeTitle, bodyPrefix := splitTitleAt250(tc.input)
+		assert.Equal(t, tc.expectedTitle, safeTitle, i)
+		assert.Equal(t, tc.expectedBodyPrefix, bodyPrefix, i)
 	}
 }
