@@ -11,7 +11,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/go-test/deep v1.1.1
-	github.com/gonvenience/ytbx v1.4.4
+	github.com/gonvenience/ytbx v1.4.7
 	github.com/google/go-github/v62 v62.0.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7
@@ -115,11 +115,10 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/gonvenience/bunt v1.3.5 // indirect
-	github.com/gonvenience/neat v1.3.13 // indirect
-	github.com/gonvenience/term v1.0.2 // indirect
-	github.com/gonvenience/text v1.0.7 // indirect
-	github.com/gonvenience/wrap v1.2.0 // indirect
+	github.com/gonvenience/bunt v1.4.0 // indirect
+	github.com/gonvenience/neat v1.3.15 // indirect
+	github.com/gonvenience/term v1.0.3 // indirect
+	github.com/gonvenience/text v1.0.8 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
