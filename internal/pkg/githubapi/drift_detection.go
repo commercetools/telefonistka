@@ -20,10 +20,10 @@ func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch strin
 
 	// staring with collecting files with different content and file only present in the source dir
 	for filename, sha := range sourceFilesSHAs {
-		ghPrClientDetails.PrLogger.Debugf("Looking at file %s", filename)
+		ghPrClientDetails.PrLogger.Debug("Looking at file", "file", filename)
 		if targetPathfileSha, found := targetFilesSHAs[filename]; found {
 			if sha != targetPathfileSha {
-				ghPrClientDetails.PrLogger.Debugf("%s is different from %s", sourcePath+"/"+filename, targetPath+"/"+filename)
+				ghPrClientDetails.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
 				hasDiff = true
 				sourceFileContent, _, _ := GetFileContent(ghPrClientDetails, defaultBranch, sourcePath+"/"+filename)
 				targetFileContent, _, _ := GetFileContent(ghPrClientDetails, defaultBranch, targetPath+"/"+filename)
@@ -32,7 +32,7 @@ func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch strin
 				diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))
 				filesWithDiff = append(filesWithDiff, sourcePath+"/"+filename)
 			} else {
-				ghPrClientDetails.PrLogger.Debugf("%s is identical to  %s", sourcePath+"/"+filename, targetPath+"/"+filename)
+				ghPrClientDetails.PrLogger.Debug("Source is identical to target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
 			}
 		} else {
 			hasDiff = true
@@ -68,20 +68,21 @@ func CompareRepoDirectories(ghPrClientDetails GhPrClientDetails, sourcePath stri
 	// comparing sourcePath targetPath Git object SHA to avoid costly tree compare:
 	sourcePathGitObjectSha, err := getDirecotyGitObjectSha(ghPrClientDetails, sourcePath, defaultBranch)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Couldn't get %v, Git object sha: %v", sourcePath, err)
+		ghPrClientDetails.PrLogger.Error("Couldn't get source, Git object sha", "path", sourcePath, "err", err)
 		return false, "", err
 	}
 	targetPathGitObjectSha, err := getDirecotyGitObjectSha(ghPrClientDetails, targetPath, defaultBranch)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Couldn't get %v, Git object sha: %v", targetPath, err)
+		ghPrClientDetails.PrLogger.Error("Couldn't get targetv, Git object sha", "target", targetPath, "err", err)
 		return false, "", err
 	}
 
 	if sourcePathGitObjectSha == targetPathGitObjectSha {
-		ghPrClientDetails.PrLogger.Debugf("%s(%s) vs %s(%s) git object SHA matched.", sourcePath, sourcePathGitObjectSha, targetPath, targetPathGitObjectSha)
+		ghPrClientDetails.PrLogger.Debug("Source and target git object SHA matched.", "source", sourcePath, "source_sha", sourcePathGitObjectSha, "target", targetPath, "target_sha", targetPathGitObjectSha)
 		return false, "", nil
 	} else {
-		ghPrClientDetails.PrLogger.Debugf("%s(%s) vs %s(%s) git object SHA didn't match! Will do a full tree compare", sourcePath, sourcePathGitObjectSha, targetPath, targetPathGitObjectSha)
+		ghPrClientDetails.PrLogger.Debug("Source and target git object SHA didn't match! Will do a full tree compare",
+			"source", sourcePath, "source_sha", sourcePathGitObjectSha, "target", targetPath, "target_sha", targetPathGitObjectSha)
 		sourceFilesSHAs := make(map[string]string)
 		targetFilesSHAs := make(map[string]string)
 		hasDiff := false
@@ -108,7 +109,7 @@ func generateFlatMapfromFileTree(ghPrClientDetails *GhPrClientDetails, workingPa
 		} else if *elementInDir.Type == "dir" {
 			generateFlatMapfromFileTree(ghPrClientDetails, elementInDir.Path, rootPath, branch, listOfFiles)
 		} else {
-			ghPrClientDetails.PrLogger.Infof("Ignoring type %s for path %s", *elementInDir.Type, *elementInDir.Path)
+			ghPrClientDetails.PrLogger.Info("Ignoring type for path", "type", *elementInDir.Type, "path", *elementInDir.Path)
 		}
 	}
 }

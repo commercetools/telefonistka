@@ -3,6 +3,7 @@ package githubapi
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -12,7 +13,6 @@ import (
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/shurcooL/githubv4"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -27,7 +27,7 @@ func getCrucialEnv(key string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
 	}
-	log.Fatalf("%s environment variable is required", key)
+	slog.Error("environment variable is required", "key", key)
 	os.Exit(3)
 	return ""
 }
@@ -51,20 +51,22 @@ func getAppInstallationId(githubAppPrivateKeyPath string, githubAppId int64, git
 	if githubRestAltURL != "" {
 		tempClient, err = tempClient.WithEnterpriseURLs(githubRestAltURL, githubRestAltURL)
 		if err != nil {
-			log.Fatalf("failed to create git client for app: %v\n", err)
+			slog.Error("failed to create git client for app", "err", err)
+			os.Exit(1)
 		}
 	}
 
 	installations, _, err := tempClient.Apps.ListInstallations(ctx, &github.ListOptions{})
 	if err != nil {
-		log.Fatalf("failed to list installations: %v\n", err)
+		slog.Error("failed to list installations", "err", err)
+		os.Exit(1)
 	}
 
 	var installID int64
 	for _, i := range installations {
 		if *i.Account.Login == owner {
 			installID = i.GetID()
-			log.Infof("Installation ID for GitHub Application # %v is: %v", githubAppId, installID)
+			slog.Info("Installation ID for GitHub Application", "github_app_id", githubAppId, "install_id", installID)
 			return installID, nil
 		}
 	}
@@ -75,7 +77,8 @@ func getAppInstallationId(githubAppPrivateKeyPath string, githubAppId int64, git
 func createGithubAppRestClient(githubAppPrivateKeyPath string, githubAppId int64, githubAppInstallationId int64, githubRestAltURL string, ctx context.Context) *github.Client {
 	itr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport, githubAppId, githubAppInstallationId, githubAppPrivateKeyPath)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("NewKeyFromFile", "err", err)
+		os.Exit(1)
 	}
 	var client *github.Client
 
@@ -104,7 +107,8 @@ func createGithubRestClient(githubOauthToken string, githubRestAltURL string, ct
 func createGithubAppGraphQlClient(githubAppPrivateKeyPath string, githubAppId int64, githubAppInstallationId int64, githubGraphqlAltURL string, githubRestAltURL string, ctx context.Context) *githubv4.Client {
 	itr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport, githubAppId, githubAppInstallationId, githubAppPrivateKeyPath)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("NewKeyFromFile", "err", err)
+		os.Exit(1)
 	}
 	var client *githubv4.Client
 
@@ -139,15 +143,15 @@ func createGhAppClientPair(ctx context.Context, githubAppId int64, owner string,
 	if githubHost != "" {
 		githubRestAltURL = fmt.Sprintf("https://%s/api/v3", githubHost)
 		githubGraphqlAltURL = fmt.Sprintf("https://%s/api/graphql", githubHost)
-		log.Infof("Github REST API endpoint is configured to %s", githubRestAltURL)
-		log.Infof("Github graphql API endpoint is configured to %s", githubGraphqlAltURL)
+		slog.Info("Github REST API endpoint is configured", "url", githubRestAltURL)
+		slog.Info("Github graphql API endpoint is configured", "url", githubGraphqlAltURL)
 	} else {
-		log.Debugf("Using public Github API endpoint")
+		slog.Debug("Using public Github API endpoint")
 	}
 
 	githubAppInstallationId, err := getAppInstallationId(githubAppPrivateKeyPath, githubAppId, githubRestAltURL, ctx, owner)
 	if err != nil {
-		log.Errorf("Couldn't find installation for app ID %v and repo owner %s", githubAppId, owner)
+		slog.Error("Couldn't find installation for app ID and repo owner", "github_app_id", githubAppId, "owner", owner)
 	}
 
 	return GhClientPair{
@@ -163,10 +167,10 @@ func createGhTokenClientPair(ctx context.Context, ghOauthToken string) GhClientP
 	if githubHost != "" {
 		githubRestAltURL = fmt.Sprintf("https://%s/api/v3", githubHost)
 		githubGraphqlAltURL = fmt.Sprintf("https://%s/api/graphql", githubHost)
-		log.Infof("Github REST API endpoint is configured to %s", githubRestAltURL)
-		log.Infof("Github graphql API endpoint is configured to %s", githubGraphqlAltURL)
+		slog.Info("Github REST API endpoint is configured", "url", githubRestAltURL)
+		slog.Info("Github graphql API endpoint is configured", "url", githubGraphqlAltURL)
 	} else {
-		log.Debugf("Using public Github API endpoint")
+		slog.Debug("Using public Github API endpoint")
 	}
 
 	return GhClientPair{
@@ -181,12 +185,13 @@ func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPa
 	if githubAppId != "" {
 		*gcp, keyExist = ghClientCache.Get(repoOwner)
 		if keyExist {
-			log.Debugf("Found cached client for %s", repoOwner)
+			slog.Debug("Found cached client for owner", "owner", repoOwner)
 		} else {
-			log.Infof("Did not found cached client for %s, creating one with %s/%s env vars", repoOwner, ghAppIdEnvVarName, ghAppPKeyPathEnvVarName)
+			slog.Info("Did not found cached client for owner, creating one", "owner", repoOwner, "github_app_id_env", ghAppIdEnvVarName, "github_app_key_env", ghAppPKeyPathEnvVarName)
 			githubAppIdint, err := strconv.ParseInt(githubAppId, 10, 64)
 			if err != nil {
-				log.Fatalf("GITHUB_APP_ID value could not converted to int64, %v", err)
+				slog.Error("GITHUB_APP_ID value could not converted to int64", "err", err)
+				os.Exit(1)
 			}
 			*gcp = createGhAppClientPair(ctx, githubAppIdint, repoOwner, ghAppPKeyPathEnvVarName)
 			ghClientCache.Add(repoOwner, *gcp)
@@ -194,9 +199,9 @@ func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPa
 	} else {
 		*gcp, keyExist = ghClientCache.Get("global")
 		if keyExist {
-			log.Debug("Found global cached client")
+			slog.Debug("Found global cached client")
 		} else {
-			log.Infof("Did not found global cached client, creating one with %s env var", ghOauthTokenEnvVarName)
+			slog.Info("Did not found global cached client, creating one with env var", "env", ghOauthTokenEnvVarName)
 			ghOauthToken := getCrucialEnv(ghOauthTokenEnvVarName)
 
 			*gcp = createGhTokenClientPair(ctx, ghOauthToken)
