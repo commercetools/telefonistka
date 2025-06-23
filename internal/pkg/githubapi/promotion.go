@@ -2,6 +2,7 @@ package githubapi
 
 import (
 	"fmt"
+	"log/slog"
 	"regexp"
 	"sort"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
 	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
 	"github.com/google/go-github/v62/github"
-	log "github.com/sirupsen/logrus"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -31,7 +31,7 @@ func containMatchingRegex(patterns []string, str string) bool {
 	for _, pattern := range patterns {
 		doesElementMatchPattern, err := regexp.MatchString(pattern, str)
 		if err != nil {
-			log.Errorf("failed to match regex %s vs %s\n%s", pattern, str, err)
+			slog.Error("failed to match regex", "pattern", pattern, "str", str, "err", err)
 			return false
 		}
 		if doesElementMatchPattern {
@@ -51,7 +51,7 @@ func contains(s []string, str string) bool {
 }
 
 func DetectDrift(ghPrClientDetails GhPrClientDetails) error {
-	ghPrClientDetails.PrLogger.Debugln("Checking for Drift")
+	ghPrClientDetails.PrLogger.Debug("Checking for Drift")
 	if ghPrClientDetails.Ctx.Err() != nil {
 		return ghPrClientDetails.Ctx.Err()
 	}
@@ -66,13 +66,13 @@ func DetectDrift(ghPrClientDetails GhPrClientDetails) error {
 	promotions, _ := GeneratePromotionPlan(ghPrClientDetails, config, ghPrClientDetails.Ref)
 
 	for _, promotion := range promotions {
-		ghPrClientDetails.PrLogger.Debugf("Checking drift for %s", promotion.Metadata.SourcePath)
+		ghPrClientDetails.PrLogger.Debug("Checking drift for source", "source", promotion.Metadata.SourcePath)
 		for trgt, src := range promotion.ComputedSyncPaths {
 			hasDiff, diffOutput, _ := CompareRepoDirectories(ghPrClientDetails, src, trgt, defaultBranch)
 			if hasDiff {
 				mapKey := fmt.Sprintf("`%s` ↔️  `%s`", src, trgt)
 				diffOutputMap[mapKey] = diffOutput
-				ghPrClientDetails.PrLogger.Debugf("Found diff @ %s", mapKey)
+				ghPrClientDetails.PrLogger.Debug("Found diff between source and target", "source", src, "target", trgt)
 			}
 		}
 	}
@@ -87,7 +87,7 @@ func DetectDrift(ghPrClientDetails GhPrClientDetails) error {
 			return err
 		}
 	} else {
-		ghPrClientDetails.PrLogger.Infof("No drift found")
+		ghPrClientDetails.PrLogger.Info("No drift found")
 	}
 
 	return nil
@@ -99,16 +99,16 @@ func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath strin
 	componentConfigFileContent, _, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, componentPath+"/telefonistka.yaml", rGetContentOps)
 	prom.InstrumentGhCall(resp)
 	if (err != nil) && (resp.StatusCode != 404) { // The file is optional
-		ghPrClientDetails.PrLogger.Errorf("could not get file list from GH API: err=%s\nresponse=%v", err, resp)
+		ghPrClientDetails.PrLogger.Error("could not get file list from GH API", "err", err, "resp", resp)
 		return nil, err
 	} else if resp.StatusCode == 404 {
-		ghPrClientDetails.PrLogger.Debugf("No in-component config in %s", componentPath)
+		ghPrClientDetails.PrLogger.Debug("No in-component config in path", "path", componentPath)
 		return &cfg.ComponentConfig{}, nil
 	}
 	componentConfigFileContentString, _ := componentConfigFileContent.GetContent()
 	err = yaml.Unmarshal([]byte(componentConfigFileContentString), componentConfig)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to parse configuration: err=%s\n", err) // TODO comment this error to PR
+		ghPrClientDetails.PrLogger.Error("Failed to parse configuration", "err", err) // TODO comment this error to PR
 		return nil, err
 	}
 	return componentConfig, nil
@@ -126,7 +126,7 @@ func generateListOfRelevantComponents(ghPrClientDetails GhPrClientDetails, confi
 		perPagePrFiles, resp, err := ghPrClientDetails.GhClientPair.v3Client.PullRequests.ListFiles(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, ghPrClientDetails.PrNumber, opts)
 		prom.InstrumentGhCall(resp)
 		if err != nil {
-			ghPrClientDetails.PrLogger.Errorf("could not get file list from GH API: err=%s\nstatus code=%v", err, resp.Response.Status)
+			ghPrClientDetails.PrLogger.Error("could not get file list from GH API", "err", err, "status_code", resp.Response.Status)
 			return nil, err
 		}
 		prFiles = append(prFiles, perPagePrFiles...)
@@ -195,7 +195,7 @@ func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, c
 	for componentToPromote := range relevantComponents {
 		componentConfig, err := getComponentConfig(ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
 		if err != nil {
-			ghPrClientDetails.PrLogger.Errorf("Failed to get in component configuration, err=%s\nskipping %s", err, componentToPromote.SourcePath+componentToPromote.ComponentName)
+			ghPrClientDetails.PrLogger.Error("Failed to get in component configuration, skipping component", "err", err, "component", componentToPromote.SourcePath+componentToPromote.ComponentName)
 		}
 
 		for _, configPromotionPath := range config.PromotionPaths {
@@ -219,7 +219,7 @@ func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, c
 
 					mapKey := configPromotionPath.SourcePath + ">" + strings.Join(ppr.TargetPaths, "|") // This key is used to aggregate the PR based on source and target combination
 					if entry, ok := promotions[mapKey]; !ok {
-						ghPrClientDetails.PrLogger.Debugf("Adding key %s", mapKey)
+						ghPrClientDetails.PrLogger.Debug("Adding key", "key", mapKey)
 						if ppr.TargetDescription == "" {
 							ppr.TargetDescription = strings.Join(ppr.TargetPaths, " ")
 						}
