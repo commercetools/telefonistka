@@ -2,6 +2,7 @@ package telefonistka
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -11,7 +12,6 @@ import (
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +53,7 @@ func bumpVersionRegex(targetRepo string, targetFile string, regex string, replac
 
 	if githubHost != "" {
 		githubRestAltURL = "https://" + githubHost + "/api/v3"
-		log.Infof("Github REST API endpoint is configured to %s", githubRestAltURL)
+		slog.Info("Github REST API endpoint is configured", "url", githubRestAltURL)
 	}
 	var mainGithubClientPair githubapi.GhClientPair
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
@@ -66,24 +66,24 @@ func bumpVersionRegex(targetRepo string, targetFile string, regex string, replac
 	ghPrClientDetails.Ctx = ctx
 	ghPrClientDetails.Owner = strings.Split(targetRepo, "/")[0]
 	ghPrClientDetails.Repo = strings.Split(targetRepo, "/")[1]
-	ghPrClientDetails.PrLogger = log.WithFields(log.Fields{}) // TODO what fields should be here?
+	ghPrClientDetails.PrLogger = slog.Default() // TODO what fields should be here?
 
 	r := regexp.MustCompile(regex)
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 
 	initialFileContent, _, err := githubapi.GetFileContent(ghPrClientDetails, defaultBranch, targetFile)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Fail to fetch file content:%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Fail to fetch file content", "err", err)
 		os.Exit(1)
 	}
 	newFileContent := r.ReplaceAllString(initialFileContent, replacement)
 
 	edits := myers.ComputeEdits(span.URIFromPath(""), initialFileContent, newFileContent)
-	ghPrClientDetails.PrLogger.Infof("Diff:\n%s", gotextdiff.ToUnified("Before", "After", initialFileContent, edits))
+	ghPrClientDetails.PrLogger.Info("Diff", "diff", gotextdiff.ToUnified("Before", "After", initialFileContent, edits))
 
 	err = githubapi.BumpVersion(ghPrClientDetails, "main", targetFile, newFileContent, triggeringRepo, triggeringRepoSHA, triggeringActor, autoMerge)
 	if err != nil {
-		log.Errorf("Failed to bump version: %v", err)
+		slog.Error("Failed to bump version", "err", err)
 		os.Exit(1)
 	}
 }

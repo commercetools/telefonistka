@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -29,7 +30,6 @@ import (
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/nao1215/markdown"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
 )
 
@@ -61,7 +61,7 @@ type GhPrClientDetails struct {
 	PrSHA         string
 	Ref           string
 	RepoURL       string
-	PrLogger      *log.Entry
+	PrLogger      *slog.Logger
 	Labels        []*github.Label
 	PrMetadata    prMetadata
 }
@@ -89,7 +89,7 @@ func (ghPrClientDetails *GhPrClientDetails) getPrMetadata(prBody string) {
 			ghPrClientDetails.PrLogger.Info("Found PR metadata")
 			err := ghPrClientDetails.PrMetadata.DeSerialize(serializedPrMetadata[1])
 			if err != nil {
-				ghPrClientDetails.PrLogger.Errorf("Fail to parser PR metadata %v", err)
+				ghPrClientDetails.PrLogger.Error("Fail to parser PR metadata", "err", err)
 			}
 		}
 	}
@@ -156,7 +156,7 @@ func HandlePREvent(eventPayload *github.PullRequestEvent, ghPrClientDetails GhPr
 	}
 
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Handling of PR event failed: err=%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Handling of PR event failed", "err", err)
 	}
 }
 
@@ -177,7 +177,7 @@ func eventToHandle(eventPayload *github.PullRequestEvent) (event string, ok bool
 }
 
 func handleShowPlanPREvent(ctx context.Context, ghPrClientDetails GhPrClientDetails, eventPayload *github.PullRequestEvent) error {
-	ghPrClientDetails.PrLogger.Infoln("Found show-plan label, posting plan")
+	ghPrClientDetails.PrLogger.Info("Found show-plan label, posting plan")
 	defaultBranch, _ := ghPrClientDetails.GetDefaultBranch()
 	config, err := GetInRepoConfig(ghPrClientDetails, defaultBranch)
 	if err != nil {
@@ -216,7 +216,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 			componentsToDiff[componentPath] = true
 			if c.DisableArgoCDDiff {
 				componentsToDiff[componentPath] = false
-				ghPrClientDetails.PrLogger.Debugf("ArgoCD diff disabled for %s\n", componentPath)
+				ghPrClientDetails.PrLogger.Debug("ArgoCD diff disabled for path", "path", componentPath)
 			}
 		}
 		argoClients, err := argocd.CreateArgoCdClients()
@@ -228,20 +228,20 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 		if err != nil {
 			return fmt.Errorf("getting diff information: %w", err)
 		}
-		ghPrClientDetails.PrLogger.Debugf("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref %s)", ghPrClientDetails.Ref)
+		ghPrClientDetails.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", ghPrClientDetails.Ref)
 		if !hasComponentDiffErrors && !hasComponentDiff {
-			ghPrClientDetails.PrLogger.Debugf("ArgoCD diff is empty, this PR will not change cluster state\n")
+			ghPrClientDetails.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state")
 			prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, prNumber, []string{"noop"})
 			prom.InstrumentGhCall(resp)
 			if err != nil {
-				ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
+				ghPrClientDetails.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
 			} else {
-				ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", prNumber, prLables)
+				ghPrClientDetails.PrLogger.Debug("PR labeled", "labels", prLables)
 			}
 			// If the PR is a promotion PR and the diff is empty, we can auto-merge it
 			// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
 			if DoesPrHasLabel(prLabels, "promotion") && config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
-				ghPrClientDetails.PrLogger.Infof("Auto-merging (no diff) PR %d", prNumber)
+				ghPrClientDetails.PrLogger.Info("Auto-merging (no diff) PR")
 				err := MergePr(ghPrClientDetails, prNumber)
 				if err != nil {
 					return fmt.Errorf("PR auto merge: %w", err)
@@ -257,7 +257,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 
 			diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(componentPathList, config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
 			componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
-			log.Infof("Generating ArgoCD Diff Comment for components: %+v, length of diff elements: %d", string(componentsToDiffJSON), len(diffCommentData.DiffOfChangedComponents))
+			slog.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(diffCommentData.DiffOfChangedComponents))
 			comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
 			if err != nil {
 				return fmt.Errorf("generate diff comment: %w", err)
@@ -269,7 +269,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 				}
 			}
 		} else {
-			ghPrClientDetails.PrLogger.Debugf("Diff not find affected ArogCD apps")
+			ghPrClientDetails.PrLogger.Debug("Diff not find affected ArogCD apps")
 		}
 	}
 	err = DetectDrift(ghPrClientDetails)
@@ -347,7 +347,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
 	commentBody, err := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
 	if err != nil {
-		log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+		slog.Error("Failed to build ArgoCD diff comment", "err", err)
 		return comments, err
 	}
 
@@ -364,7 +364,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
 		commentBody, err := buildArgoCdDiffComment(diffCommentData, false, i+1, totalComponents)
 		if err != nil {
-			log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+			slog.Error("Failed to build ArgoCD diff comment", "err", err)
 			return comments, err
 		}
 
@@ -378,7 +378,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		// now we don't have much choice, this is the saddest path, we'll use the concise template
 		commentBody, err = buildArgoCdDiffComment(diffCommentData, true, i+1, totalComponents)
 		if err != nil {
-			log.Errorf("Failed to build ArgoCD diff comment: err=%s\n", err)
+			slog.Error("Failed to build ArgoCD diff comment", "err", err)
 			return comments, err
 		}
 		comments = append(comments, commentBody)
@@ -389,8 +389,8 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 
 // ReciveEventFile this one is similar to ReciveWebhook but it's used for CLI triggering, i  simulates a webhook event to use the same code path as the webhook handler.
 func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair]) {
-	log.Infof("Event type: %s", eventType)
-	log.Infof("Proccesing file: %s", eventFilePath)
+	slog.Info("Event", "type", eventType)
+	slog.Info("Proccesing", "file", eventFilePath)
 
 	payload, err := os.ReadFile(eventFilePath)
 	if err != nil {
@@ -398,7 +398,7 @@ func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *
 	}
 	eventPayloadInterface, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
-		log.Errorf("could not parse webhook: err=%s\n", err)
+		slog.Error("could not parse webhook", "err", err)
 		prom.InstrumentWebhookHit("parsing_failed")
 		return
 	}
@@ -414,7 +414,7 @@ func ReciveEventFile(eventType string, eventFilePath string, mainGhClientCache *
 func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
 	payload, err := github.ValidatePayload(r, githubWebhookSecret)
 	if err != nil {
-		log.Errorf("error reading request body: err=%s\n", err)
+		slog.Error("error reading request body", "err", err)
 		prom.InstrumentWebhookHit("validation_failed")
 		return err
 	}
@@ -422,7 +422,7 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 
 	eventPayloadInterface, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
-		log.Errorf("could not parse webhook: err=%s\n", err)
+		slog.Error("could not parse webhook", "err", err)
 		prom.InstrumentWebhookHit("parsing_failed")
 		return err
 	}
@@ -435,7 +435,7 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("Recovered: %v", r)
+			slog.Error("Recovered", "err", r)
 		}
 	}()
 
@@ -446,7 +446,7 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 	var mainGithubClientPair GhClientPair
 	var approverGithubClientPair GhClientPair
 
-	log.Infof("Handling event type %T", eventPayloadInterface)
+	slog.Info("Handling event type", "type", fmt.Sprintf("%T", eventPayloadInterface))
 
 	switch eventPayload := eventPayloadInterface.(type) {
 	case *github.PushEvent:
@@ -454,9 +454,9 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		repoOwner := *eventPayload.Repo.Owner.Login
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
-		prLogger := log.WithFields(log.Fields{
-			"event_type": "push",
-		})
+		prLogger := slog.Default().With(
+			"event_type", "push",
+		)
 
 		ghPrClientDetails := GhPrClientDetails{
 			Ctx:          ctx,
@@ -469,13 +469,13 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 
 		handlePushEvent(ctx, eventPayload, r, payload, ghPrClientDetails)
 	case *github.PullRequestEvent:
-		log.Infof("is PullRequestEvent(%s)", *eventPayload.Action)
+		slog.Info("is PullRequestEvent", "action", *eventPayload.Action)
 
-		prLogger := log.WithFields(log.Fields{
-			"repo":       *eventPayload.Repo.Owner.Login + "/" + *eventPayload.Repo.Name,
-			"prNumber":   *eventPayload.PullRequest.Number,
-			"event_type": "pr",
-		})
+		prLogger := slog.Default().With(
+			"repo", *eventPayload.Repo.Owner.Login+"/"+*eventPayload.Repo.Name,
+			"prNumber", *eventPayload.PullRequest.Number,
+			"event_type", "pr",
+		)
 
 		repoOwner := *eventPayload.Repo.Owner.Login
 
@@ -503,11 +503,11 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		botIdentity, _ := GetBotGhIdentity(mainGithubClientPair.v4Client, ctx)
-		prLogger := log.WithFields(log.Fields{
-			"repo":       *eventPayload.Repo.Owner.Login + "/" + *eventPayload.Repo.Name,
-			"prNumber":   *eventPayload.Issue.Number,
-			"event_type": "issue_comment",
-		})
+		prLogger := slog.Default().With(
+			"repo", *eventPayload.Repo.Owner.Login+"/"+*eventPayload.Repo.Name,
+			"prNumber", *eventPayload.Issue.Number,
+			"event_type", "issue_comment",
+		)
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 		//
 		// Allowing override makes it easier to test locally using a personal
@@ -527,9 +527,8 @@ func handleEvent(eventPayloadInterface interface{}, mainGhClientCache *lru.Cache
 			}
 			_ = handleCommentPrEvent(ghPrClientDetails, eventPayload, botIdentity)
 		} else {
-			log.Debug("Ignoring self comment")
+			slog.Debug("Ignoring self comment")
 		}
-
 	default:
 		return
 	}
@@ -608,19 +607,19 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 		const checkboxIdentifier = "telefonistka-argocd-branch-sync"
 		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(*ce.Comment.Body, *ce.Changes.Body.From, checkboxIdentifier)
 		if !checkboxWaschecked && checkboxIsChecked {
-			ghPrClientDetails.PrLogger.Infof("Sync Checkbox was checked")
+			ghPrClientDetails.PrLogger.Info("Sync Checkbox was checked")
 			if config.Argocd.AllowSyncfromBranchPathRegex != "" {
 				ghPrClientDetails.getPrMetadata(ce.Issue.GetBody())
 				componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
 				if err != nil {
-					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
+					ghPrClientDetails.PrLogger.Error("Failed to get list of changed components", "err", err)
 				}
 
 				for _, componentPath := range componentPathList {
 					if isSyncFromBranchAllowedForThisPath(config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
 						err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, ghPrClientDetails.Ref, ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery)
 						if err != nil {
-							ghPrClientDetails.PrLogger.Errorf("Failed to sync ArgoCD app from branch: err=%s\n", err)
+							ghPrClientDetails.PrLogger.Error("Failed to sync ArgoCD app from branch", "err", err)
 						}
 					}
 				}
@@ -634,10 +633,10 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 		if strings.Contains(*ce.Comment.Body, "/"+commentSubstring) {
 			err := ghPrClientDetails.ToggleCommitStatus(commitStatusContext, *ce.Sender.Name)
 			if err != nil {
-				ghPrClientDetails.PrLogger.Errorf("Failed to toggle %s context,  err=%v", commitStatusContext, err)
+				ghPrClientDetails.PrLogger.Error("Failed to toggle s context", "context", commitStatusContext, "err", err)
 				break
 			} else {
-				ghPrClientDetails.PrLogger.Infof("Toggled %s status", commitStatusContext)
+				ghPrClientDetails.PrLogger.Info("Toggled status", "context", commitStatusContext)
 			}
 		}
 	}
@@ -647,7 +646,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 func commentPlanInPR(ghPrClientDetails GhPrClientDetails, promotions map[string]PromotionInstance) {
 	templateOutput, err := executeTemplate("dryRunMsg", defaultTemplatesFullPath("dry-run-pr-comment.gotmpl"), promotions)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to generate dry-run comment template: err=%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Failed to generate dry-run comment template", "err", err)
 		return
 	}
 	_ = commentPR(ghPrClientDetails, templateOutput)
@@ -673,7 +672,7 @@ func defaultTemplatesFullPath(templateFile string) string {
 func commentPR(ghPrClientDetails GhPrClientDetails, commentBody string) error {
 	err := ghPrClientDetails.CommentOnPr(commentBody)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to comment in PR: err=%v", err)
+		ghPrClientDetails.PrLogger.Error("Failed to comment in PR", "err", err)
 		return err
 	}
 	return nil
@@ -686,12 +685,12 @@ func BumpVersion(ghPrClientDetails GhPrClientDetails, defaultBranch string, file
 
 	commit, err := createCommit(ghPrClientDetails, treeEntries, defaultBranch, "Bumping version @ "+filePath)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Commit creation failed: err=%v", err)
+		ghPrClientDetails.PrLogger.Error("Commit creation failed", "err", err)
 		return err
 	}
 	newBranchRef, err := createBranch(ghPrClientDetails, commit, "artifact_version_bump/"+triggeringRepo+"/"+triggeringRepoSHA) // TODO figure out branch name!!!!
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Branch creation failed: err=%v", err)
+		ghPrClientDetails.PrLogger.Error("Branch creation failed", "err", err)
 		return err
 	}
 
@@ -699,17 +698,17 @@ func BumpVersion(ghPrClientDetails GhPrClientDetails, defaultBranch string, file
 	newPrBody := fmt.Sprintf("Bumping version triggered by %s@%s", triggeringRepo, triggeringRepoSHA)
 	pr, err := createPrObject(ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, defaultBranch, triggeringActor)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("PR opening failed: err=%v", err)
+		ghPrClientDetails.PrLogger.Error("PR opening failed", "err", err)
 		return err
 	}
 
-	ghPrClientDetails.PrLogger.Infof("New PR URL: %s", *pr.HTMLURL)
+	ghPrClientDetails.PrLogger.Info("New PR URL", "url", *pr.HTMLURL)
 
 	if autoMerge {
-		ghPrClientDetails.PrLogger.Infof("Auto-merging PR %d", *pr.Number)
+		ghPrClientDetails.PrLogger.Info("Auto-merging PR")
 		err := MergePr(ghPrClientDetails, pr.GetNumber())
 		if err != nil {
-			ghPrClientDetails.PrLogger.Errorf("PR auto merge failed: err=%v", err)
+			ghPrClientDetails.PrLogger.Error("PR auto merge failed", "err", err)
 			return err
 		}
 	}
@@ -739,20 +738,20 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 			for trgt, src := range promotion.ComputedSyncPaths {
 				err = GenerateSyncTreeEntriesForCommit(&treeEntries, ghPrClientDetails, src, trgt, defaultBranch)
 				if err != nil {
-					ghPrClientDetails.PrLogger.Errorf("Failed to generate treeEntries for %s > %s,  err=%v", src, trgt, err)
+					ghPrClientDetails.PrLogger.Error("Failed to generate treeEntries", "source", src, "target", trgt, "err", err)
 				} else {
-					ghPrClientDetails.PrLogger.Debugf("Generated treeEntries for %s > %s", src, trgt)
+					ghPrClientDetails.PrLogger.Debug("Generated treeEntries for source and target", "source", src, "target", trgt)
 				}
 			}
 
 			if len(treeEntries) < 1 {
-				ghPrClientDetails.PrLogger.Infof("TreeEntries list is empty")
+				ghPrClientDetails.PrLogger.Info("TreeEntries list is empty")
 				continue
 			}
 
 			commit, err := createCommit(ghPrClientDetails, treeEntries, defaultBranch, "Syncing from "+promotion.Metadata.SourcePath)
 			if err != nil {
-				ghPrClientDetails.PrLogger.Errorf("Commit creation failed: err=%v", err)
+				ghPrClientDetails.PrLogger.Error("Commit creation failed", "err", err)
 				return err
 			}
 
@@ -760,7 +759,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 
 			newBranchRef, err := createBranch(ghPrClientDetails, commit, newBranchName)
 			if err != nil {
-				ghPrClientDetails.PrLogger.Errorf("Branch creation failed: err=%v", err)
+				ghPrClientDetails.PrLogger.Error("Branch creation failed", "err", err)
 				return err
 			}
 
@@ -780,18 +779,18 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 
 			pull, err := createPrObject(ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, defaultBranch, originalPrAuthor)
 			if err != nil {
-				ghPrClientDetails.PrLogger.Errorf("PR opening failed: err=%v", err)
+				ghPrClientDetails.PrLogger.Error("PR opening failed", "err", err)
 				return err
 			}
 			if config.AutoApprovePromotionPrs {
 				err := ApprovePr(prApproverGithubClient, ghPrClientDetails, pull.Number)
 				if err != nil {
-					ghPrClientDetails.PrLogger.Errorf("PR auto approval failed: err=%v", err)
+					ghPrClientDetails.PrLogger.Error("PR auto approval failed", "err", err)
 					return err
 				}
 			}
 			if promotion.Metadata.AutoMerge {
-				ghPrClientDetails.PrLogger.Infof("Auto-merging PR %d", *pull.Number)
+				ghPrClientDetails.PrLogger.Info("Auto-merging PR")
 				templateData := map[string]interface{}{
 					"prNumber": *pull.Number,
 				}
@@ -806,7 +805,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 
 				err = MergePr(ghPrClientDetails, pull.GetNumber())
 				if err != nil {
-					ghPrClientDetails.PrLogger.Errorf("PR auto merge failed: err=%v", err)
+					ghPrClientDetails.PrLogger.Error("PR auto merge failed", "err", err)
 					return err
 				}
 			}
@@ -818,14 +817,14 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 	if config.Argocd.AllowSyncfromBranchPathRegex != "" {
 		componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
 		if err != nil {
-			ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD: err=%s\n", err)
+			ghPrClientDetails.PrLogger.Error("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD", "err", err)
 		}
 		for _, componentPath := range componentPathList {
 			if isSyncFromBranchAllowedForThisPath(config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-				ghPrClientDetails.PrLogger.Infof("Ensuring ArgoCD app %s is set to HEAD\n", componentPath)
+				ghPrClientDetails.PrLogger.Info("Ensuring ArgoCD app is set to HEAD", "path", componentPath)
 				err := argocd.SetArgoCDAppRevision(ghPrClientDetails.Ctx, componentPath, "HEAD", ghPrClientDetails.RepoURL, config.Argocd.UseSHALabelForAppDiscovery)
 				if err != nil {
-					ghPrClientDetails.PrLogger.Errorf("Failed to set ArgoCD app @  %s, to HEAD: err=%s\n", componentPath, err)
+					ghPrClientDetails.PrLogger.Error("Failed to set ArgoCD app to HEAD", "path", componentPath, "err", err)
 				}
 			}
 		}
@@ -859,11 +858,11 @@ func MergePr(details GhPrClientDetails, number int) error {
 		if err != nil {
 			if isMergeErrorRetryable(err.Error()) {
 				if err != nil {
-					details.PrLogger.Warnf("Failed to merge PR: transient err=%v", err)
+					details.PrLogger.Warn("Failed to merge PR: transient error", "err", err)
 				}
 				return err
 			}
-			details.PrLogger.Errorf("Failed to merge PR: permanent err=%v", err)
+			details.PrLogger.Error("Failed to merge PR", "err", err)
 			return backoff.Permanent(err)
 		}
 		return nil
@@ -872,7 +871,7 @@ func MergePr(details GhPrClientDetails, number int) error {
 	// Using default values, see https://pkg.go.dev/github.com/cenkalti/backoff#pkg-constants
 	err := backoff.Retry(operation, backoff.NewExponentialBackOff())
 	if err != nil {
-		details.PrLogger.Errorf("Failed to merge PR: backoff err=%v", err)
+		details.PrLogger.Error("Failed to merge PR: backoff failed", "err", err)
 	}
 
 	return err
@@ -904,7 +903,7 @@ func (p GhPrClientDetails) CommentOnPr(commentBody string) error {
 	_, resp, err := p.GhClientPair.v3Client.Issues.CreateComment(p.Ctx, p.Owner, p.Repo, p.PrNumber, comment)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		p.PrLogger.Errorf("Could not comment in PR: err=%s\n%v\n", err, resp)
+		p.PrLogger.Error("Could not comment in PR", "err", err, "resp", resp)
 	}
 	return err
 }
@@ -925,28 +924,28 @@ func (p *GhPrClientDetails) ToggleCommitStatus(context string, user string) erro
 	initialStatuses, resp, err := p.GhClientPair.v3Client.Repositories.ListStatuses(p.Ctx, p.Owner, p.Repo, p.Ref, listOpts)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		p.PrLogger.Errorf("Failed to fetch  existing statuses for commit  %s, err=%s", p.Ref, err)
+		p.PrLogger.Error("Failed to fetch  existing statuses for commit", "commit", p.Ref, "err", err)
 		r = err
 	}
 
 	for _, commitStatus := range initialStatuses {
 		if *commitStatus.Context == context {
 			if *commitStatus.State != "success" {
-				p.PrLogger.Infof("%s Toggled  %s(%s) to success", user, context, *commitStatus.State)
+				p.PrLogger.Info("User toggled state to success", "user", user, "context", context, "state", *commitStatus.State)
 				*commitStatus.State = "success"
 				_, resp, err := p.GhClientPair.v3Client.Repositories.CreateStatus(p.Ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
 				prom.InstrumentGhCall(resp)
 				if err != nil {
-					p.PrLogger.Errorf("Failed to create context %s, err=%s", context, err)
+					p.PrLogger.Error("Failed to create context", "context", context, "err", err)
 					r = err
 				}
 			} else {
-				p.PrLogger.Infof("%s Toggled %s(%s) to failure", user, context, *commitStatus.State)
+				p.PrLogger.Info("User toggled state to failure", "user", user, "context", context, "state", *commitStatus.State)
 				*commitStatus.State = "failure"
 				_, resp, err := p.GhClientPair.v3Client.Repositories.CreateStatus(p.Ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
 				prom.InstrumentGhCall(resp)
 				if err != nil {
-					p.PrLogger.Errorf("Failed to create context %s, err=%s", context, err)
+					p.PrLogger.Error("Failed to create context", "context", context, "err", err)
 					r = err
 				}
 			}
@@ -973,7 +972,7 @@ func SetCommitStatus(ghPrClientDetails GhPrClientDetails, state string) {
 		Context:     &tcontext,
 		AvatarURL:   &avatarURL,
 	}
-	ghPrClientDetails.PrLogger.Debugf("Setting commit %s status to %s", ghPrClientDetails.PrSHA, state)
+	ghPrClientDetails.PrLogger.Debug("Setting commit status", "commit", ghPrClientDetails.PrSHA, "status", state)
 
 	// use a separate context to avoid event processing timeout to cause
 	// failures in updating the commit status
@@ -985,7 +984,7 @@ func SetCommitStatus(ghPrClientDetails GhPrClientDetails, state string) {
 	repoSlug := ghPrClientDetails.Owner + "/" + ghPrClientDetails.Repo
 	prom.IncCommitStatusUpdateCounter(repoSlug, state)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to set commit status: err=%s\n%v", err, resp)
+		ghPrClientDetails.PrLogger.Error("Failed to set commit status", "err", err, "resp", resp)
 	}
 }
 
@@ -993,7 +992,7 @@ func (p *GhPrClientDetails) GetDefaultBranch() (string, error) {
 	if p.DefaultBranch == "" {
 		repo, resp, err := p.GhClientPair.v3Client.Repositories.Get(p.Ctx, p.Owner, p.Repo)
 		if err != nil {
-			p.PrLogger.Errorf("Could not get repo default branch: err=%s\n%v\n", err, resp)
+			p.PrLogger.Error("Could not get repo default branch", "err", err, "resp", resp)
 			return "", err
 		}
 		prom.InstrumentGhCall(resp)
@@ -1013,10 +1012,10 @@ func generateDeletionTreeEntries(ghPrClientDetails *GhPrClientDetails, path *str
 	_, directoryContent, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *path, getContentOpts)
 	prom.InstrumentGhCall(resp)
 	if resp.StatusCode == 404 {
-		ghPrClientDetails.PrLogger.Infof("Skipping deletion of non-existing  %s", *path)
+		ghPrClientDetails.PrLogger.Info("Skipping deletion of non-existing path", "path", *path)
 		return nil
 	} else if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Could not fetch %s content  err=%s\n%v\n", *path, err, resp)
+		ghPrClientDetails.PrLogger.Error("Could not fetch content", "path", *path, "err", err, "resp", resp)
 		return err
 	}
 	for _, elementInDir := range directoryContent {
@@ -1035,7 +1034,7 @@ func generateDeletionTreeEntries(ghPrClientDetails *GhPrClientDetails, path *str
 				return err
 			}
 		} else {
-			ghPrClientDetails.PrLogger.Infof("Ignoring type %s for path %s", *elementInDir.Type, *elementInDir.Path)
+			ghPrClientDetails.PrLogger.Info("Ignoring type for path", "type", *elementInDir.Type, "path", *elementInDir.Path)
 		}
 	}
 	return nil
@@ -1061,7 +1060,7 @@ func getDirecotyGitObjectSha(ghPrClientDetails GhPrClientDetails, dirPath string
 	_, directoryContent, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, path.Dir(dirPath), &repoContentGetOptions)
 	prom.InstrumentGhCall(resp)
 	if err != nil && resp.StatusCode != 404 {
-		ghPrClientDetails.PrLogger.Errorf("Could not fetch source directory SHA err=%s\n%v\n", err, resp)
+		ghPrClientDetails.PrLogger.Error("Could not fetch source directory SHA", "err", err, "resp", resp)
 		return "", err
 	} else if err == nil { // scaning the parent dir
 		for _, dirElement := range directoryContent {
@@ -1079,10 +1078,10 @@ func GenerateSyncTreeEntriesForCommit(treeEntries *[]*github.TreeEntry, ghPrClie
 	sourcePathSHA, err := getDirecotyGitObjectSha(ghPrClientDetails, sourcePath, defaultBranch)
 
 	if sourcePathSHA == "" {
-		ghPrClientDetails.PrLogger.Infoln("Source directory wasn't found, assuming a deletion PR")
+		ghPrClientDetails.PrLogger.Info("Source directory wasn't found, assuming a deletion PR")
 		err := generateDeletionTreeEntries(&ghPrClientDetails, &targetPath, &defaultBranch, treeEntries)
 		if err != nil {
-			ghPrClientDetails.PrLogger.Errorf("Failed to build deletion tree: err=%s\n", err)
+			ghPrClientDetails.PrLogger.Error("Failed to build deletion tree", "err", err)
 			return err
 		}
 	} else {
@@ -1104,7 +1103,7 @@ func GenerateSyncTreeEntriesForCommit(treeEntries *[]*github.TreeEntry, ghPrClie
 
 		for filename := range targetFilesSHAs {
 			if _, found := sourceFilesSHAs[filename]; !found {
-				ghPrClientDetails.PrLogger.Debugf("%s -- was NOT found on %s, marking as a deletion!", filename, sourcePath)
+				ghPrClientDetails.PrLogger.Debug("File was NOT found on source path, marking as a deletion!", "file", filename, "source", sourcePath)
 				fileDeleteTreeEntry := github.TreeEntry{
 					Path:    github.String(targetPath + "/" + filename),
 					Mode:    github.String("100644"),
@@ -1127,21 +1126,21 @@ func createCommit(ghPrClientDetails GhPrClientDetails, treeEntries []*github.Tre
 	ref, resp, err := ghPrClientDetails.GhClientPair.v3Client.Git.GetRef(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, "heads/"+defaultBranch)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to get main branch ref: err=%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Failed to get main branch ref", "err", err)
 		return nil, err
 	}
 	baseTreeSHA := ref.Object.SHA
 	tree, resp, err := ghPrClientDetails.GhClientPair.v3Client.Git.CreateTree(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *baseTreeSHA, treeEntries)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to create Git Tree object: err=%s\n%+v", err, resp)
-		ghPrClientDetails.PrLogger.Errorf("These are the treeEntries: %+v", treeEntries)
+		ghPrClientDetails.PrLogger.Error("Failed to create Git Tree object", "err", err, "resp", resp)
+		ghPrClientDetails.PrLogger.Error("These are the treeEntries", "entries", treeEntries)
 		return nil, err
 	}
 	parentCommit, resp, err := ghPrClientDetails.GhClientPair.v3Client.Git.GetCommit(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *baseTreeSHA)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to get parent commit: err=%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Failed to get parent commit", "err", err)
 		return nil, err
 	}
 
@@ -1154,7 +1153,7 @@ func createCommit(ghPrClientDetails GhPrClientDetails, treeEntries []*github.Tre
 	commit, resp, err := ghPrClientDetails.GhClientPair.v3Client.Git.CreateCommit(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, newCommitConfig, nil)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to create Git commit: err=%s\n", err) // TODO comment this error to PR
+		ghPrClientDetails.PrLogger.Error("Failed to create Git commit", "err", err) // TODO comment this error to PR
 		return nil, err
 	}
 
@@ -1163,7 +1162,7 @@ func createCommit(ghPrClientDetails GhPrClientDetails, treeEntries []*github.Tre
 
 func createBranch(ghPrClientDetails GhPrClientDetails, commit *github.Commit, newBranchName string) (string, error) {
 	newBranchRef := "refs/heads/" + newBranchName
-	ghPrClientDetails.PrLogger.Infof("New branch name will be: %s", newBranchName)
+	ghPrClientDetails.PrLogger.Info("New branch name", "name", newBranchName)
 
 	newRefGitObjct := &github.GitObject{
 		SHA: commit.SHA,
@@ -1177,10 +1176,10 @@ func createBranch(ghPrClientDetails GhPrClientDetails, commit *github.Commit, ne
 	_, resp, err := ghPrClientDetails.GhClientPair.v3Client.Git.CreateRef(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, newRefConfig)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Could not create Git Ref: err=%s\n%v\n", err, resp)
+		ghPrClientDetails.PrLogger.Error("Could not create Git Ref", "err", err, "resp", resp)
 		return "", err
 	}
-	ghPrClientDetails.PrLogger.Infof("New branch ref: %s", newBranchRef)
+	ghPrClientDetails.PrLogger.Info("New branch ref", "ref", newBranchRef)
 	return newBranchRef, err
 }
 
@@ -1327,28 +1326,28 @@ func createPrObject(ghPrClientDetails GhPrClientDetails, newBranchRef string, ne
 	pull, resp, err := ghPrClientDetails.GhClientPair.v3Client.PullRequests.Create(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, newPrConfig)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Could not create GitHub PR: err=%s\n%v\n", err, resp)
+		ghPrClientDetails.PrLogger.Error("Could not create GitHub PR", "err", err, "resp", resp)
 		return nil, err
 	} else {
-		ghPrClientDetails.PrLogger.Infof("PR %d opened", *pull.Number)
+		ghPrClientDetails.PrLogger.Info("PR opened")
 	}
 
 	prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *pull.Number, []string{"promotion"})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
+		ghPrClientDetails.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
 		return pull, err
 	} else {
-		ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", pull.Number, prLables)
+		ghPrClientDetails.PrLogger.Debug("PR labeled", "labels", prLables)
 	}
 
 	_, resp, err = ghPrClientDetails.GhClientPair.v3Client.Issues.AddAssignees(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *pull.Number, []string{assignee})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Warnf("Could not set %s as assignee on PR,  err=%s", assignee, err)
+		ghPrClientDetails.PrLogger.Warn("Could not set assignee on PR", "user", assignee, "err", err)
 		// return pull, err
 	} else {
-		ghPrClientDetails.PrLogger.Debugf(" %s was set as assignee on PR", assignee)
+		ghPrClientDetails.PrLogger.Debug("User was set as assignee on PR", "user", assignee)
 	}
 
 	return pull, nil // TODO
@@ -1362,7 +1361,7 @@ func ApprovePr(approverClient *github.Client, ghPrClientDetails GhPrClientDetail
 	_, resp, err := approverClient.PullRequests.CreateReview(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *prNumber, reviewRequest)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Could not create review: err=%s\n%v\n", err, resp)
+		ghPrClientDetails.PrLogger.Error("Could not create review", "err", err, "resp", resp)
 		return err
 	}
 
@@ -1372,12 +1371,12 @@ func ApprovePr(approverClient *github.Client, ghPrClientDetails GhPrClientDetail
 func GetInRepoConfig(ghPrClientDetails GhPrClientDetails, defaultBranch string) (*cfg.Config, error) {
 	inRepoConfigFileContentString, _, err := GetFileContent(ghPrClientDetails, defaultBranch, "telefonistka.yaml")
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Could not get in-repo configuration: err=%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Could not get in-repo configuration", "err", err)
 		inRepoConfigFileContentString = ""
 	}
 	c, err := cfg.ParseConfigFromYaml(inRepoConfigFileContentString)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Failed to parse configuration: err=%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Failed to parse configuration", "err", err)
 	}
 	return c, err
 }
@@ -1386,7 +1385,7 @@ func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath
 	rGetContentOps := github.RepositoryContentGetOptions{Ref: branch}
 	fileContent, _, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, filePath, &rGetContentOps)
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Fail to get file:%s\n%v\n", err, resp)
+		ghPrClientDetails.PrLogger.Error("Fail to get file", "err", err, "resp", resp)
 		if resp == nil {
 			return "", 0, err
 		}
@@ -1397,7 +1396,7 @@ func GetFileContent(ghPrClientDetails GhPrClientDetails, branch string, filePath
 	}
 	fileContentString, err := fileContent.GetContent()
 	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Fail to serlize file:%s\n", err)
+		ghPrClientDetails.PrLogger.Error("Fail to serlize file", "err", err)
 		return "", resp.StatusCode, err
 	}
 	return fileContentString, resp.StatusCode, nil
@@ -1421,7 +1420,7 @@ func commitStatusTargetURL(commitTime time.Time, tmplFile string) string {
 	}
 	renderedURL, err := executeTemplate(tmplName, tmplFile, p)
 	if err != nil {
-		log.Debugf("Failed to render target URL template: %v", err)
+		slog.Debug("Failed to render target URL template", "err", err)
 		return targetURL
 	}
 
