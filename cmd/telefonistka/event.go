@@ -29,7 +29,7 @@ func init() { //nolint:gochecknoinits
 func event(eventType string, eventFilePath string) {
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
-	githubapi.ReciveEventFile(eventFilePath, eventType, mainGhClientCache, prApproverGhClientCache)
+	githubapi.ReciveEventFile(eventType, eventFilePath,  mainGhClientCache, prApproverGhClientCache)
 }
 
 func getEnv(key, fallback string) string {
