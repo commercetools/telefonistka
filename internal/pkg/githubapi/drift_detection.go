@@ -3,6 +3,7 @@ package githubapi
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 
 	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
@@ -11,6 +12,34 @@ import (
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
 )
+
+var GetInRepoConfigFunc = GetInRepoConfig
+
+// removes all lines that match any of the regular expressions
+func filterLinesByRegex(content string, regexList []string) string {
+	lines := strings.Split(content, "\n")
+	var filtered []string
+	var regexps []*regexp.Regexp
+	for _, expr := range regexList {
+		re, err := regexp.Compile(expr)
+		if err == nil {
+			regexps = append(regexps, re)
+		}
+	}
+	for _, line := range lines {
+		ignore := false
+		for _, re := range regexps {
+			if re.MatchString(line) {
+				ignore = true
+				break
+			}
+		}
+		if !ignore {
+			filtered = append(filtered, line)
+		}
+	}
+	return strings.Join(filtered, "\n")
+}
 
 func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch string, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
 	var hasDiff bool
@@ -27,6 +56,13 @@ func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch strin
 				hasDiff = true
 				sourceFileContent, _, _ := GetFileContent(ghPrClientDetails, defaultBranch, sourcePath+"/"+filename)
 				targetFileContent, _, _ := GetFileContent(ghPrClientDetails, defaultBranch, targetPath+"/"+filename)
+
+				// filter lines using regex
+				config, _ := GetInRepoConfigFunc(ghPrClientDetails, defaultBranch)
+				if config != nil && len(config.DriftDetectionIgnoreLineRegex) > 0 {
+					sourceFileContent = filterLinesByRegex(sourceFileContent, config.DriftDetectionIgnoreLineRegex)
+					targetFileContent = filterLinesByRegex(targetFileContent, config.DriftDetectionIgnoreLineRegex)
+				}
 
 				edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
 				diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))
@@ -101,9 +137,24 @@ func generateFlatMapfromFileTree(ghPrClientDetails *GhPrClientDetails, workingPa
 	}
 	_, directoryContent, resp, _ := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *workingPath, getContentOpts)
 	prom.InstrumentGhCall(resp)
+
+	// Hole Ignore-Liste aus der Konfiguration
+	config, _ := GetInRepoConfigFunc(*ghPrClientDetails, *branch)
+	ignoreFiles := map[string]struct{}{}
+	if config != nil {
+		for _, f := range config.DriftDetectionIgnoreFiles {
+			ignoreFiles[f] = struct{}{}
+		}
+	}
+
 	for _, elementInDir := range directoryContent {
 		if *elementInDir.Type == "file" {
 			relativeName := strings.TrimPrefix(*elementInDir.Path, *rootPath+"/")
+			// Ignoriere Datei, falls sie in der Ignore-Liste steht
+			if _, found := ignoreFiles[relativeName]; found {
+				ghPrClientDetails.PrLogger.Debugf("Ignoring file for drift detection: %s", relativeName)
+				continue
+			}
 			listOfFiles[relativeName] = *elementInDir.SHA
 		} else if *elementInDir.Type == "dir" {
 			generateFlatMapfromFileTree(ghPrClientDetails, elementInDir.Path, rootPath, branch, listOfFiles)

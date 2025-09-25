@@ -22,7 +22,7 @@ promotionPaths:
         - "env/prod/us-west1/c2/"
         - "env/prod/us-central1/c3/"
 
-promtionPrLables:
+promotionPrLables:
   - "promotion"
 promotionBranchNameTemplte: "promotions/{{.safeBranchName}}"
 promtionPrBodyTemplate: |

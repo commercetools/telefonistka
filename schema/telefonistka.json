@@ -86,6 +86,20 @@
         "$ref": "#/definitions/path"
       }
     },
+    "driftDetectionIgnoreFiles": {
+      "type": "array",
+      "description": "List of file names or glob patterns to ignore during drift detection.",
+      "items": {
+        "type": "string"
+      }
+    },
+    "driftDetectionIgnoreLineRegex": {
+      "type": "array",
+      "description": "List of regex patterns for lines to ignore during drift detection diff.",
+      "items": {
+        "type": "string"
+      }
+    },
     "promtionPRlables": {
       "type": "array",
       "description": "List of labels to apply on PR",

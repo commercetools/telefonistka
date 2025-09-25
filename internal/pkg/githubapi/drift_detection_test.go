@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/commercetools/telefonistka/internal/pkg/configuration"
 	"github.com/go-test/deep"
 	"github.com/google/go-github/v62/github"
 	"github.com/hexops/gotextdiff"
@@ -13,7 +14,29 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Mock für GetInRepoConfig
+var mockConfig = &struct {
+	DriftDetectionIgnoreFiles     []string
+	DriftDetectionIgnoreLineRegex []string
+}{
+	DriftDetectionIgnoreFiles:     []string{"ignoreme.txt"},
+	DriftDetectionIgnoreLineRegex: []string{},
+}
+
+// Die Wrapper-Strategie wird verwendet, um GetInRepoConfigFunc im Test zu mocken.
+
 func TestGenerateFlatMapfromFileTree(t *testing.T) {
+	// Wrapper-Mock für GetInRepoConfigFunc
+	GetInRepoConfigFunc = func(details GhPrClientDetails, branch string) (*configuration.Config, error) {
+		return &configuration.Config{DriftDetectionIgnoreFiles: []string{"ignoreme.txt"}}, nil
+	}
+	defer func() { GetInRepoConfigFunc = GetInRepoConfig }()
+	// Mock für GetInRepoConfigFunc
+	GetInRepoConfigFunc = func(details GhPrClientDetails, branch string) (*configuration.Config, error) {
+		return &configuration.Config{DriftDetectionIgnoreFiles: []string{"ignoreme.txt"}}, nil
+	}
+	defer func() { GetInRepoConfigFunc = GetInRepoConfig }()
+
 	t.Parallel()
 	ctx := context.Background()
 	filesSHAs := make(map[string]string)
@@ -295,5 +318,16 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 	}
 	if !isDiff {
 		t.Errorf("Did not detect diff in in files with different SHAs/content, isDiff=%t", isDiff)
+	}
+}
+
+func TestFilterLinesByRegex(t *testing.T) {
+	content := "export KUBECONFIG=kkp-dev-root-kubeconfig\nsource ../secrets/credentials.sh\nchmod 0600 ../secrets/kone-key-ecdsa\n/usr/bin/keychain --clear ../secrets/kone-key-ecdsa"
+	regexList := []string{"^export KUBECONFIG=.*$"}
+	filtered := filterLinesByRegex(content, regexList)
+
+	expected := "source ../secrets/credentials.sh\nchmod 0600 ../secrets/kone-key-ecdsa\n/usr/bin/keychain --clear ../secrets/kone-key-ecdsa"
+	if filtered != expected {
+		t.Errorf("filterLinesByRegex failed.\nExpected:\n%s\nGot:\n%s", expected, filtered)
 	}
 }
