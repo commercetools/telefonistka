@@ -59,9 +59,9 @@ func generateDiffOutput(ghPrClientDetails GhPrClientDetails, defaultBranch strin
 
 				// filter lines using regex
 				config, _ := GetInRepoConfigFunc(ghPrClientDetails, defaultBranch)
-				if config != nil && len(config.DriftDetectionIgnoreLineRegex) > 0 {
-					sourceFileContent = filterLinesByRegex(sourceFileContent, config.DriftDetectionIgnoreLineRegex)
-					targetFileContent = filterLinesByRegex(targetFileContent, config.DriftDetectionIgnoreLineRegex)
+				if config != nil && len(config.IgnoreLineRegex) > 0 {
+					sourceFileContent = filterLinesByRegex(sourceFileContent, config.IgnoreLineRegex)
+					targetFileContent = filterLinesByRegex(targetFileContent, config.IgnoreLineRegex)
 				}
 
 				edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
@@ -142,7 +142,7 @@ func generateFlatMapfromFileTree(ghPrClientDetails *GhPrClientDetails, workingPa
 	config, _ := GetInRepoConfigFunc(*ghPrClientDetails, *branch)
 	ignoreFiles := map[string]struct{}{}
 	if config != nil {
-		for _, f := range config.DriftDetectionIgnoreFiles {
+		for _, f := range config.IgnoreFiles {
 			ignoreFiles[f] = struct{}{}
 		}
 	}

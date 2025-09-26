@@ -37,15 +37,15 @@ type Config struct {
 	PromotionPaths []PromotionPath `yaml:"promotionPaths"`
 
 	// Generic configuration
-	PromtionPrLables              []string               `yaml:"promtionPRlables"`
-	DryRunMode                    bool                   `yaml:"dryRunMode"`
-	AutoApprovePromotionPrs       bool                   `yaml:"autoApprovePromotionPrs"`
-	ToggleCommitStatus            map[string]string      `yaml:"toggleCommitStatus"`
-	WebhookEndpointRegexs         []WebhookEndpointRegex `yaml:"webhookEndpointRegexs"`
-	WhProxtSkipTLSVerifyUpstream  bool                   `yaml:"whProxtSkipTLSVerifyUpstream"`
-	Argocd                        ArgocdConfig           `yaml:"argocd"`
-	DriftDetectionIgnoreFiles     []string               `yaml:"driftDetectionIgnoreFiles"`
-	DriftDetectionIgnoreLineRegex []string               `yaml:"driftDetectionIgnoreLineRegex"`
+	PromtionPrLables             []string               `yaml:"promtionPRlables"`
+	DryRunMode                   bool                   `yaml:"dryRunMode"`
+	AutoApprovePromotionPrs      bool                   `yaml:"autoApprovePromotionPrs"`
+	ToggleCommitStatus           map[string]string      `yaml:"toggleCommitStatus"`
+	WebhookEndpointRegexs        []WebhookEndpointRegex `yaml:"webhookEndpointRegexs"`
+	WhProxtSkipTLSVerifyUpstream bool                   `yaml:"whProxtSkipTLSVerifyUpstream"`
+	Argocd                       ArgocdConfig           `yaml:"argocd"`
+	IgnoreFiles                  []string               `yaml:"ignoreFiles"`
+	IgnoreLineRegex              []string               `yaml:"ignoreLineRegex"`
 }
 
 type ArgocdConfig struct {

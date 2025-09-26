@@ -16,10 +16,10 @@ import (
 
 // Mock für GetInRepoConfig
 var mockConfig = &struct {
-	DriftDetectionIgnoreFiles     []string
+	IgnoreFiles     []string
 	DriftDetectionIgnoreLineRegex []string
 }{
-	DriftDetectionIgnoreFiles:     []string{"ignoreme.txt"},
+	IgnoreFiles:     []string{"ignoreme.txt"},
 	DriftDetectionIgnoreLineRegex: []string{},
 }
 
@@ -28,12 +28,12 @@ var mockConfig = &struct {
 func TestGenerateFlatMapfromFileTree(t *testing.T) {
 	// Wrapper-Mock für GetInRepoConfigFunc
 	GetInRepoConfigFunc = func(details GhPrClientDetails, branch string) (*configuration.Config, error) {
-		return &configuration.Config{DriftDetectionIgnoreFiles: []string{"ignoreme.txt"}}, nil
+			   return &configuration.Config{IgnoreFiles: []string{"ignoreme.txt"}}, nil
 	}
 	defer func() { GetInRepoConfigFunc = GetInRepoConfig }()
 	// Mock für GetInRepoConfigFunc
 	GetInRepoConfigFunc = func(details GhPrClientDetails, branch string) (*configuration.Config, error) {
-		return &configuration.Config{DriftDetectionIgnoreFiles: []string{"ignoreme.txt"}}, nil
+			   return &configuration.Config{IgnoreFiles: []string{"ignoreme.txt"}}, nil
 	}
 	defer func() { GetInRepoConfigFunc = GetInRepoConfig }()
 

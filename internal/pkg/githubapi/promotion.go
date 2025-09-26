@@ -13,19 +13,6 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-type PromotionInstance struct {
-	Metadata          PromotionInstanceMetaData `deep:"-"` // Unit tests ignore Metadata currently
-	ComputedSyncPaths map[string]string         // key is target, value is source
-}
-
-type PromotionInstanceMetaData struct {
-	SourcePath                     string
-	TargetPaths                    []string
-	TargetDescription              string
-	PerComponentSkippedTargetPaths map[string][]string // ComponentName is the key,
-	ComponentNames                 []string
-	AutoMerge                      bool
-}
 
 func containMatchingRegex(patterns []string, str string) bool {
 	for _, pattern := range patterns {
@@ -93,7 +80,7 @@ func DetectDrift(ghPrClientDetails GhPrClientDetails) error {
 	return nil
 }
 
-func getComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath string, branch string) (*cfg.ComponentConfig, error) {
+func GetComponentConfig(ghPrClientDetails GhPrClientDetails, componentPath string, branch string) (*cfg.ComponentConfig, error) {
 	componentConfig := &cfg.ComponentConfig{}
 	rGetContentOps := &github.RepositoryContentGetOptions{Ref: branch}
 	componentConfigFileContent, _, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, componentPath+"/telefonistka.yaml", rGetContentOps)
@@ -171,7 +158,7 @@ type relevantComponent struct {
 	AutoMerge     bool
 }
 
-func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (changedComponentPaths []string, err error) {
+func GenerateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, config *cfg.Config) (changedComponentPaths []string, err error) {
 	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
 	if len(ghPrClientDetails.PrMetadata.PromotedPaths) > 0 {
 		changedComponentPaths = ghPrClientDetails.PrMetadata.PromotedPaths
@@ -192,8 +179,8 @@ func generateListOfChangedComponentPaths(ghPrClientDetails GhPrClientDetails, co
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
 func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, config *cfg.Config, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
 	promotions = make(map[string]PromotionInstance)
-	for componentToPromote := range relevantComponents {
-		componentConfig, err := getComponentConfig(ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
+       for componentToPromote := range relevantComponents {
+	       componentConfig, err := GetComponentConfig(ghPrClientDetails, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
 		if err != nil {
 			ghPrClientDetails.PrLogger.Errorf("Failed to get in component configuration, err=%s\nskipping %s", err, componentToPromote.SourcePath+componentToPromote.ComponentName)
 		}
@@ -240,6 +227,10 @@ func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, c
 					}
 
 					for _, indevidualPath := range ppr.TargetPaths {
+						// Datei-Exklusion: falls Zielpfad auf IgnoreFiles matcht, überspringen
+							   if IsIgnoredFile(indevidualPath, config.IgnoreFiles) {
+							continue
+						}
 						if componentConfig != nil {
 							// BlockList supersedes Allowlist, if something matched there the entry is ignored regardless of allowlist
 							if componentConfig.PromotionTargetBlockList != nil {
@@ -255,6 +246,9 @@ func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, c
 								}
 							}
 						}
+						// Zeilen-Exklusion: falls aktiviert, Inhalt filtern (dies muss beim eigentlichen Schreiben/Übertragen erfolgen)
+						// promotions[mapKey].ComputedSyncPaths[indevidualPath+componentToPromote.ComponentName] = componentToPromote.SourcePath + componentToPromote.ComponentName
+						// Die eigentliche Anwendung von filterLinesByRegex muss beim Kopieren/Schreiben erfolgen!
 						promotions[mapKey].ComputedSyncPaths[indevidualPath+componentToPromote.ComponentName] = componentToPromote.SourcePath + componentToPromote.ComponentName
 					}
 				}
