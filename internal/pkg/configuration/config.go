@@ -44,6 +44,8 @@ type Config struct {
 	WebhookEndpointRegexs        []WebhookEndpointRegex `yaml:"webhookEndpointRegexs"`
 	WhProxtSkipTLSVerifyUpstream bool                   `yaml:"whProxtSkipTLSVerifyUpstream"`
 	Argocd                       ArgocdConfig           `yaml:"argocd"`
+	IgnoreFiles                  []string               `yaml:"ignoreFiles"`
+	IgnoreLineRegex              []string               `yaml:"ignoreLineRegex"`
 }
 
 type ArgocdConfig struct {

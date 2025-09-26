@@ -39,9 +39,8 @@ const (
 )
 
 type DiffCommentData struct {
-	DiffOfChangedComponents   []argocd.DiffResult
-	DisplaySyncBranchCheckBox bool
-	BranchName                string
+		DiffOfChangedComponents   []argocd.DiffResult
+		DisplaySyncBranchCheckBox bool
 }
 
 type promotionInstanceMetaData struct {
@@ -200,7 +199,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 		return fmt.Errorf("get in-repo configuration: %w", err)
 	}
 	if config.Argocd.CommentDiffonPR {
-		componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+		componentPathList, err := GenerateListOfChangedComponentPaths(ghPrClientDetails, config)
 		if err != nil {
 			return fmt.Errorf("generate list of changed components: %w", err)
 		}
@@ -209,7 +208,7 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 		// I'm avoiding doing this in the ArgoCD package to avoid circular dependencies and keep package scope clean
 		componentsToDiff := map[string]bool{}
 		for _, componentPath := range componentPathList {
-			c, err := getComponentConfig(ghPrClientDetails, componentPath, ghPrClientDetails.Ref)
+			   c, err := GetComponentConfig(ghPrClientDetails, componentPath, ghPrClientDetails.Ref)
 			if err != nil {
 				return fmt.Errorf("get component (%s) config:  %w", componentPath, err)
 			}
@@ -250,10 +249,9 @@ func handleChangedPREvent(ctx context.Context, mainGithubClientPair GhClientPair
 		}
 
 		if len(diffOfChangedComponents) > 0 {
-			diffCommentData := DiffCommentData{
-				DiffOfChangedComponents: diffOfChangedComponents,
-				BranchName:              ghPrClientDetails.Ref,
-			}
+	       diffCommentData := DiffCommentData{
+		       DiffOfChangedComponents: diffOfChangedComponents,
+	       }
 
 			diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(componentPathList, config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
 			componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
@@ -337,9 +335,9 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 			}
 		}
 	}
-	if diffCommentData.DisplaySyncBranchCheckBox {
-		md.PlainTextf("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `%s`", diffCommentData.BranchName)
-	}
+       if diffCommentData.DisplaySyncBranchCheckBox {
+	       md.PlainTextf("- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision")
+       }
 	err := md.Build()
 	return buf.String(), err
 }
@@ -611,7 +609,7 @@ func handleCommentPrEvent(ghPrClientDetails GhPrClientDetails, ce *github.IssueC
 			ghPrClientDetails.PrLogger.Infof("Sync Checkbox was checked")
 			if config.Argocd.AllowSyncfromBranchPathRegex != "" {
 				ghPrClientDetails.getPrMetadata(ce.Issue.GetBody())
-				componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+				   componentPathList, err := GenerateListOfChangedComponentPaths(ghPrClientDetails, config)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components: err=%s\n", err)
 				}
@@ -737,7 +735,8 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 
 			var treeEntries []*github.TreeEntry
 			for trgt, src := range promotion.ComputedSyncPaths {
-				err = GenerateSyncTreeEntriesForCommit(&treeEntries, ghPrClientDetails, src, trgt, defaultBranch)
+				   // TODO: ignoreFiles und ignoreLineRegex aus Config holen und übergeben
+				   err = GenerateSyncTreeEntriesForCommit(&treeEntries, ghPrClientDetails, src, trgt, defaultBranch, config.IgnoreFiles, config.IgnoreLineRegex)
 				if err != nil {
 					ghPrClientDetails.PrLogger.Errorf("Failed to generate treeEntries for %s > %s,  err=%v", src, trgt, err)
 				} else {
@@ -816,7 +815,7 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 	}
 
 	if config.Argocd.AllowSyncfromBranchPathRegex != "" {
-		componentPathList, err := generateListOfChangedComponentPaths(ghPrClientDetails, config)
+		componentPathList, err := GenerateListOfChangedComponentPaths(ghPrClientDetails, config)
 		if err != nil {
 			ghPrClientDetails.PrLogger.Errorf("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD: err=%s\n", err)
 		}
@@ -1075,49 +1074,79 @@ func getDirecotyGitObjectSha(ghPrClientDetails GhPrClientDetails, dirPath string
 	return direcotyGitObjectSha, nil
 }
 
-func GenerateSyncTreeEntriesForCommit(treeEntries *[]*github.TreeEntry, ghPrClientDetails GhPrClientDetails, sourcePath string, targetPath string, defaultBranch string) error {
-	sourcePathSHA, err := getDirecotyGitObjectSha(ghPrClientDetails, sourcePath, defaultBranch)
+// Neue Version: Dateien einzeln lesen, Zeilen filtern, neue Blobs erzeugen und als TreeEntry hinzufügen
+func GenerateSyncTreeEntriesForCommit(treeEntries *[]*github.TreeEntry, ghPrClientDetails GhPrClientDetails, sourcePath string, targetPath string, defaultBranch string, ignoreFiles []string, ignoreLineRegex []string) error {
+       // Hole alle Dateien rekursiv aus sourcePath
+       getContentOpts := &github.RepositoryContentGetOptions{Ref: defaultBranch}
+       _, directoryContent, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, sourcePath, getContentOpts)
+       prom.InstrumentGhCall(resp)
+       if err != nil {
+	       if resp != nil && resp.StatusCode == 404 {
+		       ghPrClientDetails.PrLogger.Infoln("Source directory wasn't found, assuming a deletion PR")
+		       err := generateDeletionTreeEntries(&ghPrClientDetails, &targetPath, &defaultBranch, treeEntries)
+		       if err != nil {
+			       ghPrClientDetails.PrLogger.Errorf("Failed to build deletion tree: err=%s\n", err)
+			       return err
+		       }
+		       return nil
+	       }
+	       return err
+       }
 
-	if sourcePathSHA == "" {
-		ghPrClientDetails.PrLogger.Infoln("Source directory wasn't found, assuming a deletion PR")
-		err := generateDeletionTreeEntries(&ghPrClientDetails, &targetPath, &defaultBranch, treeEntries)
-		if err != nil {
-			ghPrClientDetails.PrLogger.Errorf("Failed to build deletion tree: err=%s\n", err)
-			return err
-		}
-	} else {
-		syncTreeEntry := github.TreeEntry{
-			Path: github.String(targetPath),
-			Mode: github.String("040000"),
-			Type: github.String("tree"),
-			SHA:  github.String(sourcePathSHA),
-		}
-		*treeEntries = append(*treeEntries, &syncTreeEntry)
+       // Hilfsfunktion für rekursives Traversieren
+       var traverse func(contents []*github.RepositoryContent, relPath string) error
+       traverse = func(contents []*github.RepositoryContent, relPath string) error {
+	       for _, entry := range contents {
+		       entryPath := path.Join(relPath, path.Base(*entry.Path))
+		       if *entry.Type == "file" {
+			       // Datei-Exklusion
+			       if IsIgnoredFile(entryPath, ignoreFiles) {
+				       continue
+			       }
+			       // Dateiinhalt holen
+			       fileContent, _, _, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *entry.Path, getContentOpts)
+			       prom.InstrumentGhCall(resp)
+			       if err != nil || fileContent == nil {
+				       ghPrClientDetails.PrLogger.Warnf("Could not get file content for %s: %v", *entry.Path, err)
+				       continue
+			       }
+			       contentStr, err := fileContent.GetContent()
+			       if err != nil {
+				       ghPrClientDetails.PrLogger.Warnf("Could not decode file content for %s: %v", *entry.Path, err)
+				       continue
+			       }
+			       // Zeilen-Filter anwenden
+			       filtered := FilterLinesByRegex(contentStr, ignoreLineRegex)
+			       // TreeEntry für gefilterte Datei erzeugen
+			       treeEntry := github.TreeEntry{
+				       Path:    github.String(path.Join(targetPath, entryPath)),
+				       Mode:    github.String("100644"),
+				       Type:    github.String("blob"),
+				       Content: github.String(filtered),
+			       }
+			       *treeEntries = append(*treeEntries, &treeEntry)
+		       } else if *entry.Type == "dir" {
+			       // Rekursiv in Unterverzeichnisse
+			       _, subdirContent, resp, err := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *entry.Path, getContentOpts)
+			       prom.InstrumentGhCall(resp)
+			       if err != nil {
+				       ghPrClientDetails.PrLogger.Warnf("Could not get dir content for %s: %v", *entry.Path, err)
+				       continue
+			       }
+			       err = traverse(subdirContent, entryPath)
+			       if err != nil {
+				       return err
+			       }
+		       }
+	       }
+	       return nil
+       }
 
-		// Aperntly... the way we sync directories(set the target dir git tree object SHA) doesn't delete files!!!! GH just "merges" the old and new tree objects.
-		// So for now, I'll just go over all the files and add explicitly add  delete tree  entries  :(
-		// TODO compare sourcePath targetPath Git object SHA to avoid costly tree compare where possible?
-		sourceFilesSHAs := make(map[string]string)
-		targetFilesSHAs := make(map[string]string)
-		generateFlatMapfromFileTree(&ghPrClientDetails, &sourcePath, &sourcePath, &defaultBranch, sourceFilesSHAs)
-		generateFlatMapfromFileTree(&ghPrClientDetails, &targetPath, &targetPath, &defaultBranch, targetFilesSHAs)
-
-		for filename := range targetFilesSHAs {
-			if _, found := sourceFilesSHAs[filename]; !found {
-				ghPrClientDetails.PrLogger.Debugf("%s -- was NOT found on %s, marking as a deletion!", filename, sourcePath)
-				fileDeleteTreeEntry := github.TreeEntry{
-					Path:    github.String(targetPath + "/" + filename),
-					Mode:    github.String("100644"),
-					Type:    github.String("blob"),
-					SHA:     nil, // this is how you delete a file https://docs.github.com/en/rest/git/trees?apiVersion=2022-11-28#create-a-tree
-					Content: nil,
-				}
-				*treeEntries = append(*treeEntries, &fileDeleteTreeEntry)
-			}
-		}
-	}
-
-	return err
+       err = traverse(directoryContent, "")
+       if err != nil {
+	       return err
+       }
+       return nil
 }
 
 func createCommit(ghPrClientDetails GhPrClientDetails, treeEntries []*github.TreeEntry, defaultBranch string, commitMsg string) (*github.Commit, error) {
