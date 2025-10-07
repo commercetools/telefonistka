@@ -423,7 +423,7 @@ func startTelefonistka(t *testing.T, token, argoServerAddr, webhookSecret string
 	// code.
 	// cmd := exec.CommandContext(t.Context(), "go", "run", ".", "server")
 	// NOTE: testing air to get live reloading
-	cmd := exec.CommandContext(t.Context(), "go", "run", "github.com/air-verse/air@latest", "--build.cmd", "go build", "--build.bin", "./telefonistka server")
+	cmd := exec.CommandContext(t.Context(), "go", "run", "github.com/air-verse/air@latest", "--build.cmd", "go build ./cmd/telefonistka", "--build.bin", "./telefonistka", "--build.args_bin", "server")
 	cmd.Env = append(os.Environ(),
 		"GITHUB_WEBHOOK_SECRET="+webhookSecret,
 
