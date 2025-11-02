@@ -22,23 +22,26 @@ func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[stri
 	// staring with collecting files with different content and file only present in the source dir
 	for filename, sha := range sourceFilesSHAs {
 		c.PrLogger.Debug("Looking at file", "file", filename)
-		if targetPathfileSha, found := targetFilesSHAs[filename]; found {
-			if sha != targetPathfileSha {
-				c.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
-				hasDiff = true
-				sourceFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
-				targetFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
-
-				edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
-				diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))
-				filesWithDiff = append(filesWithDiff, sourcePath+"/"+filename)
-			} else {
-				c.PrLogger.Debug("Source is identical to target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
-			}
-		} else {
+		targetPathfileSha, found := targetFilesSHAs[filename]
+		if !found {
 			hasDiff = true
 			diffOutput.WriteString(fmt.Sprintf("--- %s/%s (missing from target dir %s)\n", sourcePath, filename, targetPath))
+			continue
 		}
+
+		if sha == targetPathfileSha {
+			c.PrLogger.Debug("Source is identical to target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
+			continue
+		}
+
+		c.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
+		hasDiff = true
+		sourceFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
+		targetFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
+
+		edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
+		diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))
+		filesWithDiff = append(filesWithDiff, sourcePath+"/"+filename)
 	}
 
 	// then going over the target to check files that only exists there
