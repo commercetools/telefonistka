@@ -189,78 +189,79 @@ func handleChangedPREvent(ctx context.Context, c Context) error {
 }
 
 func CommentDiff(ctx context.Context, c Context) error {
-	if c.Config.Argocd.CommentDiffonPR {
-		componentPathList, err := generateListOfChangedComponentPaths(ctx, c)
+	if !c.Config.Argocd.CommentDiffonPR {
+		return nil
+	}
+	componentPathList, err := generateListOfChangedComponentPaths(ctx, c)
+	if err != nil {
+		return fmt.Errorf("generate list of changed components: %w", err)
+	}
+
+	// Building a map component's path and a boolean value that indicates if we should diff it not.
+	// I'm avoiding doing this in the ArgoCD package to avoid circular dependencies and keep package scope clean
+	componentsToDiff := map[string]bool{}
+	for _, componentPath := range componentPathList {
+		conf, err := getComponentConfig(ctx, c, componentPath, c.Ref)
 		if err != nil {
-			return fmt.Errorf("generate list of changed components: %w", err)
+			return fmt.Errorf("get component (%s) config:  %w", componentPath, err)
 		}
+		componentsToDiff[componentPath] = true
+		if conf.DisableArgoCDDiff {
+			componentsToDiff[componentPath] = false
+			c.PrLogger.Debug("ArgoCD diff disabled for path", "path", componentPath)
+		}
+	}
+	argoClients, err := argocd.CreateArgoCdClients()
+	if err != nil {
+		return fmt.Errorf("error creating ArgoCD clients: %w", err)
+	}
 
-		// Building a map component's path and a boolean value that indicates if we should diff it not.
-		// I'm avoiding doing this in the ArgoCD package to avoid circular dependencies and keep package scope clean
-		componentsToDiff := map[string]bool{}
-		for _, componentPath := range componentPathList {
-			conf, err := getComponentConfig(ctx, c, componentPath, c.Ref)
-			if err != nil {
-				return fmt.Errorf("get component (%s) config:  %w", componentPath, err)
-			}
-			componentsToDiff[componentPath] = true
-			if conf.DisableArgoCDDiff {
-				componentsToDiff[componentPath] = false
-				c.PrLogger.Debug("ArgoCD diff disabled for path", "path", componentPath)
-			}
-		}
-		argoClients, err := argocd.CreateArgoCdClients()
+	hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.Config.Argocd.CreateTempAppObjectFroNewApps, argoClients)
+	if err != nil {
+		return fmt.Errorf("getting diff information: %w", err)
+	}
+	c.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", c.Ref)
+	if !hasComponentDiffErrors && !hasComponentDiff {
+		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state")
+		prLables, resp, err := c.GhClientPair.v3Client.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
+		prom.InstrumentGhCall(resp)
 		if err != nil {
-			return fmt.Errorf("error creating ArgoCD clients: %w", err)
-		}
-
-		hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.Config.Argocd.CreateTempAppObjectFroNewApps, argoClients)
-		if err != nil {
-			return fmt.Errorf("getting diff information: %w", err)
-		}
-		c.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", c.Ref)
-		if !hasComponentDiffErrors && !hasComponentDiff {
-			c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state")
-			prLables, resp, err := c.GhClientPair.v3Client.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
-			prom.InstrumentGhCall(resp)
-			if err != nil {
-				c.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
-			} else {
-				c.PrLogger.Debug("PR labeled", "labels", prLables)
-			}
-			// If the PR is a promotion PR and the diff is empty, we can auto-merge it
-			// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
-			if DoesPrHasLabel(c.Labels, "promotion") && c.Config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
-				c.PrLogger.Info("Auto-merging (no diff) PR")
-				err := MergePr(ctx, c, c.PrNumber)
-				if err != nil {
-					return fmt.Errorf("PR auto merge: %w", err)
-				}
-			}
-		}
-
-		if len(diffOfChangedComponents) > 0 {
-			diffCommentData := DiffCommentData{
-				DiffOfChangedComponents: diffOfChangedComponents,
-				BranchName:              c.Ref,
-			}
-
-			diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(ctx, componentPathList, c.Config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
-			componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
-			c.PrLogger.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(diffCommentData.DiffOfChangedComponents))
-			comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
-			if err != nil {
-				return fmt.Errorf("generate diff comment: %w", err)
-			}
-			for _, comment := range comments {
-				err = commentPR(ctx, c, comment)
-				if err != nil {
-					return fmt.Errorf("commenting on PR: %w", err)
-				}
-			}
+			c.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
 		} else {
-			c.PrLogger.Debug("Diff not find affected ArogCD apps")
+			c.PrLogger.Debug("PR labeled", "labels", prLables)
 		}
+		// If the PR is a promotion PR and the diff is empty, we can auto-merge it
+		// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
+		if DoesPrHasLabel(c.Labels, "promotion") && c.Config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
+			c.PrLogger.Info("Auto-merging (no diff) PR")
+			err := MergePr(ctx, c, c.PrNumber)
+			if err != nil {
+				return fmt.Errorf("PR auto merge: %w", err)
+			}
+		}
+	}
+
+	if len(diffOfChangedComponents) > 0 {
+		diffCommentData := DiffCommentData{
+			DiffOfChangedComponents: diffOfChangedComponents,
+			BranchName:              c.Ref,
+		}
+
+		diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(ctx, componentPathList, c.Config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
+		componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
+		c.PrLogger.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(diffCommentData.DiffOfChangedComponents))
+		comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
+		if err != nil {
+			return fmt.Errorf("generate diff comment: %w", err)
+		}
+		for _, comment := range comments {
+			err = commentPR(ctx, c, comment)
+			if err != nil {
+				return fmt.Errorf("commenting on PR: %w", err)
+			}
+		}
+	} else {
+		c.PrLogger.Debug("Diff not find affected ArogCD apps")
 	}
 	return nil
 }
