@@ -105,11 +105,12 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := Context{
-		GhClientPair: &ghClientPair,
-		Owner:        "AnOwner",
-		Repo:         "Arepo",
-		PrNumber:     120,
-		Ref:          "Abranch",
+		DefaultBranch: "main",
+		GhClientPair:  &ghClientPair,
+		Owner:         "AnOwner",
+		Repo:          "Arepo",
+		PrNumber:      120,
+		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -135,7 +136,7 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 	sourceFilesSHAs["file-1.text"] = "000001"
 	targetFilesSHAs["file-1.text"] = "000002"
 
-	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}
@@ -157,11 +158,12 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := Context{
-		GhClientPair: &ghClientPair,
-		Owner:        "AnOwner",
-		Repo:         "Arepo",
-		PrNumber:     120,
-		Ref:          "Abranch",
+		DefaultBranch: "main",
+		GhClientPair:  &ghClientPair,
+		Owner:         "AnOwner",
+		Repo:          "Arepo",
+		PrNumber:      120,
+		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -177,7 +179,7 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 	sourceFilesSHAs["file-1.text"] = "000001"
 	targetFilesSHAs["file-1.text"] = "000001"
 
-	isDiff, _, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, _, err := generateDiffOutput(t.Context(), ghPrClientDetails, sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}
@@ -202,11 +204,12 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := Context{
-		GhClientPair: &ghClientPair,
-		Owner:        "AnOwner",
-		Repo:         "Arepo",
-		PrNumber:     120,
-		Ref:          "Abranch",
+		DefaultBranch: "main",
+		GhClientPair:  &ghClientPair,
+		Owner:         "AnOwner",
+		Repo:          "Arepo",
+		PrNumber:      120,
+		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -224,7 +227,7 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 
 	targetFilesSHAs["file-1.text"] = "000001"
 
-	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}
@@ -252,11 +255,12 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
 
 	ghPrClientDetails := Context{
-		GhClientPair: &ghClientPair,
-		Owner:        "AnOwner",
-		Repo:         "Arepo",
-		PrNumber:     120,
-		Ref:          "Abranch",
+		DefaultBranch: "main",
+		GhClientPair:  &ghClientPair,
+		Owner:         "AnOwner",
+		Repo:          "Arepo",
+		PrNumber:      120,
+		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -274,7 +278,7 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 
 	sourceFilesSHAs["file-1.text"] = "000001"
 
-	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, "main", sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
+	isDiff, diffOutput, err := generateDiffOutput(t.Context(), ghPrClientDetails, sourceFilesSHAs, targetFilesSHAs, "source-path", "target-path")
 	if err != nil {
 		t.Fatalf("generating diff output failed: err=%s", err)
 	}

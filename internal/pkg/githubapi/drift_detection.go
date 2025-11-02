@@ -13,7 +13,7 @@ import (
 	"github.com/hexops/gotextdiff/span"
 )
 
-func generateDiffOutput(ctx context.Context, c Context, defaultBranch string, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
+func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[string]string, targetFilesSHAs map[string]string, sourcePath string, targetPath string) (bool, string, error) {
 	var hasDiff bool
 	var diffOutput bytes.Buffer
 	var filesWithDiff []string
@@ -26,8 +26,8 @@ func generateDiffOutput(ctx context.Context, c Context, defaultBranch string, so
 			if sha != targetPathfileSha {
 				c.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
 				hasDiff = true
-				sourceFileContent, _, _ := GetFileContent(ctx, c, defaultBranch, sourcePath+"/"+filename)
-				targetFileContent, _, _ := GetFileContent(ctx, c, defaultBranch, targetPath+"/"+filename)
+				sourceFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
+				targetFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
 
 				edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
 				diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))
@@ -91,7 +91,7 @@ func CompareRepoDirectories(ctx context.Context, c Context, sourcePath string, t
 		generateFlatMapfromFileTree(ctx, &c, &sourcePath, &sourcePath, &defaultBranch, sourceFilesSHAs)
 		generateFlatMapfromFileTree(ctx, &c, &targetPath, &targetPath, &defaultBranch, targetFilesSHAs)
 		// ghPrClientDetails.PrLogger.Infoln(sourceFilesSHAs)
-		hasDiff, diffOutput, err := generateDiffOutput(ctx, c, defaultBranch, sourceFilesSHAs, targetFilesSHAs, sourcePath, targetPath)
+		hasDiff, diffOutput, err := generateDiffOutput(ctx, c, sourceFilesSHAs, targetFilesSHAs, sourcePath, targetPath)
 
 		return hasDiff, diffOutput, err
 	}
