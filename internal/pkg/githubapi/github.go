@@ -703,44 +703,6 @@ func commentPR(ctx context.Context, c Context, commentBody string) error {
 	return nil
 }
 
-func BumpVersion(ctx context.Context, c Context, defaultBranch string, filePath string, newFileContent string, triggeringRepo string, triggeringRepoSHA string, triggeringActor string, autoMerge bool) error {
-	var treeEntries []*github.TreeEntry
-
-	generateBumpTreeEntiesForCommit(&treeEntries, c, defaultBranch, filePath, newFileContent)
-
-	commit, err := createCommit(ctx, c, treeEntries, defaultBranch, "Bumping version @ "+filePath)
-	if err != nil {
-		c.PrLogger.Error("Commit creation failed", "err", err)
-		return err
-	}
-	newBranchRef, err := createBranch(ctx, c, commit, "artifact_version_bump/"+triggeringRepo+"/"+triggeringRepoSHA) // TODO figure out branch name!!!!
-	if err != nil {
-		c.PrLogger.Error("Branch creation failed", "err", err)
-		return err
-	}
-
-	newPrTitle := triggeringRepo + "🚠 Bumping version @ " + filePath
-	newPrBody := fmt.Sprintf("Bumping version triggered by %s@%s", triggeringRepo, triggeringRepoSHA)
-	pr, err := createPrObject(ctx, c, newBranchRef, newPrTitle, newPrBody, defaultBranch, triggeringActor)
-	if err != nil {
-		c.PrLogger.Error("PR opening failed", "err", err)
-		return err
-	}
-
-	c.PrLogger.Info("New PR URL", "url", pr.GetHTMLURL())
-
-	if autoMerge {
-		c.PrLogger.Info("Auto-merging PR")
-		err := MergePr(ctx, c, pr.GetNumber())
-		if err != nil {
-			c.PrLogger.Error("PR auto merge failed", "err", err)
-			return err
-		}
-	}
-
-	return nil
-}
-
 func handleMergedPrEvent(ctx context.Context, c Context) error {
 	var err error
 
