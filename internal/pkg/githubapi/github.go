@@ -68,6 +68,28 @@ type Context struct {
 	Config        *configuration.Config
 }
 
+func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
+	prMetadataRegex := regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
+	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
+	if len(serializedPrMetadata) == 2 {
+		if serializedPrMetadata[1] != "" {
+			c.PrLogger.Info("Found PR metadata")
+			err := c.PrMetadata.DeSerialize(serializedPrMetadata[1])
+			if err != nil {
+				c.PrLogger.Error("Fail to parser PR metadata", "err", err)
+			}
+		}
+	}
+}
+
+func (c *Context) getBlameURLPrefix(ctx context.Context) string {
+	githubHost := getEnv("GITHUB_HOST", "")
+	if githubHost == "" {
+		githubHost = githubPublicBaseURL
+	}
+	return fmt.Sprintf("%s/%s/%s/blame", githubHost, c.Owner, c.Repo)
+}
+
 type prMetadata struct {
 	OriginalPrAuthor          string                            `json:"originalPrAuthor"`
 	OriginalPrNumber          int                               `json:"originalPrNumber"`
@@ -90,28 +112,6 @@ func (pm *prMetadata) DeSerialize(s string) error {
 	}
 	err = json.Unmarshal(decoded, pm)
 	return err
-}
-
-func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
-	prMetadataRegex := regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
-	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
-	if len(serializedPrMetadata) == 2 {
-		if serializedPrMetadata[1] != "" {
-			c.PrLogger.Info("Found PR metadata")
-			err := c.PrMetadata.DeSerialize(serializedPrMetadata[1])
-			if err != nil {
-				c.PrLogger.Error("Fail to parser PR metadata", "err", err)
-			}
-		}
-	}
-}
-
-func (c *Context) getBlameURLPrefix(ctx context.Context) string {
-	githubHost := getEnv("GITHUB_HOST", "")
-	if githubHost == "" {
-		githubHost = githubPublicBaseURL
-	}
-	return fmt.Sprintf("%s/%s/%s/blame", githubHost, c.Owner, c.Repo)
 }
 
 // shouldSyncBranchCheckBoxBeDisplayed checks if the sync branch checkbox should be displayed in the PR comment.
