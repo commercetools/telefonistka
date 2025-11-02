@@ -83,6 +83,15 @@ func (pm prMetadata) serialize() (string, error) {
 	return base64.StdEncoding.EncodeToString(pmJson), nil
 }
 
+func (pm *prMetadata) DeSerialize(s string) error {
+	decoded, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(decoded, pm)
+	return err
+}
+
 func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
 	prMetadataRegex := regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
 	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
@@ -896,15 +905,6 @@ func tryMergePR(ctx context.Context, details Context, number int) error {
 
 func isMergeErrorRetryable(errMessage string) bool {
 	return strings.Contains(errMessage, "405") && strings.Contains(errMessage, "try the merge again")
-}
-
-func (pm *prMetadata) DeSerialize(s string) error {
-	decoded, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(decoded, pm)
-	return err
 }
 
 func (p Context) CommentOnPr(ctx context.Context, commentBody string) error {
