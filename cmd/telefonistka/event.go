@@ -1,6 +1,10 @@
 package telefonistka
 
 import (
+	"bytes"
+	"io"
+	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
@@ -29,7 +33,17 @@ func init() { //nolint:gochecknoinits
 func event(eventType string, eventFilePath string) {
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
-	githubapi.ReciveEventFile(eventType, eventFilePath, mainGhClientCache, prApproverGhClientCache)
+
+	slog.Info("Proccesing", "file", eventFilePath)
+	payload, err := os.ReadFile(eventFilePath)
+	if err != nil {
+		panic(err)
+	}
+	r, _ := http.NewRequest("POST", "", nil) //nolint:noctx
+	r.Body = io.NopCloser(bytes.NewReader(payload))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-GitHub-Event", eventType)
+	githubapi.HandleEvent(eventType, mainGhClientCache, prApproverGhClientCache, r, payload)
 }
 
 func getEnv(key, fallback string) string {
