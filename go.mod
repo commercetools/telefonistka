@@ -18,7 +18,7 @@ require (
 	github.com/hexops/gotextdiff v1.0.3
 	github.com/homeport/dyff v1.10.2
 	github.com/migueleliasweb/go-github-mock v1.3.0
-	github.com/mikefarah/yq/v4 v4.47.2
+	github.com/mikefarah/yq/v4 v4.48.1
 	github.com/nao1215/markdown v0.8.0
 	github.com/prometheus/client_golang v1.21.1
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
