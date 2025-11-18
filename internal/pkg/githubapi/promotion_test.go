@@ -9,7 +9,6 @@ import (
 	"github.com/go-test/deep"
 	"github.com/google/go-github/v62/github"
 	"github.com/migueleliasweb/go-github-mock/src/mock"
-	"github.com/stretchr/testify/assert"
 )
 
 func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, expectedPromotion map[string]PromotionInstance, mockedHTTPClient *http.Client) {
@@ -83,7 +82,15 @@ func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTT
 		expectedPromotionMatched = true
 		break
 	}
-	assert.True(t, expectedPromotionMatched, diffs)
+	if !expectedPromotionMatched {
+		if len(diffs) == 0 {
+			t.Fatal("expected promotion plan did not match any provided expectations")
+		}
+		for _, diff := range diffs {
+			t.Logf("diff: %s", diff)
+		}
+		t.Fatalf("expected promotion plan did not match any provided expectations out of %d candidates", len(expectedPromotions))
+	}
 }
 
 func TestGeneratePromotionConditionalPlan(t *testing.T) {
