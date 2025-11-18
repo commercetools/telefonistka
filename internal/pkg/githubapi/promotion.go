@@ -82,24 +82,23 @@ func shouldSkipTarget(componentConfig *cfg.ComponentConfig, componentName, targe
 }
 
 func componentFromFile(promotionPath cfg.PromotionPath, filename string) (relevantComponent, bool) {
-	match, _ := regexp.MatchString("^"+promotionPath.SourcePath+".*", filename)
-	if !match {
+	if !strings.HasPrefix(filename, promotionPath.SourcePath) {
 		return relevantComponent{}, false
 	}
 
-	componentPathRegexSubstrings := make([]string, promotionPath.ComponentPathExtraDepth+1)
-	for i := range componentPathRegexSubstrings {
-		componentPathRegexSubstrings[i] = "[^/]*"
-	}
-	componentPathRegexSubString := strings.Join(componentPathRegexSubstrings, "/")
-	componentRegex := regexp.MustCompile("^" + promotionPath.SourcePath + "(" + componentPathRegexSubString + ")/.*")
-	componentName := componentRegex.ReplaceAllString(filename, "${1}")
+	remainder := strings.TrimPrefix(filename, promotionPath.SourcePath)
+	remainder = strings.TrimPrefix(remainder, "/")
+	parts := strings.Split(remainder, "/")
 
-	sourceRegex := regexp.MustCompile("^(" + promotionPath.SourcePath + ")" + componentName + "/.*")
-	sourcePath := sourceRegex.ReplaceAllString(filename, "${1}")
+	requiredParts := promotionPath.ComponentPathExtraDepth + 1
+	if len(parts) <= requiredParts {
+		return relevantComponent{}, false
+	}
+
+	componentName := strings.Join(parts[:requiredParts], "/")
 
 	component := relevantComponent{
-		SourcePath:    sourcePath,
+		SourcePath:    promotionPath.SourcePath,
 		ComponentName: componentName,
 		AutoMerge:     promotionPath.Conditions.AutoMerge,
 	}
@@ -107,16 +106,26 @@ func componentFromFile(promotionPath cfg.PromotionPath, filename string) (releva
 	return component, true
 }
 
-func newPromotionInstance(component relevantComponent, ppr cfg.PromotionPr) PromotionInstance {
-	targetDescription := ppr.TargetDescription
-	if targetDescription == "" {
-		targetDescription = strings.Join(ppr.TargetPaths, " ")
+func normalizedTargetPaths(targetPaths []string) []string {
+	clone := slices.Clone(targetPaths)
+	sort.Strings(clone)
+	return clone
+}
+
+func promotionMapKey(source string, targets []string) string {
+	return source + ">" + strings.Join(targets, "|")
+}
+
+func newPromotionInstance(component relevantComponent, targetPaths []string, description string) PromotionInstance {
+	desc := description
+	if desc == "" {
+		desc = strings.Join(targetPaths, " ")
 	}
 
 	return PromotionInstance{
 		Metadata: PromotionInstanceMetaData{
-			TargetPaths:                    ppr.TargetPaths,
-			TargetDescription:              targetDescription,
+			TargetPaths:                    targetPaths,
+			TargetDescription:              desc,
 			SourcePath:                     component.SourcePath,
 			ComponentNames:                 []string{component.ComponentName},
 			PerComponentSkippedTargetPaths: map[string][]string{},
@@ -143,6 +152,32 @@ func updatePromotionInstance(instance PromotionInstance, component relevantCompo
 	}
 
 	return instance
+}
+
+func applyPromotionPath(promotions map[string]PromotionInstance, component relevantComponent, componentConfig *cfg.ComponentConfig, path cfg.PromotionPath, labels []*github.Label, logger *slog.Logger) bool {
+	if !strings.HasPrefix(component.SourcePath, path.SourcePath) {
+		return false
+	}
+
+	if !hasAnyRequiredLabel(path.Conditions.PrHasLabels, labels) {
+		return false
+	}
+
+	for _, ppr := range path.PromotionPrs {
+		targets := normalizedTargetPaths(ppr.TargetPaths)
+		key := promotionMapKey(path.SourcePath, targets)
+
+		instance, found := promotions[key]
+		if !found {
+			logger.Debug("Adding key", "key", key)
+			instance = newPromotionInstance(component, targets, ppr.TargetDescription)
+		}
+
+		instance = updatePromotionInstance(instance, component, componentConfig, targets)
+		promotions[key] = instance
+	}
+
+	return true
 }
 
 func DetectDrift(ctx context.Context, c Context) error {
@@ -274,37 +309,16 @@ func generateListOfChangedComponentPaths(ctx context.Context, c Context) (change
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
 func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
 	promotions = make(map[string]PromotionInstance)
-	for componentToPromote := range relevantComponents {
-		componentConfig, err := getComponentConfig(ctx, c, componentToPromote.SourcePath+componentToPromote.ComponentName, configBranch)
+	for component := range relevantComponents {
+		componentConfig, err := getComponentConfig(ctx, c, component.SourcePath+component.ComponentName, configBranch)
 		if err != nil {
-			c.PrLogger.Error("Failed to get in component configuration, skipping component", "err", err, "component", componentToPromote.SourcePath+componentToPromote.ComponentName)
+			c.PrLogger.Error("Failed to get in component configuration, skipping component", "err", err, "component", component.SourcePath+component.ComponentName)
 		}
 
-		for _, configPromotionPath := range c.Config.PromotionPaths {
-			match, _ := regexp.MatchString(configPromotionPath.SourcePath, componentToPromote.SourcePath)
-			if !match {
-				continue
+		for _, path := range c.Config.PromotionPaths {
+			if applyPromotionPath(promotions, component, componentConfig, path, c.Labels, c.PrLogger) {
+				break
 			}
-
-			requiredLabels := configPromotionPath.Conditions.PrHasLabels
-			if requiredLabels != nil && !hasAnyRequiredLabel(requiredLabels, c.Labels) {
-				continue
-			}
-
-			for _, ppr := range configPromotionPath.PromotionPrs {
-				sort.Strings(ppr.TargetPaths)
-
-				mapKey := configPromotionPath.SourcePath + ">" + strings.Join(ppr.TargetPaths, "|") // This key is used to aggregate the PR based on source and target combination
-				instance, found := promotions[mapKey]
-				if !found {
-					c.PrLogger.Debug("Adding key", "key", mapKey)
-					instance = newPromotionInstance(componentToPromote, ppr)
-				}
-
-				instance = updatePromotionInstance(instance, componentToPromote, componentConfig, ppr.TargetPaths)
-				promotions[mapKey] = instance
-			}
-			break
 		}
 	}
 	return promotions, nil
