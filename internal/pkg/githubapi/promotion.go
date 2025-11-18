@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -36,15 +37,6 @@ func containMatchingRegex(patterns []string, str string) bool {
 			return false
 		}
 		if doesElementMatchPattern {
-			return true
-		}
-	}
-	return false
-}
-
-func contains(s []string, str string) bool {
-	for _, v := range s {
-		if v == str {
 			return true
 		}
 	}
@@ -202,7 +194,7 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, releva
 				if configPromotionPath.Conditions.PrHasLabels != nil {
 					thisPrHasTheRightLabel := false
 					for _, l := range c.Labels {
-						if contains(configPromotionPath.Conditions.PrHasLabels, *l.Name) {
+						if slices.Contains(configPromotionPath.Conditions.PrHasLabels, *l.Name) {
 							thisPrHasTheRightLabel = true
 							break
 						}
@@ -232,7 +224,7 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, releva
 							},
 							ComputedSyncPaths: map[string]string{},
 						}
-					} else if !contains(entry.Metadata.ComponentNames, componentToPromote.ComponentName) {
+					} else if !slices.Contains(entry.Metadata.ComponentNames, componentToPromote.ComponentName) {
 						entry.Metadata.ComponentNames = append(entry.Metadata.ComponentNames, componentToPromote.ComponentName)
 						promotions[mapKey] = entry
 					}
