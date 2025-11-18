@@ -81,12 +81,26 @@ func shouldSkipTarget(componentConfig *cfg.ComponentConfig, componentName, targe
 	return false
 }
 
+func matchSourcePrefix(pattern, candidate string) (string, bool) {
+	re, err := regexp.Compile("^" + pattern)
+	if err != nil {
+		slog.Error("invalid source path pattern", "pattern", pattern, "err", err)
+		return "", false
+	}
+	matched := re.FindString(candidate)
+	if matched == "" {
+		return "", false
+	}
+	return matched, true
+}
+
 func componentFromFile(promotionPath cfg.PromotionPath, filename string) (relevantComponent, bool) {
-	if !strings.HasPrefix(filename, promotionPath.SourcePath) {
+	matchedPrefix, ok := matchSourcePrefix(promotionPath.SourcePath, filename)
+	if !ok {
 		return relevantComponent{}, false
 	}
 
-	remainder := strings.TrimPrefix(filename, promotionPath.SourcePath)
+	remainder := strings.TrimPrefix(filename, matchedPrefix)
 	remainder = strings.TrimPrefix(remainder, "/")
 	parts := strings.Split(remainder, "/")
 
@@ -98,7 +112,7 @@ func componentFromFile(promotionPath cfg.PromotionPath, filename string) (releva
 	componentName := strings.Join(parts[:requiredParts], "/")
 
 	component := relevantComponent{
-		SourcePath:    promotionPath.SourcePath,
+		SourcePath:    matchedPrefix,
 		ComponentName: componentName,
 		AutoMerge:     promotionPath.Conditions.AutoMerge,
 	}
@@ -155,7 +169,7 @@ func updatePromotionInstance(instance PromotionInstance, component relevantCompo
 }
 
 func applyPromotionPath(promotions map[string]PromotionInstance, component relevantComponent, componentConfig *cfg.ComponentConfig, path cfg.PromotionPath, labels []*github.Label, logger *slog.Logger) bool {
-	if !strings.HasPrefix(component.SourcePath, path.SourcePath) {
+	if _, ok := matchSourcePrefix(path.SourcePath, component.SourcePath); !ok {
 		return false
 	}
 
