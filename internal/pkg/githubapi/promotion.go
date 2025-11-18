@@ -55,6 +55,28 @@ func hasAnyRequiredLabel(required []string, labels []*github.Label) bool {
 	return false
 }
 
+func shouldSkipTarget(componentConfig *cfg.ComponentConfig, componentName, target string, metadata *PromotionInstanceMetaData) bool {
+	if componentConfig == nil {
+		return false
+	}
+
+	if blockList := componentConfig.PromotionTargetBlockList; blockList != nil {
+		if containMatchingRegex(blockList, target) {
+			metadata.PerComponentSkippedTargetPaths[componentName] = append(metadata.PerComponentSkippedTargetPaths[componentName], target)
+			return true
+		}
+	}
+
+	if allowList := componentConfig.PromotionTargetAllowList; allowList != nil {
+		if !containMatchingRegex(allowList, target) {
+			metadata.PerComponentSkippedTargetPaths[componentName] = append(metadata.PerComponentSkippedTargetPaths[componentName], target)
+			return true
+		}
+	}
+
+	return false
+}
+
 func DetectDrift(ctx context.Context, c Context) error {
 	c.PrLogger.Debug("Checking for Drift")
 	if ctx.Err() != nil {
@@ -218,38 +240,37 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, releva
 				sort.Strings(ppr.TargetPaths)
 
 				mapKey := configPromotionPath.SourcePath + ">" + strings.Join(ppr.TargetPaths, "|") // This key is used to aggregate the PR based on source and target combination
-				if entry, ok := promotions[mapKey]; !ok {
+				instance, found := promotions[mapKey]
+				if !found {
 					c.PrLogger.Debug("Adding key", "key", mapKey)
 					if ppr.TargetDescription == "" {
 						ppr.TargetDescription = strings.Join(ppr.TargetPaths, " ")
 					}
-					promotions[mapKey] = PromotionInstance{
+					instance = PromotionInstance{
 						Metadata: PromotionInstanceMetaData{
 							TargetPaths:                    ppr.TargetPaths,
 							TargetDescription:              ppr.TargetDescription,
 							SourcePath:                     componentToPromote.SourcePath,
-							ComponentNames:                 []string{componentToPromote.ComponentName},
+							ComponentNames:                 []string{},
 							PerComponentSkippedTargetPaths: map[string][]string{},
 							AutoMerge:                      componentToPromote.AutoMerge,
 						},
 						ComputedSyncPaths: map[string]string{},
 					}
-				} else if !slices.Contains(entry.Metadata.ComponentNames, componentToPromote.ComponentName) {
-					entry.Metadata.ComponentNames = append(entry.Metadata.ComponentNames, componentToPromote.ComponentName)
-					promotions[mapKey] = entry
+				}
+
+				if !slices.Contains(instance.Metadata.ComponentNames, componentToPromote.ComponentName) {
+					instance.Metadata.ComponentNames = append(instance.Metadata.ComponentNames, componentToPromote.ComponentName)
 				}
 
 				for _, indevidualPath := range ppr.TargetPaths {
-					if componentConfig != nil && componentConfig.PromotionTargetBlockList != nil && containMatchingRegex(componentConfig.PromotionTargetBlockList, indevidualPath) {
-						promotions[mapKey].Metadata.PerComponentSkippedTargetPaths[componentToPromote.ComponentName] = append(promotions[mapKey].Metadata.PerComponentSkippedTargetPaths[componentToPromote.ComponentName], indevidualPath)
+					if shouldSkipTarget(componentConfig, componentToPromote.ComponentName, indevidualPath, &instance.Metadata) {
 						continue
 					}
-					if componentConfig != nil && componentConfig.PromotionTargetAllowList != nil && !containMatchingRegex(componentConfig.PromotionTargetAllowList, indevidualPath) {
-						promotions[mapKey].Metadata.PerComponentSkippedTargetPaths[componentToPromote.ComponentName] = append(promotions[mapKey].Metadata.PerComponentSkippedTargetPaths[componentToPromote.ComponentName], indevidualPath)
-						continue
-					}
-					promotions[mapKey].ComputedSyncPaths[indevidualPath+componentToPromote.ComponentName] = componentToPromote.SourcePath + componentToPromote.ComponentName
+					instance.ComputedSyncPaths[indevidualPath+componentToPromote.ComponentName] = componentToPromote.SourcePath + componentToPromote.ComponentName
 				}
+
+				promotions[mapKey] = instance
 			}
 			break
 		}
