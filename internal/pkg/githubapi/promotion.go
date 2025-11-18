@@ -56,6 +56,10 @@ func hasAnyRequiredLabel(required []string, labels []*github.Label) bool {
 }
 
 func shouldSkipTarget(componentConfig *cfg.ComponentConfig, componentName, target string, metadata *PromotionInstanceMetaData) bool {
+	if metadata.PerComponentSkippedTargetPaths == nil {
+		metadata.PerComponentSkippedTargetPaths = map[string][]string{}
+	}
+
 	if componentConfig == nil {
 		return false
 	}
@@ -75,6 +79,70 @@ func shouldSkipTarget(componentConfig *cfg.ComponentConfig, componentName, targe
 	}
 
 	return false
+}
+
+func componentFromFile(promotionPath cfg.PromotionPath, filename string) (relevantComponent, bool) {
+	match, _ := regexp.MatchString("^"+promotionPath.SourcePath+".*", filename)
+	if !match {
+		return relevantComponent{}, false
+	}
+
+	componentPathRegexSubstrings := make([]string, promotionPath.ComponentPathExtraDepth+1)
+	for i := range componentPathRegexSubstrings {
+		componentPathRegexSubstrings[i] = "[^/]*"
+	}
+	componentPathRegexSubString := strings.Join(componentPathRegexSubstrings, "/")
+	componentRegex := regexp.MustCompile("^" + promotionPath.SourcePath + "(" + componentPathRegexSubString + ")/.*")
+	componentName := componentRegex.ReplaceAllString(filename, "${1}")
+
+	sourceRegex := regexp.MustCompile("^(" + promotionPath.SourcePath + ")" + componentName + "/.*")
+	sourcePath := sourceRegex.ReplaceAllString(filename, "${1}")
+
+	component := relevantComponent{
+		SourcePath:    sourcePath,
+		ComponentName: componentName,
+		AutoMerge:     promotionPath.Conditions.AutoMerge,
+	}
+
+	return component, true
+}
+
+func newPromotionInstance(component relevantComponent, ppr cfg.PromotionPr) PromotionInstance {
+	targetDescription := ppr.TargetDescription
+	if targetDescription == "" {
+		targetDescription = strings.Join(ppr.TargetPaths, " ")
+	}
+
+	return PromotionInstance{
+		Metadata: PromotionInstanceMetaData{
+			TargetPaths:                    ppr.TargetPaths,
+			TargetDescription:              targetDescription,
+			SourcePath:                     component.SourcePath,
+			ComponentNames:                 []string{component.ComponentName},
+			PerComponentSkippedTargetPaths: map[string][]string{},
+			AutoMerge:                      component.AutoMerge,
+		},
+		ComputedSyncPaths: map[string]string{},
+	}
+}
+
+func updatePromotionInstance(instance PromotionInstance, component relevantComponent, componentConfig *cfg.ComponentConfig, targetPaths []string) PromotionInstance {
+	if instance.ComputedSyncPaths == nil {
+		instance.ComputedSyncPaths = map[string]string{}
+	}
+
+	if !slices.Contains(instance.Metadata.ComponentNames, component.ComponentName) {
+		instance.Metadata.ComponentNames = append(instance.Metadata.ComponentNames, component.ComponentName)
+	}
+
+	for _, target := range targetPaths {
+		if shouldSkipTarget(componentConfig, component.ComponentName, target, &instance.Metadata) {
+			continue
+		}
+		instance.ComputedSyncPaths[target+component.ComponentName] = component.SourcePath + component.ComponentName
+	}
+
+	return instance
 }
 
 func DetectDrift(ctx context.Context, c Context) error {
@@ -162,30 +230,17 @@ func generateListOfRelevantComponents(ctx context.Context, c Context) (relevantC
 	}
 
 	for _, changedFile := range prFiles {
+		if changedFile.Filename == nil {
+			continue
+		}
+
+		filename := *changedFile.Filename
 		for _, promotionPathConfig := range c.Config.PromotionPaths {
-			match, _ := regexp.MatchString("^"+promotionPathConfig.SourcePath+".*", *changedFile.Filename)
-			if !match {
+			relevantComponent, ok := componentFromFile(promotionPathConfig, filename)
+			if !ok {
 				continue
 			}
-			// "components" here are the sub directories of the SourcePath
-			// but with promotionPathConfig.ComponentPathExtraDepth we can grab multiple levels of subdirectories,
-			// to support cases where components are nested deeper(e.g. [SourcePath]/owningTeam/namespace/component1)
-			componentPathRegexSubSstrings := []string{}
-			for i := 0; i <= promotionPathConfig.ComponentPathExtraDepth; i++ {
-				componentPathRegexSubSstrings = append(componentPathRegexSubSstrings, "[^/]*")
-			}
-			componentPathRegexSubString := strings.Join(componentPathRegexSubSstrings, "/")
-			getComponentRegexString := regexp.MustCompile("^" + promotionPathConfig.SourcePath + "(" + componentPathRegexSubString + ")/.*")
-			componentName := getComponentRegexString.ReplaceAllString(*changedFile.Filename, "${1}")
-
-			getSourcePathRegexString := regexp.MustCompile("^(" + promotionPathConfig.SourcePath + ")" + componentName + "/.*")
-			compiledSourcePath := getSourcePathRegexString.ReplaceAllString(*changedFile.Filename, "${1}")
-			relevantComponentsElement := relevantComponent{
-				SourcePath:    compiledSourcePath,
-				ComponentName: componentName,
-				AutoMerge:     promotionPathConfig.Conditions.AutoMerge,
-			}
-			relevantComponents[relevantComponentsElement] = struct{}{}
+			relevantComponents[relevantComponent] = struct{}{}
 			break // a file can only be a single "source dir"
 		}
 	}
@@ -243,33 +298,10 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, releva
 				instance, found := promotions[mapKey]
 				if !found {
 					c.PrLogger.Debug("Adding key", "key", mapKey)
-					if ppr.TargetDescription == "" {
-						ppr.TargetDescription = strings.Join(ppr.TargetPaths, " ")
-					}
-					instance = PromotionInstance{
-						Metadata: PromotionInstanceMetaData{
-							TargetPaths:                    ppr.TargetPaths,
-							TargetDescription:              ppr.TargetDescription,
-							SourcePath:                     componentToPromote.SourcePath,
-							ComponentNames:                 []string{},
-							PerComponentSkippedTargetPaths: map[string][]string{},
-							AutoMerge:                      componentToPromote.AutoMerge,
-						},
-						ComputedSyncPaths: map[string]string{},
-					}
+					instance = newPromotionInstance(componentToPromote, ppr)
 				}
 
-				if !slices.Contains(instance.Metadata.ComponentNames, componentToPromote.ComponentName) {
-					instance.Metadata.ComponentNames = append(instance.Metadata.ComponentNames, componentToPromote.ComponentName)
-				}
-
-				for _, indevidualPath := range ppr.TargetPaths {
-					if shouldSkipTarget(componentConfig, componentToPromote.ComponentName, indevidualPath, &instance.Metadata) {
-						continue
-					}
-					instance.ComputedSyncPaths[indevidualPath+componentToPromote.ComponentName] = componentToPromote.SourcePath + componentToPromote.ComponentName
-				}
-
+				instance = updatePromotionInstance(instance, componentToPromote, componentConfig, ppr.TargetPaths)
 				promotions[mapKey] = instance
 			}
 			break
