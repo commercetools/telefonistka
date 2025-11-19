@@ -290,7 +290,6 @@ func readFile(t *testing.T, path string) *bytes.Buffer {
 	return bytes.NewBuffer(b)
 }
 
-//nolint:unused
 func newDockerClient(t *testing.T) *dockerclient.Client {
 	t.Helper()
 	c, err := dockerclient.NewClientWithOpts(
@@ -303,7 +302,7 @@ func newDockerClient(t *testing.T) *dockerclient.Client {
 
 // loadLocalImage loads an image from the host into the cluster.
 //
-//nolint:unused
+
 func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, images ...string) {
 	t.Helper()
 	args := filters.NewArgs()
