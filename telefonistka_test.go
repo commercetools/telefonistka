@@ -139,6 +139,10 @@ func TestTelefonistka(t *testing.T) {
 }
 
 func TestHelm(t *testing.T) {
+	if enabled, _ := strconv.ParseBool(os.Getenv("INTEGRATE")); !enabled {
+		t.Skip("This is an interactive test; set INTEGRATE explicitly to run it")
+	}
+
 	// Make test interactive by waiting for explicit interrupt before
 	// finishing. This allows setting things up so that caller can interact
 	// with resources before they're all cleaned up.
