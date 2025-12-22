@@ -2,6 +2,7 @@ package telefonistka
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -43,7 +44,7 @@ func event(eventType string, eventFilePath string) {
 	r.Body = io.NopCloser(bytes.NewReader(payload))
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("X-GitHub-Event", eventType)
-	githubapi.HandleEvent(eventType, mainGhClientCache, prApproverGhClientCache, r, payload)
+	githubapi.HandleEvent(context.Background(), mainGhClientCache, prApproverGhClientCache, r, payload)
 }
 
 func getEnv(key, fallback string) string {

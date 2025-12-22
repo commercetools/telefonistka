@@ -45,7 +45,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 	}
 
 	for _, pr := range prs {
-		if DoesPrHasLabel(pr.Labels, "promotion") {
+		if doesPRHaveLabel(pr.Labels, "promotion") {
 			pc.OpenPromotionPrs++
 		}
 

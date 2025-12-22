@@ -7,12 +7,12 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
-// GetBotGhIdentity retrieves the self identity of the used credentials.
+// getBotIdentity retrieves the self identity of the used credentials.
 //
 // Note that go-github is the preferred way of interacting with GitHub because
 // of types and easy API mocking, however some functionality is not available
 // in GH V3 rest API.
-func GetBotGhIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
+func getBotIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
 	var query struct {
 		Viewer struct {
 			Login githubv4.String
@@ -26,7 +26,8 @@ func GetBotGhIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
 	return string(query.Viewer.Login), nil
 }
 
-func MinimizeStalePRComments(ctx context.Context, c Context, botIdentity string) error {
+func MinimizeStalePRComments(ctx context.Context, c Context) error {
+	botIdentity, _ := getBotIdentity(ctx, c.GhClientPair.v4Client)
 	comments, err := getUnminimizedComments(ctx, c)
 	if err != nil {
 		c.PrLogger.Error("Failed to get unminimized comments", "err", err)

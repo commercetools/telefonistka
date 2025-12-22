@@ -36,8 +36,8 @@ func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[stri
 
 		c.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
 		hasDiff = true
-		sourceFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
-		targetFileContent, _, _ := GetFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
+		sourceFileContent, _ := GetFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
+		targetFileContent, _ := GetFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
 
 		edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
 		diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))

@@ -135,7 +135,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func HandlePREvent(ctx context.Context, stat string, c Context) {
+func handlePREvent(ctx context.Context, stat string, c Context) {
 	SetCommitStatus(ctx, c, "pending")
 
 	var err error
@@ -172,19 +172,19 @@ func handleShowPlanPREvent(ctx context.Context, c Context) error {
 }
 
 func handleChangedPREvent(ctx context.Context, c Context) error {
-	botIdentity, _ := GetBotGhIdentity(ctx, c.GhClientPair.v4Client)
-	err := MinimizeStalePRComments(ctx, c, botIdentity)
-	if err != nil {
+
+	if err := MinimizeStalePRComments(ctx, c); err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
 	}
 
 	if err := CommentDiff(ctx, c); err != nil {
 		return fmt.Errorf("failed to comment diff: %w", err)
 	}
-	err = DetectDrift(ctx, c)
-	if err != nil {
+
+	if err := DetectDrift(ctx, c); err != nil {
 		return fmt.Errorf("detecting drift: %w", err)
 	}
+
 	return nil
 }
 
@@ -232,9 +232,9 @@ func CommentDiff(ctx context.Context, c Context) error {
 		}
 		// If the PR is a promotion PR and the diff is empty, we can auto-merge it
 		// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
-		if DoesPrHasLabel(c.Labels, "promotion") && c.Config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
+		if doesPRHaveLabel(c.Labels, "promotion") && c.Config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
 			c.PrLogger.Info("Auto-merging (no diff) PR")
-			err := MergePr(ctx, c, c.PrNumber)
+			err := MergePr(ctx, c)
 			if err != nil {
 				return fmt.Errorf("PR auto merge: %w", err)
 			}
@@ -382,19 +382,19 @@ func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClien
 		prom.InstrumentWebhookHit("validation_failed")
 		return err
 	}
-	eventType := github.WebHookType(r)
 
-	go HandleEvent(eventType, mainGhClientCache, prApproverGhClientCache, r, payload)
+	go HandleEvent(context.Background(), mainGhClientCache, prApproverGhClientCache, r, payload)
 	return nil
 }
 
-func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
+func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("Recovered", "err", r)
 		}
 	}()
 
+	eventType := github.WebHookType(r)
 	e, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
 		slog.Error("could not parse webhook", "err", err)
@@ -405,7 +405,7 @@ func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClient
 
 	// We don't use the request context as it might have a short deadline and we don't want to stop event handling based on that
 	// But we do want to stop the event handling after a certain point, so:
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	var mainGithubClientPair GhClientPair
 	var approverGithubClientPair GhClientPair
@@ -436,7 +436,7 @@ func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClient
 			return
 		}
 
-		config, _ := GetInRepoConfig(ctx, c, defaultBranch)
+		config, _ := GetInRepoConfig(ctx, c)
 		c.Config = config
 		listOfChangedFiles := generateListOfChangedFiles(event)
 
@@ -468,7 +468,7 @@ func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClient
 
 		c.PrLogger = prLogger
 
-		config, err := GetInRepoConfig(ctx, c, c.DefaultBranch)
+		config, err := GetInRepoConfig(ctx, c)
 		if err != nil {
 			_ = c.CommentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
 			prLogger.Error("Failed to get config", "err", err)
@@ -482,11 +482,11 @@ func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClient
 		c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 		switch {
 		case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
-			HandlePREvent(ctx, "merged", c)
+			handlePREvent(ctx, "merged", c)
 		case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
-			HandlePREvent(ctx, "changed", c)
-		case event.GetAction() == "labeled" && DoesPrHasLabel(event.GetPullRequest().Labels, "show-plan"):
-			HandlePREvent(ctx, "show-plan", c)
+			handlePREvent(ctx, "changed", c)
+		case event.GetAction() == "labeled" && doesPRHaveLabel(event.GetPullRequest().Labels, "show-plan"):
+			handlePREvent(ctx, "show-plan", c)
 		}
 
 	case *github.IssueCommentEvent:
@@ -494,7 +494,7 @@ func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClient
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
-		botIdentity, _ := GetBotGhIdentity(ctx, mainGithubClientPair.v4Client)
+		botIdentity, _ := getBotIdentity(ctx, mainGithubClientPair.v4Client)
 
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 		//
@@ -524,7 +524,7 @@ func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClient
 
 		c.PrLogger = prLogger
 
-		config, err := GetInRepoConfig(ctx, c, c.DefaultBranch)
+		config, err := GetInRepoConfig(ctx, c)
 		if err != nil {
 			prLogger.Error("Failed to get config", "err", err)
 			return
@@ -550,7 +550,7 @@ func HandleEvent(eventType string, mainGhClientCache *lru.Cache[string, GhClient
 		c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 		retrigger := event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody())
 		if retrigger {
-			HandlePREvent(ctx, "retriggered", c)
+			handlePREvent(ctx, "retriggered", c)
 			return
 		}
 
@@ -651,19 +651,21 @@ func commentPlanInPR(ctx context.Context, c Context, promotions map[string]Promo
 		c.PrLogger.Error("Failed to generate dry-run comment template", "err", err)
 		return
 	}
-	_ = commentPR(ctx, c, templateOutput)
+	commentPR(ctx, c, templateOutput)
 }
 
 func executeTemplate(templateName string, templateFile string, data interface{}) (string, error) {
 	var templateOutput bytes.Buffer
+
 	messageTemplate, err := template.New(templateName).ParseFiles(templateFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
-	err = messageTemplate.ExecuteTemplate(&templateOutput, templateName, data)
-	if err != nil {
+
+	if err := messageTemplate.ExecuteTemplate(&templateOutput, templateName, data); err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
+
 	return templateOutput.String(), nil
 }
 
@@ -672,14 +674,14 @@ func defaultTemplatesFullPath(templateFile string) string {
 }
 
 func commentPR(ctx context.Context, c Context, commentBody string) error {
-	err := c.CommentOnPr(ctx, commentBody)
-	if err != nil {
+	if err := c.CommentOnPr(ctx, commentBody); err != nil {
 		c.PrLogger.Error("Failed to comment in PR", "err", err)
 		return err
 	}
 	return nil
 }
 
+// handleMergedPrEvent
 func handleMergedPrEvent(ctx context.Context, c Context) error {
 	var err error
 
@@ -741,28 +743,28 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 				c.PrLogger.Error("PR opening failed", "err", err)
 				return err
 			}
-			if c.Config.AutoApprovePromotionPrs {
-				err := ApprovePr(ctx, c, pull.GetNumber())
-				if err != nil {
-					c.PrLogger.Error("PR auto approval failed", "err", err)
-					return err
-				}
+
+			if err := ApprovePr(ctx, c); err != nil {
+				c.PrLogger.Error("PR auto approval failed", "err", err)
+				return err
 			}
+
 			if promotion.Metadata.AutoMerge {
 				c.PrLogger.Info("Auto-merging PR")
 				templateData := map[string]interface{}{
 					"prNumber": pull.GetNumber(),
 				}
+
 				templateOutput, err := executeTemplate("autoMerge", defaultTemplatesFullPath("auto-merge-comment.gotmpl"), templateData)
 				if err != nil {
 					return err
 				}
-				err = commentPR(ctx, c, templateOutput)
-				if err != nil {
+
+				if err := commentPR(ctx, c, templateOutput); err != nil {
 					return err
 				}
 
-				err = MergePr(ctx, c, pull.GetNumber())
+				err = MergePr(ctx, c)
 				if err != nil {
 					c.PrLogger.Error("PR auto merge failed", "err", err)
 					return err
@@ -811,17 +813,17 @@ func firstN(str string, n int) string {
 	return string(v[:n])
 }
 
-func MergePr(ctx context.Context, details Context, number int) error {
+func MergePr(ctx context.Context, c Context) error {
 	operation := func() error {
-		err := tryMergePR(ctx, details, number)
+		err := tryMergePR(ctx, c, c.PrNumber)
 		if err != nil {
 			if isMergeErrorRetryable(err.Error()) {
 				if err != nil {
-					details.PrLogger.Warn("Failed to merge PR: transient error", "err", err)
+					c.PrLogger.Warn("Failed to merge PR: transient error", "err", err)
 				}
 				return err
 			}
-			details.PrLogger.Error("Failed to merge PR", "err", err)
+			c.PrLogger.Error("Failed to merge PR", "err", err)
 			return backoff.Permanent(err)
 		}
 		return nil
@@ -830,7 +832,7 @@ func MergePr(ctx context.Context, details Context, number int) error {
 	// Using default values, see https://pkg.go.dev/github.com/cenkalti/backoff#pkg-constants
 	err := backoff.Retry(operation, backoff.NewExponentialBackOff())
 	if err != nil {
-		details.PrLogger.Error("Failed to merge PR: backoff failed", "err", err)
+		c.PrLogger.Error("Failed to merge PR: backoff failed", "err", err)
 	}
 
 	return err
@@ -858,7 +860,7 @@ func (p Context) CommentOnPr(ctx context.Context, commentBody string) error {
 	return err
 }
 
-func DoesPrHasLabel(labels []*github.Label, name string) bool {
+func doesPRHaveLabel(labels []*github.Label, name string) bool {
 	for _, l := range labels {
 		if l.GetName() == name {
 			return true
@@ -1294,12 +1296,16 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 	return pull, nil // TODO
 }
 
-func ApprovePr(ctx context.Context, c Context, prNumber int) error {
+func ApprovePr(ctx context.Context, c Context) error {
+	if !c.Config.AutoApprovePromotionPrs {
+		return nil
+	}
+
 	reviewRequest := &github.PullRequestReviewRequest{
 		Event: github.String("APPROVE"),
 	}
 
-	_, resp, err := c.Approver.v3Client.PullRequests.CreateReview(ctx, c.Owner, c.Repo, prNumber, reviewRequest)
+	_, resp, err := c.Approver.v3Client.PullRequests.CreateReview(ctx, c.Owner, c.Repo, c.PrNumber, reviewRequest)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Could not create review", "err", err, "resp", resp)
@@ -1309,8 +1315,8 @@ func ApprovePr(ctx context.Context, c Context, prNumber int) error {
 	return nil
 }
 
-func GetInRepoConfig(ctx context.Context, c Context, defaultBranch string) (*cfg.Config, error) {
-	inRepoConfigFileContentString, _, err := GetFileContent(ctx, c, defaultBranch, "telefonistka.yaml")
+func GetInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
+	inRepoConfigFileContentString, err := GetFileContent(ctx, c, c.DefaultBranch, "telefonistka.yaml")
 	if err != nil {
 		c.PrLogger.Error("Could not get in-repo configuration", "err", err)
 		inRepoConfigFileContentString = ""
@@ -1322,25 +1328,25 @@ func GetInRepoConfig(ctx context.Context, c Context, defaultBranch string) (*cfg
 	return conf, err
 }
 
-func GetFileContent(ctx context.Context, c Context, branch string, filePath string) (string, int, error) {
+func GetFileContent(ctx context.Context, c Context, branch string, filePath string) (string, error) {
 	rGetContentOps := github.RepositoryContentGetOptions{Ref: branch}
 	fileContent, _, resp, err := c.GhClientPair.v3Client.Repositories.GetContents(ctx, c.Owner, c.Repo, filePath, &rGetContentOps)
 	if err != nil {
 		c.PrLogger.Error("Fail to get file", "err", err, "resp", resp)
 		if resp == nil {
-			return "", 0, err
+			return "", err
 		}
 		prom.InstrumentGhCall(resp)
-		return "", resp.StatusCode, err
+		return "", err
 	} else {
 		prom.InstrumentGhCall(resp)
 	}
 	fileContentString, err := fileContent.GetContent()
 	if err != nil {
 		c.PrLogger.Error("Fail to serlize file", "err", err)
-		return "", resp.StatusCode, err
+		return "", err
 	}
-	return fileContentString, resp.StatusCode, nil
+	return fileContentString, nil
 }
 
 func generateListOfChangedFiles(eventPayload *github.PushEvent) []string {
