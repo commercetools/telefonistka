@@ -628,3 +628,72 @@ func Test_splitTitleAt250(t *testing.T) {
 		assert.Equal(t, tc.expectedBodyPrefix, bodyPrefix, i)
 	}
 }
+
+func TestMergeLabels(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name               string
+		configLabels       []string
+		promotionLabels    []string
+		expectedLabels     []string
+		expectedLabelCount int
+	}{
+		{
+			name:               "Both empty",
+			configLabels:       []string{},
+			promotionLabels:    []string{},
+			expectedLabels:     []string{},
+			expectedLabelCount: 0,
+		},
+		{
+			name:               "Only config labels",
+			configLabels:       []string{"promotion", "auto-merge"},
+			promotionLabels:    []string{},
+			expectedLabels:     []string{"promotion", "auto-merge"},
+			expectedLabelCount: 2,
+		},
+		{
+			name:               "Only promotion labels",
+			configLabels:       []string{},
+			promotionLabels:    []string{"staging", "prod"},
+			expectedLabels:     []string{"staging", "prod"},
+			expectedLabelCount: 2,
+		},
+		{
+			name:               "No overlapping labels",
+			configLabels:       []string{"promotion"},
+			promotionLabels:    []string{"staging"},
+			expectedLabels:     []string{"promotion", "staging"},
+			expectedLabelCount: 2,
+		},
+		{
+			name:               "With duplicate labels",
+			configLabels:       []string{"promotion", "auto-merge"},
+			promotionLabels:    []string{"promotion", "prod"},
+			expectedLabels:     []string{"promotion", "auto-merge", "prod"},
+			expectedLabelCount: 3,
+		},
+		{
+			name:               "Config labels only contain duplicates",
+			configLabels:       []string{"promotion", "promotion"},
+			promotionLabels:    []string{"staging"},
+			expectedLabels:     []string{"promotion", "staging"},
+			expectedLabelCount: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			result := mergeLabels(tc.configLabels, tc.promotionLabels)
+			assert.Equal(t, tc.expectedLabelCount, len(result), "Label count mismatch")
+
+			// Check all expected labels are present
+			for _, expectedLabel := range tc.expectedLabels {
+				assert.Contains(t, result, expectedLabel, "Expected label not found")
+			}
+		})
+	}
+}

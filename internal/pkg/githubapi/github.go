@@ -670,6 +670,31 @@ func defaultTemplatesFullPath(templateFile string) string {
 	return filepath.Join(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
 }
 
+// mergeLabels combines labels from config and promotion-specific labels
+// avoiding duplicates. Returns a slice of unique labels.
+func mergeLabels(configLabels []string, promotionLabels []string) []string {
+	labelMap := make(map[string]bool)
+	var result []string
+
+	// Add config labels first
+	for _, label := range configLabels {
+		if !labelMap[label] {
+			labelMap[label] = true
+			result = append(result, label)
+		}
+	}
+
+	// Add promotion-specific labels
+	for _, label := range promotionLabels {
+		if !labelMap[label] {
+			labelMap[label] = true
+			result = append(result, label)
+		}
+	}
+
+	return result
+}
+
 func commentPR(ghPrClientDetails GhPrClientDetails, commentBody string) error {
 	err := ghPrClientDetails.CommentOnPr(commentBody)
 	if err != nil {
@@ -697,7 +722,7 @@ func BumpVersion(ghPrClientDetails GhPrClientDetails, defaultBranch string, file
 
 	newPrTitle := triggeringRepo + "🚠 Bumping version @ " + filePath
 	newPrBody := fmt.Sprintf("Bumping version triggered by %s@%s", triggeringRepo, triggeringRepoSHA)
-	pr, err := createPrObject(ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, defaultBranch, triggeringActor)
+	pr, err := createPrObject(ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, defaultBranch, triggeringActor, []string{"promotions"}) // TODO figure out labels, this is the existing behavior
 	if err != nil {
 		ghPrClientDetails.PrLogger.Errorf("PR opening failed: err=%v", err)
 		return err
@@ -778,7 +803,10 @@ func handleMergedPrEvent(ghPrClientDetails GhPrClientDetails, prApproverGithubCl
 
 			newPrBody := generatePromotionPrBody(ghPrClientDetails, components, promotion, originalPrAuthor)
 
-			pull, err := createPrObject(ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, defaultBranch, originalPrAuthor)
+			// Merge labels from config and promotion-specific labels
+			mergedLabels := mergeLabels(config.PromotionPrLabels, promotion.Metadata.Labels)
+
+			pull, err := createPrObject(ghPrClientDetails, newBranchRef, newPrTitle, newPrBody, defaultBranch, originalPrAuthor, mergedLabels)
 			if err != nil {
 				ghPrClientDetails.PrLogger.Errorf("PR opening failed: err=%v", err)
 				return err
@@ -1315,7 +1343,7 @@ func splitTitleAt250(s string) (string, string) {
 	return string(runes[:250]) + "...", "..." + string(runes[250:]) + "\n"
 }
 
-func createPrObject(ghPrClientDetails GhPrClientDetails, newBranchRef string, newPrTitle string, newPrBody string, defaultBranch string, assignee string) (*github.PullRequest, error) {
+func createPrObject(ghPrClientDetails GhPrClientDetails, newBranchRef string, newPrTitle string, newPrBody string, defaultBranch string, assignee string, labels []string) (*github.PullRequest, error) {
 	safeTitle, bodyPrefix := splitTitleAt250(newPrTitle)
 	newPrConfig := &github.NewPullRequest{
 		Body:  github.String(bodyPrefix + newPrBody),
@@ -1333,13 +1361,16 @@ func createPrObject(ghPrClientDetails GhPrClientDetails, newBranchRef string, ne
 		ghPrClientDetails.PrLogger.Infof("PR %d opened", *pull.Number)
 	}
 
-	prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *pull.Number, []string{"promotion"})
-	prom.InstrumentGhCall(resp)
-	if err != nil {
-		ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
-		return pull, err
-	} else {
-		ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", pull.Number, prLables)
+	// Merge labels: start with top-level config labels, then add any additional ones
+	if len(labels) > 0 {
+		prLables, resp, err := ghPrClientDetails.GhClientPair.v3Client.Issues.AddLabelsToIssue(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *pull.Number, labels)
+		prom.InstrumentGhCall(resp)
+		if err != nil {
+			ghPrClientDetails.PrLogger.Errorf("Could not label GitHub PR: err=%s\n%v\n", err, resp)
+			return pull, err
+		} else {
+			ghPrClientDetails.PrLogger.Debugf("PR %v labeled\n%+v", pull.Number, prLables)
+		}
 	}
 
 	_, resp, err = ghPrClientDetails.GhClientPair.v3Client.Issues.AddAssignees(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *pull.Number, []string{assignee})

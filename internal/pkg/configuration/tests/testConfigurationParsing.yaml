@@ -7,6 +7,8 @@ promotionPaths:
     promotionPrs:
       - targetPaths:
         - "env/staging/us-east4/c1/"
+        labels:
+        - "staging"
       - targetPaths:
         - "env/staging/europe-west4/c1/"
   - sourcePath: "env/staging/us-east4/c1/"
@@ -15,6 +17,8 @@ promotionPaths:
     promotionPrs:
       - targetPaths:
         - "env/prod/us-central1/c2/"
+        labels:
+        - "prod-us"
   - sourcePath: "env/prod/us-central1/c2/"
     conditions:
     promotionPrs:
@@ -22,7 +26,7 @@ promotionPaths:
         - "env/prod/us-west1/c2/"
         - "env/prod/us-central1/c3/"
 
-promtionPrLables:
+promotionPrLabels:
   - "promotion"
 promotionBranchNameTemplte: "promotions/{{.safeBranchName}}"
 promtionPrBodyTemplate: |

@@ -36,6 +36,9 @@ func TestConfigurationParse(t *testing.T) {
 						TargetPaths: []string{
 							"env/staging/us-east4/c1/",
 						},
+						Labels: []string{
+							"staging",
+						},
 					},
 					{
 						TargetPaths: []string{
@@ -53,6 +56,9 @@ func TestConfigurationParse(t *testing.T) {
 					{
 						TargetPaths: []string{
 							"env/prod/us-central1/c2/",
+						},
+						Labels: []string{
+							"prod-us",
 						},
 					},
 				},
@@ -73,6 +79,8 @@ func TestConfigurationParse(t *testing.T) {
 			},
 		},
 	}
+
+	expectedConfig.PromotionPrLabels = []string{"promotion"}
 
 	if diff := deep.Equal(expectedConfig, config); diff != nil {
 		t.Error(diff)
