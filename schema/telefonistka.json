@@ -86,7 +86,7 @@
         "$ref": "#/definitions/path"
       }
     },
-    "promtionPRlables": {
+    "promotionPrLabels": {
       "type": "array",
       "description": "List of labels to apply on PR",
       "items": {
