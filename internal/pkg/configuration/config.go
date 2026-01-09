@@ -23,6 +23,7 @@ type Condition struct {
 type PromotionPr struct {
 	TargetDescription string   `yaml:"targetDescription"`
 	TargetPaths       []string `yaml:"targetPaths"`
+	Labels            []string `yaml:"labels"`
 }
 
 type PromotionPath struct {
