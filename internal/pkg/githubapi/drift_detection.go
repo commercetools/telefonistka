@@ -102,12 +102,13 @@ func generateFlatMapfromFileTree(ghPrClientDetails *GhPrClientDetails, workingPa
 	_, directoryContent, resp, _ := ghPrClientDetails.GhClientPair.v3Client.Repositories.GetContents(ghPrClientDetails.Ctx, ghPrClientDetails.Owner, ghPrClientDetails.Repo, *workingPath, getContentOpts)
 	prom.InstrumentGhCall(resp)
 	for _, elementInDir := range directoryContent {
-		if *elementInDir.Type == "file" {
+		switch *elementInDir.Type {
+		case "file":
 			relativeName := strings.TrimPrefix(*elementInDir.Path, *rootPath+"/")
 			listOfFiles[relativeName] = *elementInDir.SHA
-		} else if *elementInDir.Type == "dir" {
+		case "dir":
 			generateFlatMapfromFileTree(ghPrClientDetails, elementInDir.Path, rootPath, branch, listOfFiles)
-		} else {
+		default:
 			ghPrClientDetails.PrLogger.Infof("Ignoring type %s for path %s", *elementInDir.Type, *elementInDir.Path)
 		}
 	}

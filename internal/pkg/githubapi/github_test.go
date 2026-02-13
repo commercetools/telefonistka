@@ -187,8 +187,8 @@ func TestIsSyncFromBranchAllowedForThisPath(t *testing.T) {
 	}
 }
 
+//nolint:tparallel
 func TestGenerateArgoCdDiffComments(t *testing.T) {
-	t.Parallel()
 	tests := map[string]struct {
 		diffCommentDataTestDataFileName string
 		expectedNumberOfComments        int
@@ -211,9 +211,7 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		},
 	}
 
-	if err := os.Setenv("TEMPLATES_PATH", "../../../templates/"); err != nil { //nolint:tenv
-		t.Fatal(err)
-	}
+	t.Setenv("TEMPLATES_PATH", "../../../templates/")
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -382,8 +380,8 @@ func TestPrBodyMultiComponent(t *testing.T) {
 	assert.Equal(t, string(expectedPrBody), newPrBody)
 }
 
+//nolint:paralleltest
 func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		Host      string
 		Owner     string
@@ -405,10 +403,8 @@ func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 	}
 
 	// reset the GITHUB_HOST env to prevent conflicts with other tests.
-	defer os.Unsetenv("GITHUB_HOST")
-
 	for _, tc := range tests {
-		os.Setenv("GITHUB_HOST", tc.Host)
+		t.Setenv("GITHUB_HOST", tc.Host)
 		ghPrClientDetails := &GhPrClientDetails{Owner: tc.Owner, Repo: tc.Repo}
 		blameURLPrefix := ghPrClientDetails.getBlameURLPrefix()
 		assert.Equal(t, tc.ExpectURL, blameURLPrefix)

@@ -592,7 +592,7 @@ func getDecodedSecret(t *testing.T, c typedcorev1.CoreV1Interface, namespace, na
 func createNamespace(t *testing.T, c typedcorev1.NamespaceInterface, name string) {
 	t.Helper()
 	var ns corev1.Namespace
-	ns.ObjectMeta.Name = name
+	ns.Name = name
 	_, err := c.Create(t.Context(), &ns, metav1.CreateOptions{})
 	checkErr(t, err)
 }
@@ -692,9 +692,7 @@ func portForward(t *testing.T, clientConfig *rest.Config, namespace, podName str
 	go func(ctx context.Context) {
 		defer wg.Done()
 		//nolint:gosimple // TBD how to handle this
-		select {
-		case <-ctx.Done():
-		}
+		<-ctx.Done()
 		t.Log("Stopping portforward")
 		close(stopChannel)
 	}(t.Context())
