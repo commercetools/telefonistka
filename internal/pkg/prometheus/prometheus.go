@@ -139,7 +139,7 @@ func InstrumentGhCall(resp *github.Response) prometheus.Labels {
 		"api_path":  apiPath,
 		"repo_slug": repoSlug,
 		"method":    resp.Request.Method,
-		"status":    strconv.Itoa(resp.Response.StatusCode),
+		"status":    strconv.Itoa(resp.StatusCode),
 	}
 
 	rateLimitLables := prometheus.Labels{

@@ -592,7 +592,7 @@ func getDecodedSecret(t *testing.T, c typedcorev1.CoreV1Interface, namespace, na
 func createNamespace(t *testing.T, c typedcorev1.NamespaceInterface, name string) {
 	t.Helper()
 	var ns corev1.Namespace
-	ns.ObjectMeta.Name = name
+	ns.Name = name
 	_, err := c.Create(t.Context(), &ns, metav1.CreateOptions{})
 	checkErr(t, err)
 }
