@@ -187,8 +187,8 @@ func TestIsSyncFromBranchAllowedForThisPath(t *testing.T) {
 	}
 }
 
+//nolint:tparallel
 func TestGenerateArgoCdDiffComments(t *testing.T) {
-	t.Parallel()
 	tests := map[string]struct {
 		diffCommentDataTestDataFileName string
 		expectedNumberOfComments        int
@@ -380,8 +380,8 @@ func TestPrBodyMultiComponent(t *testing.T) {
 	assert.Equal(t, string(expectedPrBody), newPrBody)
 }
 
+//nolint:paralleltest
 func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		Host      string
 		Owner     string
