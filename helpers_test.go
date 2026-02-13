@@ -692,9 +692,7 @@ func portForward(t *testing.T, clientConfig *rest.Config, namespace, podName str
 	go func(ctx context.Context) {
 		defer wg.Done()
 		//nolint:gosimple // TBD how to handle this
-		select {
-		case <-ctx.Done():
-		}
+		<-ctx.Done()
 		t.Log("Stopping portforward")
 		close(stopChannel)
 	}(t.Context())

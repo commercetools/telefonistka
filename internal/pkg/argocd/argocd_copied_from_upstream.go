@@ -52,7 +52,7 @@ func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructu
 	}
 	localObs, _, err := controller.DeduplicateTargetObjects(appNamespace, localObs, &resourceInfoProvider{namespacedByGk: namespacedByGk})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to DeDuplicate target objects: %v", err)
+		return nil, fmt.Errorf("failed to DeDuplicate target objects: %v", err)
 	}
 	objByKey := make(map[kube.ResourceKey]*unstructured.Unstructured)
 	for i := range localObs {
@@ -72,7 +72,7 @@ func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[
 		live := &unstructured.Unstructured{}
 		err := json.Unmarshal([]byte(res.NormalizedLiveState), &live)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to unmarshal live object(%v): %v", res.Name, err)
+			return nil, fmt.Errorf("failed to unmarshal live object(%v): %v", res.Name, err)
 		}
 
 		key := kube.ResourceKey{Name: res.Name, Namespace: res.Namespace, Group: res.Group, Kind: res.Kind}
@@ -85,7 +85,7 @@ func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[
 			if local != nil && !kube.IsCRD(local) {
 				err = resourceTracking.SetAppInstance(local, argoSettings.AppLabelKey, appName, namespace, argoappv1.TrackingMethod(argoSettings.GetTrackingMethod()), argoSettings.GetInstallationID())
 				if err != nil {
-					return nil, fmt.Errorf("Failed to set app instance label: %v", err)
+					return nil, fmt.Errorf("failed to set app instance label: %v", err)
 				}
 			}
 
