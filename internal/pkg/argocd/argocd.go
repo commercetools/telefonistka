@@ -540,10 +540,24 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 				slog.Error("Error creating temporary app object", "err", err)
 				componentDiffResult.DiffError = err
 				return componentDiffResult
-			} else {
-				slog.Debug("Created temporary app object", "app", app.Name)
-				componentDiffResult.AppWasTemporarilyCreated = true
 			}
+			slog.Debug("Created temporary app object", "app", app.Name)
+			componentDiffResult.AppWasTemporarilyCreated = true
+
+			// Guarantee cleanup regardless of how this function exits.
+			// Use a context detached from the parent so the delete
+			// succeeds even if the caller's context was cancelled.
+			cleanupCtx := context.WithoutCancel(ctx)
+			defer func() {
+				if _, delErr := ac.app.Delete(cleanupCtx, &application.ApplicationDeleteRequest{
+					Name:         &app.Name,
+					AppNamespace: &app.Namespace,
+				}); delErr != nil {
+					slog.Error("Failed to delete temporary app", "app", app.Name, "err", delErr)
+				} else {
+					slog.Debug("Deleted temporary app object", "app", app.Name)
+				}
+			}()
 		} else {
 			componentDiffResult.DiffError = fmt.Errorf("no ArgoCD application found for component path %s(repo %s)", componentPath, repo)
 			return
@@ -613,19 +627,6 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 
 	slog.Debug("Generating diff for component", "component_path", componentPath)
 	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption)
-
-	// only delete the temprorary app object if it was created and there was no error on diff
-	// otherwise let's keep it for investigation
-	if componentDiffResult.AppWasTemporarilyCreated && componentDiffResult.DiffError == nil {
-		// Delete the temporary app object
-		_, err = ac.app.Delete(ctx, &application.ApplicationDeleteRequest{Name: &app.Name, AppNamespace: &app.Namespace})
-		if err != nil {
-			slog.Error("Error deleting temporary app object", "err", err)
-			componentDiffResult.DiffError = err
-		} else {
-			slog.Debug("Deleted temporary app object", "app", app.Name)
-		}
-	}
 
 	return componentDiffResult
 }

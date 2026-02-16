@@ -365,6 +365,122 @@ func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 	}
 }
 
+func TestTempAppDeletedOnDiffError(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+
+	mockAppClient := mocks.NewMockApplicationServiceClient(ctrl)
+	mockAppSetClient := mocks.NewMockApplicationSetServiceClient(ctrl)
+
+	ac := argoCdClients{
+		app:    mockAppClient,
+		appSet: mockAppSetClient,
+	}
+
+	componentPath := "clusters/test/app"
+	repo := "test-repo"
+	prBranch := "feature-branch"
+
+	// 1. No existing app — List returns empty.
+	mockAppClient.EXPECT().
+		List(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&argoappv1.ApplicationList{}, nil)
+
+	// 2. AppSet matches component path via Git generator.
+	mockAppSetClient.EXPECT().
+		List(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(&argoappv1.ApplicationSetList{
+			Items: []argoappv1.ApplicationSet{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-appset"},
+					Spec: argoappv1.ApplicationSetSpec{
+						GoTemplate: true,
+						Generators: []argoappv1.ApplicationSetGenerator{
+							{
+								Git: &argoappv1.GitGenerator{
+									RepoURL: repo,
+									Directories: []argoappv1.GitDirectoryGeneratorItem{
+										{Path: "clusters/test/*"},
+									},
+								},
+							},
+						},
+						Template: argoappv1.ApplicationSetTemplate{
+							ApplicationSetTemplateMeta: argoappv1.ApplicationSetTemplateMeta{
+								Name: "{{.path.basename}}",
+							},
+							Spec: argoappv1.ApplicationSpec{
+								Source: &argoappv1.ApplicationSource{
+									RepoURL:        repo,
+									Path:           "{{.path.path}}",
+									TargetRevision: "main",
+								},
+								SyncPolicy: &argoappv1.SyncPolicy{
+									Automated: &argoappv1.SyncPolicyAutomated{},
+								},
+								Destination: argoappv1.ApplicationDestination{
+									Server:    "https://kubernetes.default.svc",
+									Namespace: "default",
+								},
+								Project: "default",
+							},
+						},
+					},
+				},
+			},
+		}, nil)
+
+	tempApp := &argoappv1.Application{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "temp-app",
+			Namespace: "argocd",
+		},
+		Spec: argoappv1.ApplicationSpec{
+			Source: &argoappv1.ApplicationSource{
+				TargetRevision: prBranch,
+			},
+			SyncPolicy: &argoappv1.SyncPolicy{},
+			Project:     "default",
+		},
+		Status: argoappv1.ApplicationStatus{
+			Health: argoappv1.HealthStatus{Status: "Unknown"},
+			Sync:   argoappv1.SyncStatus{Status: "Unknown"},
+		},
+	}
+
+	// 3. Create succeeds.
+	mockAppClient.EXPECT().
+		Create(gomock.Any(), gomock.Any()).
+		Return(tempApp, nil)
+
+	// 4. ManagedResources fails — simulating a mid-flight error.
+	managedResourcesErr := fmt.Errorf("connection refused")
+	mockAppClient.EXPECT().
+		ManagedResources(gomock.Any(), gomock.Any()).
+		Return(nil, managedResourcesErr)
+
+	// 5. Delete MUST be called despite the error above.
+	mockAppClient.EXPECT().
+		Delete(gomock.Any(), gomock.Any()).
+		Return(&application.ApplicationResponse{}, nil)
+
+	result := generateDiffOfAComponent(
+		context.Background(),
+		false,
+		componentPath,
+		prBranch,
+		repo,
+		ac,
+		&settings.Settings{URL: "https://argocd.test"},
+		true,  // useSHALabelForArgoDicovery
+		true,  // createTempAppObjectFromNewApps
+	)
+
+	assert.True(t, result.AppWasTemporarilyCreated, "expected temp app to be flagged as created")
+	assert.ErrorContains(t, result.DiffError, "connection refused", "expected ManagedResources error to propagate")
+	// gomock will fail the test if Delete was not called
+}
+
 func TestFetchArgoDiffConcurrently(t *testing.T) {
 	t.Parallel()
 	// MockApplicationServiceClient

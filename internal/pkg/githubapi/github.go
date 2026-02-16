@@ -283,7 +283,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 			md.Cautionf("%s (%s) ", markdown.Bold("Error getting diff from ArgoCD"), markdown.Code(appDiffResult.ComponentPath))
 			md.PlainTextf("Please check the App Conditions of %s %s for more details.", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)))
 			if appDiffResult.AppWasTemporarilyCreated {
-				md.Warning("For investigation we kept the temporary application, please make sure to clean it up later!")
+				md.Note("A temporary ArgoCD application was created for this diff and has been cleaned up.")
 			}
 			md.CodeBlocks(markdown.SyntaxHighlightNone, appDiffResult.DiffError.Error())
 		} else {
