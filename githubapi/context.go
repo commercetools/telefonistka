@@ -42,8 +42,8 @@ func NewGithubEndpoints(host string) GithubEndpoints {
 
 // EventConfig holds all externally-resolved configuration for event handling.
 type EventConfig struct {
-	MainClientCache     *lru.Cache[string, GhClientPair]
-	ApproverClientCache *lru.Cache[string, GhClientPair]
+	MainClientCache     *lru.Cache[string, GhClient]
+	ApproverClientCache *lru.Cache[string, GhClient]
 	MainClient          ClientConfig
 	ApproverClient      ClientConfig
 	Endpoints           GithubEndpoints

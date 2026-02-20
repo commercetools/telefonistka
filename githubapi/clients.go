@@ -14,7 +14,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-type GhClientPair struct {
+type GhClient struct {
 	v3Client *github.Client
 	v4Client *githubv4.Client
 }
@@ -55,15 +55,15 @@ func getAppInstallationId(ctx context.Context, keyPath string, appID int64, rest
 
 // newAppClientPair creates a REST+GraphQL client pair using GitHub App auth.
 // A single ghinstallation transport is shared by both clients.
-func newAppClientPair(ctx context.Context, appID int64, keyPath string, endpoints GithubEndpoints, owner string) (GhClientPair, error) {
+func newAppClientPair(ctx context.Context, appID int64, keyPath string, endpoints GithubEndpoints, owner string) (GhClient, error) {
 	installID, err := getAppInstallationId(ctx, keyPath, appID, endpoints.RestURL, owner)
 	if err != nil {
-		return GhClientPair{}, fmt.Errorf("getting app installation ID for owner %s: %w", owner, err)
+		return GhClient{}, fmt.Errorf("getting app installation ID for owner %s: %w", owner, err)
 	}
 
 	itr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport, appID, installID, keyPath)
 	if err != nil {
-		return GhClientPair{}, fmt.Errorf("loading installation key: %w", err)
+		return GhClient{}, fmt.Errorf("loading installation key: %w", err)
 	}
 	if endpoints.RestURL != "" {
 		itr.BaseURL = endpoints.RestURL
@@ -75,7 +75,7 @@ func newAppClientPair(ctx context.Context, appID int64, keyPath string, endpoint
 	if endpoints.RestURL != "" {
 		v3, err = v3.WithEnterpriseURLs(endpoints.RestURL, endpoints.RestURL)
 		if err != nil {
-			return GhClientPair{}, fmt.Errorf("configuring enterprise REST URL: %w", err)
+			return GhClient{}, fmt.Errorf("configuring enterprise REST URL: %w", err)
 		}
 	}
 
@@ -86,11 +86,11 @@ func newAppClientPair(ctx context.Context, appID int64, keyPath string, endpoint
 		v4 = githubv4.NewClient(httpClient)
 	}
 
-	return GhClientPair{v3Client: v3, v4Client: v4}, nil
+	return GhClient{v3Client: v3, v4Client: v4}, nil
 }
 
 // newTokenClientPair creates a REST+GraphQL client pair using an OAuth token.
-func newTokenClientPair(ctx context.Context, token string, endpoints GithubEndpoints) GhClientPair {
+func newTokenClientPair(ctx context.Context, token string, endpoints GithubEndpoints) GhClient {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	httpClient := oauth2.NewClient(ctx, ts)
 
@@ -106,12 +106,12 @@ func newTokenClientPair(ctx context.Context, token string, endpoints GithubEndpo
 		v4 = githubv4.NewClient(httpClient)
 	}
 
-	return GhClientPair{v3Client: v3, v4Client: v4}
+	return GhClient{v3Client: v3, v4Client: v4}
 }
 
 // GetOrCreateClient retrieves a cached client pair or creates one.
 // App-auth clients are cached per owner; token-auth clients are cached globally.
-func GetOrCreateClient(ctx context.Context, cache *lru.Cache[string, GhClientPair], creds ClientConfig, endpoints GithubEndpoints, owner string) (GhClientPair, error) {
+func GetOrCreateClient(ctx context.Context, cache *lru.Cache[string, GhClient], creds ClientConfig, endpoints GithubEndpoints, owner string) (GhClient, error) {
 	key := owner
 	if creds.AppID == 0 {
 		key = "global"
@@ -126,14 +126,14 @@ func GetOrCreateClient(ctx context.Context, cache *lru.Cache[string, GhClientPai
 	if creds.AppID != 0 {
 		pair, err := newAppClientPair(ctx, creds.AppID, creds.AppKeyPath, endpoints, owner)
 		if err != nil {
-			return GhClientPair{}, err
+			return GhClient{}, err
 		}
 		cache.Add(key, pair)
 		return pair, nil
 	}
 
 	if creds.OAuthToken == "" {
-		return GhClientPair{}, fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
+		return GhClient{}, fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
 	}
 	pair := newTokenClientPair(ctx, creds.OAuthToken, endpoints)
 	cache.Add(key, pair)

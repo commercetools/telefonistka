@@ -32,8 +32,8 @@ func init() { //nolint:gochecknoinits
 }
 
 func event(eventType string, eventFilePath string) {
-	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
-	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
+	mainGhClientCache, _ := lru.New[string, githubapi.GhClient](128)
+	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClient](128)
 
 	cfg := githubapi.EventConfig{
 		MainClientCache:     mainGhClientCache,

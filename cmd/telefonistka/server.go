@@ -64,8 +64,8 @@ func handleWebhook(cfg githubapi.EventConfig) func(http.ResponseWriter, *http.Re
 }
 
 func serve() {
-	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
-	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
+	mainGhClientCache, _ := lru.New[string, githubapi.GhClient](128)
+	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClient](128)
 
 	cfg := githubapi.EventConfig{
 		MainClientCache:     mainGhClientCache,

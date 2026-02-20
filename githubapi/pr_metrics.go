@@ -15,14 +15,14 @@ const (
 	metricRefreshTime = 60 * time.Second
 )
 
-func MainGhMetricsLoop(mainGhClientCache *lru.Cache[string, GhClientPair]) {
+func MainGhMetricsLoop(mainGhClientCache *lru.Cache[string, GhClient]) {
 	for t := range time.Tick(metricRefreshTime) {
 		slog.Debug("Updating pr metrics", "tick", t)
 		getPrMetrics(mainGhClientCache)
 	}
 }
 
-func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.Repository) (pc prom.PrCounters, err error) {
+func getRepoPrMetrics(ctx context.Context, ghClient GhClient, repo *github.Repository) (pc prom.PrCounters, err error) {
 	slog.Debug("Checking repo", "repo", repo.GetName())
 	ghOwner := repo.GetOwner().GetLogin()
 	prListOpts := &github.PullRequestListOptions{
@@ -84,7 +84,7 @@ func isPrStalePending(commitStatuses *github.CombinedStatus, timeToDefineStale t
 // getPrMetrics iterates through all clients , gets all repos and then all PRs and calculates metrics
 // getPrMetrics assumes Telefonistka uses a GitHub App style of authentication as it uses the Apps.ListRepos call
 // When using  personal access token authentication, Telefonistka is unaware of the "relevant" repos (at least it get a webhook from them).
-func getPrMetrics(mainGhClientCache *lru.Cache[string, GhClientPair]) {
+func getPrMetrics(mainGhClientCache *lru.Cache[string, GhClient]) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
 	for _, ghOwner := range mainGhClientCache.Keys() {
