@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"slices"
-	"sort"
 	"strings"
 )
 
@@ -40,7 +39,7 @@ func generatePromotionPrBody(ctx context.Context, c Context, components string, 
 	for k := range newPrMetadata.PreviousPromotionMetadata {
 		keys = append(keys, k)
 	}
-	sort.Ints(keys)
+	slices.Sort(keys)
 
 	newPrBody = prBody(keys, newPrMetadata, newPrBody, promotionSkipPaths)
 
@@ -103,7 +102,7 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string, promotionSki
 		sp = newPrMetadata.PreviousPromotionMetadata[k].SourcePath
 		x := filterSkipPaths(newPrMetadata.PreviousPromotionMetadata[k].TargetPaths, promotionSkipPaths)
 		// sort the paths so that we have a predictable order for tests and better readability for users
-		sort.Strings(x)
+		slices.Sort(x)
 		tp = strings.Join(x, fmt.Sprintf("`  \n%s`", strings.Repeat(mkTab, i+1)))
 		newPrBody = newPrBody + fmt.Sprintf("%s↘️  #%d  `%s` ➡️  \n%s`%s`  \n", strings.Repeat(mkTab, i), k, sp, strings.Repeat(mkTab, i+1), tp)
 	}

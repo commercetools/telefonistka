@@ -5,7 +5,7 @@ package githubapi
 // @Author
 // @Update
 import (
-	"sort"
+	"slices"
 	"testing"
 
 	cfg "github.com/commercetools/telefonistka/configuration"
@@ -44,8 +44,8 @@ func TestGenerateListOfEndpoints(t *testing.T) {
 		"https://ingress-b-sdeprod-dsm1-c1.example.com/webhook",
 	}
 
-	sort.Strings(endpoints)
-	sort.Strings(expectedEndpoints)
+	slices.Sort(endpoints)
+	slices.Sort(expectedEndpoints)
 	if diff := deep.Equal(endpoints, expectedEndpoints); diff != nil {
 		t.Error(diff)
 	}
@@ -80,8 +80,8 @@ func TestGenerateListOfChangedFiles(t *testing.T) {
 		"clusters/sdeprod/dsm1/c1/csi-verify/values/global.yaml",
 	}
 
-	sort.Strings(listOfFiles)
-	sort.Strings(expectedListOfFiles)
+	slices.Sort(listOfFiles)
+	slices.Sort(expectedListOfFiles)
 
 	if diff := deep.Equal(listOfFiles, expectedListOfFiles); diff != nil {
 		t.Error(diff)

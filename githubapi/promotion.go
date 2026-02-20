@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 
 	cfg "github.com/commercetools/telefonistka/configuration"
@@ -122,7 +121,7 @@ func componentFromFile(promotionPath cfg.PromotionPath, filename string) (releva
 
 func normalizedTargetPaths(targetPaths []string) []string {
 	clone := slices.Clone(targetPaths)
-	sort.Strings(clone)
+	slices.Sort(clone)
 	return clone
 }
 
