@@ -47,42 +47,35 @@ func setCommitStatus(_ context.Context, c Context, state string) {
 }
 
 func (p *Context) toggleCommitStatus(ctx context.Context, context string, user string) error {
-	var r error
-	listOpts := &github.ListOptions{}
-
-	initialStatuses, resp, err := p.Repositories.ListStatuses(ctx, p.Owner, p.Repo, p.Ref, listOpts)
+	initialStatuses, resp, err := p.Repositories.ListStatuses(ctx, p.Owner, p.Repo, p.Ref, &github.ListOptions{})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
-		p.PrLogger.Error("Failed to fetch  existing statuses for commit", "commit", p.Ref, "err", err)
-		r = err
+		p.PrLogger.Error("Failed to fetch existing statuses for commit", "commit", p.Ref, "err", err)
+		return err
 	}
 
 	for _, commitStatus := range initialStatuses {
-		if commitStatus.GetContext() == context {
-			if commitStatus.GetState() != "success" {
-				p.PrLogger.Info("User toggled state to success", "user", user, "context", context, "state", commitStatus.GetState())
-				commitStatus.State = github.String("success")
-				_, resp, err := p.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
-				prom.InstrumentGhCall(resp)
-				if err != nil {
-					p.PrLogger.Error("Failed to create context", "context", context, "err", err)
-					r = err
-				}
-			} else {
-				p.PrLogger.Info("User toggled state to failure", "user", user, "context", context, "state", commitStatus.GetState())
-				commitStatus.State = github.String("failure")
-				_, resp, err := p.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
-				prom.InstrumentGhCall(resp)
-				if err != nil {
-					p.PrLogger.Error("Failed to create context", "context", context, "err", err)
-					r = err
-				}
-			}
-			break
+		if commitStatus.GetContext() != context {
+			continue
 		}
+
+		newState := "success"
+		if commitStatus.GetState() == "success" {
+			newState = "failure"
+		}
+		p.PrLogger.Info("User toggled state", "user", user, "context", context, "from", commitStatus.GetState(), "to", newState)
+		commitStatus.State = github.String(newState)
+
+		_, resp, err := p.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
+		prom.InstrumentGhCall(resp)
+		if err != nil {
+			p.PrLogger.Error("Failed to create context", "context", context, "err", err)
+			return err
+		}
+		break
 	}
 
-	return r
+	return nil
 }
 
 // commitStatusTargetURL generates a target URL based on an optional
