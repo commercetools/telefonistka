@@ -203,7 +203,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 	for i, singleComponentDiff := range diffCommentData.DiffOfChangedComponents {
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
-		commentBody, err := buildArgoCdDiffComment(diffCommentData, false, i+1, totalComponents)
+		commentBody, err := buildArgoCdDiffComment(componentTemplateData, false, i+1, totalComponents)
 		if err != nil {
 			slog.Error("Failed to build ArgoCD diff comment", "err", err)
 			return comments, err
@@ -217,7 +217,7 @@ func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMa
 		}
 
 		// now we don't have much choice, this is the saddest path, we'll use the concise template
-		commentBody, err = buildArgoCdDiffComment(diffCommentData, true, i+1, totalComponents)
+		commentBody, err = buildArgoCdDiffComment(componentTemplateData, true, i+1, totalComponents)
 		if err != nil {
 			slog.Error("Failed to build ArgoCD diff comment", "err", err)
 			return comments, err
