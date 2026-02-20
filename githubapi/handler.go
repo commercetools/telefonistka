@@ -272,12 +272,12 @@ func handleChangedPREvent(ctx context.Context, c Context) error {
 	return nil
 }
 
-// handleMergedPrEvent
+// handleMergedPrEvent processes a PR that has been merged, generating promotions and opening new PRs for each.
 func handleMergedPrEvent(ctx context.Context, c Context) error {
 	var err error
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
-	// If we'l ever want to generate this plan on an unmerged PR the PR branch (c.Ref) should be used
+	// If we'll ever want to generate this plan on an unmerged PR the PR branch (c.Ref) should be used
 	promotions, err := generatePromotionPlan(ctx, c, c.DefaultBranch)
 	if err != nil {
 		return fmt.Errorf("generating promotion plan: %w", err)
@@ -413,13 +413,13 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 		}
 	}
 
-	// I should probably deprecated this whole part altogether - it was designed to solve a *very* specific problem that is probably no longer relevant with GitHub Rulesets
-	// The only reason I'm keeping it is that I don't have a clear feature depreciation policy and if I do remove it should be in a distinct PR
+	// I should probably deprecate this whole part altogether - it was designed to solve a *very* specific problem that is probably no longer relevant with GitHub Rulesets
+	// The only reason I'm keeping it is that I don't have a clear feature deprecation policy and if I do remove it should be in a distinct PR
 	for commentSubstring, commitStatusContext := range c.Config.ToggleCommitStatus {
 		if strings.Contains(ce.GetComment().GetBody(), "/"+commentSubstring) {
 			err := c.toggleCommitStatus(ctx, commitStatusContext, ce.GetSender().GetName())
 			if err != nil {
-				c.PrLogger.Error("Failed to toggle s context", "context", commitStatusContext, "err", err)
+				c.PrLogger.Error("Failed to toggle commit status context", "context", commitStatusContext, "err", err)
 				return err
 			}
 			c.PrLogger.Info("Toggled status", "context", commitStatusContext)

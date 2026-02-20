@@ -65,7 +65,7 @@ func getRepoPrMetrics(ctx context.Context, ghClient GhClientPair, repo *github.R
 	return
 }
 
-// isPrStalePending checks if the a combinedStatus has a "telefonistka" context pending status that is older than timeToDefineStale and is in pending state
+// isPrStalePending checks if a CombinedStatus has a "telefonistka" context pending status that is older than timeToDefineStale.
 func isPrStalePending(commitStatuses *github.CombinedStatus, timeToDefineStale time.Duration) bool {
 	for _, status := range commitStatuses.Statuses {
 		if *status.Context == "telefonistka" &&
@@ -82,7 +82,7 @@ func isPrStalePending(commitStatuses *github.CombinedStatus, timeToDefineStale t
 }
 
 // getPrMetrics iterates through all clients , gets all repos and then all PRs and calculates metrics
-// getPrMetrics assumes Telefonsitka uses a GitHub App style of authentication as it uses the Apps.ListRepos call
+// getPrMetrics assumes Telefonistka uses a GitHub App style of authentication as it uses the Apps.ListRepos call
 // When using  personal access token authentication, Telefonistka is unaware of the "relevant" repos (at least it get a webhook from them).
 func getPrMetrics(mainGhClientCache *lru.Cache[string, GhClientPair]) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)

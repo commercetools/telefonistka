@@ -25,13 +25,13 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 	}
 	c.PrLogger.Info("PR opened")
 
-	prLables, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, *pull.Number, []string{"promotion"})
+	prLabels, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, *pull.Number, []string{"promotion"})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
 		return pull, err
 	}
-	c.PrLogger.Debug("PR labeled", "labels", prLables)
+	c.PrLogger.Debug("PR labeled", "labels", prLabels)
 
 	_, resp, err = c.Issues.AddAssignees(ctx, c.Owner, c.Repo, *pull.Number, []string{assignee})
 	prom.InstrumentGhCall(resp)

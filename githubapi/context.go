@@ -84,7 +84,7 @@ func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
 			c.PrLogger.Info("Found PR metadata")
 			err := c.PrMetadata.deserialize(serializedPrMetadata[1])
 			if err != nil {
-				c.PrLogger.Error("Fail to parser PR metadata", "err", err)
+				c.PrLogger.Error("Failed to parse PR metadata", "err", err)
 			}
 		}
 	}

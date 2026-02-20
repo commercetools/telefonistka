@@ -64,7 +64,7 @@ func generateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*githu
 }
 
 func generateDeletionTreeEntries(ctx context.Context, c *Context, path string, branch string, treeEntries *[]*github.TreeEntry) error {
-	// GH tree API doesn't allow deletion a whole dir, so this recursive function traverse the whole tree
+	// GH tree API doesn't allow deleting a whole directory, so this recursive function traverses the whole tree
 	// and create a tree entry array that would delete all the files in that path
 	getContentOpts := &github.RepositoryContentGetOptions{
 		Ref: branch,
@@ -112,7 +112,7 @@ func getDirectoryGitObjectSHA(ctx context.Context, c Context, dirPath string, br
 	if err != nil && resp.StatusCode != 404 {
 		c.PrLogger.Error("Could not fetch source directory SHA", "err", err, "resp", resp)
 		return "", err
-	} else if err == nil { // scaning the parent dir
+	} else if err == nil { // scanning the parent dir
 		for _, dirElement := range directoryContent {
 			if dirElement.GetPath() == dirPath {
 				directoryGitObjectSHA = dirElement.GetSHA()
@@ -188,8 +188,8 @@ func createBranch(ctx context.Context, c Context, commit *github.Commit, newBran
 	return newBranchRef, err
 }
 
-// Creating a unique branch name based on the PR number, PR ref and the promotion target paths
-// Max length of branch name is 250 characters
+// generateSafePromotionBranchName creates a unique branch name based on the PR number, PR ref and the promotion
+// target paths. Max length of branch name is 250 characters.
 func generateSafePromotionBranchName(ctx context.Context, prNumber int, originalBranchName string, targetPaths []string) string {
 	targetPathsBa := []byte(strings.Join(targetPaths, "_"))
 	hasher := sha1.New() //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case

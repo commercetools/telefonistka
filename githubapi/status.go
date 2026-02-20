@@ -15,7 +15,6 @@ import (
 )
 
 func setCommitStatus(_ context.Context, c Context, state string) {
-	// TODO change all these values
 	tcontext := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
 	description := "Telefonistka GitOps Bot"

@@ -255,7 +255,7 @@ func getComponentConfig(ctx context.Context, c Context, componentPath string, br
 	return componentConfig, nil
 }
 
-// This function generates a list of "components" that where changed in the PR and are relevant for promotion)
+// generateListOfRelevantComponents returns the set of components that were changed in the PR and are relevant for promotion.
 func generateListOfRelevantComponents(ctx context.Context, c Context) (relevantComponents map[relevantComponent]struct{}, err error) {
 	relevantComponents = make(map[relevantComponent]struct{})
 
@@ -302,7 +302,7 @@ type relevantComponent struct {
 }
 
 func generateListOfChangedComponentPaths(ctx context.Context, c Context) (changedComponentPaths []string, err error) {
-	// If the PR has a list of promoted paths in the PR Telefonistika metadata(=is a promotion PR), we use that
+	// If the PR has a list of promoted paths in the PR Telefonistka metadata (= is a promotion PR), we use that
 	if len(c.PrMetadata.PromotedPaths) > 0 {
 		changedComponentPaths = c.PrMetadata.PromotedPaths
 		return changedComponentPaths, nil
@@ -319,7 +319,7 @@ func generateListOfChangedComponentPaths(ctx context.Context, c Context) (change
 	return changedComponentPaths, nil
 }
 
-// This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
+// generatePlanBasedOnChangedComponent builds a promotion plan from the relevant components that were changed and the in-repo telefonistka configuration.
 func generatePlanBasedOnChangedComponent(ctx context.Context, c Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]promotionInstance, err error) {
 	promotions = make(map[string]promotionInstance)
 	for component := range relevantComponents {
@@ -338,7 +338,7 @@ func generatePlanBasedOnChangedComponent(ctx context.Context, c Context, relevan
 }
 
 func generatePromotionPlan(ctx context.Context, c Context, configBranch string) (map[string]promotionInstance, error) {
-	c.PrLogger.Debug("Generating promotion plan plan")
+	c.PrLogger.Debug("Generating promotion plan")
 	// TODO refactor tests to use the two functions below instead of this one
 	relevantComponents, err := generateListOfRelevantComponents(ctx, c)
 	if err != nil {

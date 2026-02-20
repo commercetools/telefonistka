@@ -19,7 +19,7 @@ func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[stri
 	var filesWithDiff []string
 	diffOutput.WriteString("\n```diff\n")
 
-	// staring with collecting files with different content and file only present in the source dir
+	// starting with collecting files with different content and files only present in the source dir
 	for filename, sha := range sourceFilesSHAs {
 		c.PrLogger.Debug("Looking at file", "file", filename)
 		targetPathfileSha, found := targetFilesSHAs[filename]
@@ -34,7 +34,7 @@ func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[stri
 			continue
 		}
 
-		c.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
+		c.PrLogger.Debug("Source is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
 		hasDiff = true
 		sourceFileContent, _ := getFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
 		targetFileContent, _ := getFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
@@ -77,7 +77,7 @@ func compareRepoDirectories(ctx context.Context, c Context, sourcePath string, t
 	}
 	targetPathGitObjectSha, err := getDirectoryGitObjectSHA(ctx, c, targetPath, defaultBranch)
 	if err != nil {
-		c.PrLogger.Error("Couldn't get targetv, Git object sha", "target", targetPath, "err", err)
+		c.PrLogger.Error("Couldn't get target Git object SHA", "target", targetPath, "err", err)
 		return false, "", err
 	}
 

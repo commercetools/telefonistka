@@ -22,7 +22,7 @@ type diffCommentData struct {
 
 // shouldSyncBranchCheckBoxBeDisplayed checks if the sync branch checkbox should be displayed in the PR comment.
 // The checkbox should be displayed if:
-// - The component is allowed to be synced from a branch(based on Telefonsitka configuration)
+// - The component is allowed to be synced from a branch (based on Telefonistka configuration)
 // - The relevant app is not new, temporary app that was created just to generate the diff
 func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList []string, allowSyncfromBranchPathRegex string, diffOfChangedComponents []argocd.DiffResult) bool {
 	for _, componentPath := range componentPathList {
@@ -51,7 +51,7 @@ func commentDiff(ctx context.Context, c Context) error {
 		return fmt.Errorf("generate list of changed components: %w", err)
 	}
 
-	// Building a map component's path and a boolean value that indicates if we should diff it not.
+	// Building a map of component paths to a boolean indicating whether we should diff them.
 	// I'm avoiding doing this in the ArgoCD package to avoid circular dependencies and keep package scope clean
 	componentsToDiff := map[string]bool{}
 	for _, componentPath := range componentPathList {
@@ -77,12 +77,12 @@ func commentDiff(ctx context.Context, c Context) error {
 	c.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", c.Ref)
 	if !hasComponentDiffErrors && !hasComponentDiff {
 		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state")
-		prLables, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
+		prLabels, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
 		prom.InstrumentGhCall(resp)
 		if err != nil {
 			c.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
 		} else {
-			c.PrLogger.Debug("PR labeled", "labels", prLables)
+			c.PrLogger.Debug("PR labeled", "labels", prLabels)
 		}
 		// If the PR is a promotion PR and the diff is empty, we can auto-merge it
 		// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
@@ -115,7 +115,7 @@ func commentDiff(ctx context.Context, c Context) error {
 			}
 		}
 	} else {
-		c.PrLogger.Debug("Diff not find affected ArogCD apps")
+		c.PrLogger.Debug("Did not find affected ArgoCD apps")
 	}
 	return nil
 }
@@ -154,7 +154,7 @@ func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, par
 					md.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
 				}
 				if !appDiffResult.ArgoCdAppAutoSyncEnabled {
-					md.Note("This ArgoCD app is doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
+					md.Note("This ArgoCD app doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
 				}
 			}
 			if appDiffResult.HasDiff {

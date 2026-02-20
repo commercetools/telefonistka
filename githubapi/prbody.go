@@ -65,7 +65,7 @@ func getPromotionSkipPaths(promotion promotionInstance) map[string]bool {
 	}
 
 	// if we have one or more components then we are just going to
-	// user the component that has the fewest skipPaths when
+	// use the component that has the fewest skipPaths when
 	// generating the promotion prBody. This way the promotion
 	// body will error on the side of informing the user
 	// of more promotion paths, rather than leaving some out.

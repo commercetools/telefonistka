@@ -488,7 +488,7 @@ func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 			fmt.Sprintf("%s/commercetools/test/blame", githubPublicBaseURL),
 		},
 		{
-			"https://myserver.github.com",
+			"myserver.github.com",
 			"some-other-owner",
 			"some-other-repo",
 			"https://myserver.github.com/some-other-owner/some-other-repo/blame",
