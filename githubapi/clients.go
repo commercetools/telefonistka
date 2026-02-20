@@ -40,7 +40,7 @@ type GhClientPair struct {
 func getAppInstallationId(githubAppPrivateKeyPath string, githubAppId int64, githubRestAltURL string, ctx context.Context, owner string) (int64, error) {
 	atr, err := ghinstallation.NewAppsTransportKeyFromFile(http.DefaultTransport, githubAppId, githubAppPrivateKeyPath)
 	if err != nil {
-		panic(err)
+		return 0, fmt.Errorf("loading app private key: %w", err)
 	}
 	tempClient := github.NewClient(
 		&http.Client{
@@ -51,15 +51,13 @@ func getAppInstallationId(githubAppPrivateKeyPath string, githubAppId int64, git
 	if githubRestAltURL != "" {
 		tempClient, err = tempClient.WithEnterpriseURLs(githubRestAltURL, githubRestAltURL)
 		if err != nil {
-			slog.Error("failed to create git client for app", "err", err)
-			os.Exit(1)
+			return 0, fmt.Errorf("configuring enterprise URL: %w", err)
 		}
 	}
 
 	installations, _, err := tempClient.Apps.ListInstallations(ctx, &github.ListOptions{})
 	if err != nil {
-		slog.Error("failed to list installations", "err", err)
-		os.Exit(1)
+		return 0, fmt.Errorf("listing installations: %w", err)
 	}
 
 	var installID int64
