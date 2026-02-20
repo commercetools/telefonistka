@@ -104,7 +104,7 @@ func (p Context) commentOnPr(ctx context.Context, commentBody string) error {
 }
 
 func commentPlanInPR(ctx context.Context, c Context, promotions map[string]promotionInstance) {
-	templateOutput, err := executeTemplate("dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
+	templateOutput, err := executeTemplate(c.TemplatesFS, "dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
 	if err != nil {
 		c.PrLogger.Error("Failed to generate dry-run comment template", "err", err)
 		return

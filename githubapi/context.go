@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io/fs"
 	"log/slog"
 	"regexp"
 
 	"github.com/commercetools/telefonistka/configuration"
-"github.com/google/go-github/v62/github"
+	"github.com/google/go-github/v62/github"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -59,6 +60,9 @@ type Context struct {
 	Git          gitService         `json:"-"`
 	GraphQL      graphQLClient      `json:"-"`
 	ApproverPRs  pullRequestService `json:"-"`
+
+	TemplatesFS                fs.FS  `json:"-"`
+	CommitStatusURLTemplatePath string `json:"-"`
 
 	DefaultBranch string
 	Owner         string

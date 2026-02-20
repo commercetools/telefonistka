@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -18,7 +17,7 @@ func setCommitStatus(_ context.Context, c Context, state string) {
 	tcontext := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
 	description := "Telefonistka GitOps Bot"
-	tmplFile := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH")
+	tmplFile := c.CommitStatusURLTemplatePath
 
 	targetURL := commitStatusTargetURL(time.Now(), tmplFile)
 

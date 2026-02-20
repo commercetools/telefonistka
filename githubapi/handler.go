@@ -3,22 +3,33 @@ package githubapi
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
+	"maps"
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"maps"
-	"slices"
-
 	"github.com/commercetools/telefonistka/argocd"
 	prom "github.com/commercetools/telefonistka/prometheus"
+	"github.com/commercetools/telefonistka/templates"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
 )
+
+// resolveTemplatesFS returns an fs.FS for template lookups, using the
+// TEMPLATES_PATH environment variable as an override directory, or the
+// embedded templates as the default.
+func resolveTemplatesFS() fs.FS {
+	if p := os.Getenv("TEMPLATES_PATH"); p != "" {
+		return os.DirFS(p)
+	}
+	return templates.FS
+}
 
 // ReceiveWebhook validates the webhook payload and spawns a goroutine to handle the event.
 func ReceiveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
@@ -55,6 +66,8 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 	defer cancel()
 	var mainGithubClientPair GhClientPair
 	var approverGithubClientPair GhClientPair
+	tmplFS := resolveTemplatesFS()
+	commitStatusURLTmplPath := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH")
 
 	switch event := e.(type) {
 	case *github.PushEvent:
@@ -67,10 +80,12 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 		}
 
 		c := Context{
-			Repositories: mainGithubClientPair.v3Client.Repositories,
-			Owner:        repoOwner,
-			Repo:         event.GetRepo().GetName(),
-			RepoURL:      event.GetRepo().GetHTMLURL(),
+			Repositories:                mainGithubClientPair.v3Client.Repositories,
+			TemplatesFS:                 tmplFS,
+			CommitStatusURLTemplatePath: commitStatusURLTmplPath,
+			Owner:                       repoOwner,
+			Repo:                        event.GetRepo().GetName(),
+			RepoURL:                     event.GetRepo().GetHTMLURL(),
 		}
 
 		prLogger := slog.Default().With(
@@ -111,15 +126,17 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 			GraphQL:      mainGithubClientPair.v4Client,
 			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
 
-			Labels:        event.GetPullRequest().Labels,
-			Owner:         repoOwner,
-			Repo:          event.GetRepo().GetName(),
-			RepoURL:       event.GetRepo().GetHTMLURL(),
-			PrNumber:      event.GetPullRequest().GetNumber(),
-			Ref:           event.GetPullRequest().GetHead().GetRef(),
-			PrAuthor:      event.GetPullRequest().GetUser().GetLogin(),
-			PrSHA:         event.GetPullRequest().GetHead().GetSHA(),
-			DefaultBranch: event.GetRepo().GetDefaultBranch(),
+			TemplatesFS:                 tmplFS,
+			CommitStatusURLTemplatePath: commitStatusURLTmplPath,
+			Labels:                      event.GetPullRequest().Labels,
+			Owner:                       repoOwner,
+			Repo:                        event.GetRepo().GetName(),
+			RepoURL:                     event.GetRepo().GetHTMLURL(),
+			PrNumber:                    event.GetPullRequest().GetNumber(),
+			Ref:                         event.GetPullRequest().GetHead().GetRef(),
+			PrAuthor:                    event.GetPullRequest().GetUser().GetLogin(),
+			PrSHA:                       event.GetPullRequest().GetHead().GetSHA(),
+			DefaultBranch:               event.GetRepo().GetDefaultBranch(),
 		}
 
 		prLogger := slog.Default().With(
@@ -180,13 +197,15 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 			GraphQL:      mainGithubClientPair.v4Client,
 			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
 
-			Owner:         repoOwner,
-			Repo:          event.GetRepo().GetName(),
-			RepoURL:       event.GetRepo().GetHTMLURL(),
-			PrNumber:      event.GetIssue().GetNumber(),
-			PrAuthor:      event.GetIssue().GetUser().GetLogin(),
-			Labels:        event.GetIssue().Labels,
-			DefaultBranch: event.GetRepo().GetDefaultBranch(),
+			TemplatesFS:                 tmplFS,
+			CommitStatusURLTemplatePath: commitStatusURLTmplPath,
+			Owner:                       repoOwner,
+			Repo:                        event.GetRepo().GetName(),
+			RepoURL:                     event.GetRepo().GetHTMLURL(),
+			PrNumber:                    event.GetIssue().GetNumber(),
+			PrAuthor:                    event.GetIssue().GetUser().GetLogin(),
+			Labels:                      event.GetIssue().Labels,
+			DefaultBranch:               event.GetRepo().GetDefaultBranch(),
 		}
 
 		prLogger := slog.Default().With(
@@ -364,7 +383,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 					"prNumber": pull.GetNumber(),
 				}
 
-				templateOutput, err := executeTemplate("autoMerge", "auto-merge-comment.gotmpl", templateData)
+				templateOutput, err := executeTemplate(c.TemplatesFS, "autoMerge", "auto-merge-comment.gotmpl", templateData)
 				if err != nil {
 					return err
 				}

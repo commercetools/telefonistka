@@ -217,7 +217,7 @@ func detectDrift(ctx context.Context, c Context) error {
 		}
 	}
 	if len(diffOutputMap) != 0 {
-		templateOutput, err := executeTemplate("driftMsg", "drift-pr-comment.gotmpl", diffOutputMap)
+		templateOutput, err := executeTemplate(c.TemplatesFS, "driftMsg", "drift-pr-comment.gotmpl", diffOutputMap)
 		if err != nil {
 			return err
 		}

@@ -5,25 +5,16 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"os"
 	"text/template"
 
 	cfg "github.com/commercetools/telefonistka/configuration"
-	"github.com/commercetools/telefonistka/templates"
 	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
 )
 
-func templatesFS() fs.FS {
-	if p := os.Getenv("TEMPLATES_PATH"); p != "" {
-		return os.DirFS(p)
-	}
-	return templates.FS
-}
-
-func executeTemplate(templateName string, templateFile string, data any) (string, error) {
+func executeTemplate(fsys fs.FS, templateName string, templateFile string, data any) (string, error) {
 	var buf bytes.Buffer
-	tmpl, err := template.New(templateName).ParseFS(templatesFS(), templateFile)
+	tmpl, err := template.New(templateName).ParseFS(fsys, templateFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
