@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/commercetools/telefonistka/argocd"
 	"github.com/commercetools/telefonistka/configuration"
+	"github.com/commercetools/telefonistka/templates"
 	cfg "github.com/commercetools/telefonistka/configuration"
 	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
@@ -646,7 +648,7 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 }
 
 func commentPlanInPR(ctx context.Context, c Context, promotions map[string]PromotionInstance) {
-	templateOutput, err := executeTemplate("dryRunMsg", defaultTemplatesFullPath("dry-run-pr-comment.gotmpl"), promotions)
+	templateOutput, err := executeTemplate("dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
 	if err != nil {
 		c.PrLogger.Error("Failed to generate dry-run comment template", "err", err)
 		return
@@ -654,23 +656,35 @@ func commentPlanInPR(ctx context.Context, c Context, promotions map[string]Promo
 	commentPR(ctx, c, templateOutput)
 }
 
-func executeTemplate(templateName string, templateFile string, data interface{}) (string, error) {
-	var templateOutput bytes.Buffer
+func templatesFS() fs.FS {
+	if p := os.Getenv("TEMPLATES_PATH"); p != "" {
+		return os.DirFS(p)
+	}
+	return templates.FS
+}
 
-	messageTemplate, err := template.New(templateName).ParseFiles(templateFile)
+func executeTemplate(templateName string, templateFile string, data any) (string, error) {
+	var buf bytes.Buffer
+	tmpl, err := template.New(templateName).ParseFS(templatesFS(), templateFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
-
-	if err := messageTemplate.ExecuteTemplate(&templateOutput, templateName, data); err != nil {
+	if err := tmpl.ExecuteTemplate(&buf, templateName, data); err != nil {
 		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
-
-	return templateOutput.String(), nil
+	return buf.String(), nil
 }
 
-func defaultTemplatesFullPath(templateFile string) string {
-	return filepath.Join(getEnv("TEMPLATES_PATH", "templates/") + templateFile)
+func executeTemplateFile(templateName string, templateFile string, data any) (string, error) {
+	var buf bytes.Buffer
+	tmpl, err := template.New(templateName).ParseFiles(templateFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+	if err := tmpl.ExecuteTemplate(&buf, templateName, data); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+	return buf.String(), nil
 }
 
 func commentPR(ctx context.Context, c Context, commentBody string) error {
@@ -755,7 +769,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 					"prNumber": pull.GetNumber(),
 				}
 
-				templateOutput, err := executeTemplate("autoMerge", defaultTemplatesFullPath("auto-merge-comment.gotmpl"), templateData)
+				templateOutput, err := executeTemplate("autoMerge", "auto-merge-comment.gotmpl", templateData)
 				if err != nil {
 					return err
 				}
@@ -1383,7 +1397,7 @@ func commitStatusTargetURL(commitTime time.Time, tmplFile string) string {
 	}{
 		CommitTime: commitTime,
 	}
-	renderedURL, err := executeTemplate(tmplName, tmplFile, p)
+	renderedURL, err := executeTemplateFile(tmplName, tmplFile, p)
 	if err != nil {
 		slog.Debug("Failed to render target URL template", "err", err)
 		return targetURL

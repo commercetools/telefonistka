@@ -89,7 +89,7 @@ Environment variables for the webhook process:
 
 `GITHUB_APP_ID` Application ID for Github applications style of deployments, available in the Github Application setting page.
 
-`TEMPLATES_PATH` Telefonistka uses Go templates to format GitHub PR comments, the variable override the default templates path("templates/"), useful for environments where the container workdir is overridden(like GitHub Actions) or when custom templates are desired.
+`TEMPLATES_PATH` Optional override that points to a directory of `.gotmpl` files on disk. When unset, built-in embedded templates are used. Useful when custom templates are desired.
 
 `CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH` allows you to set a custom [commit status](https://docs.github.com/en/rest/commits/statuses?apiVersion=2022-11-28#about-commit-statuses) target URL using Go templates. The commit time will be passed as a dynamic parameter to the template. Here is an example:
 
