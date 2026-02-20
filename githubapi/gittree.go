@@ -94,16 +94,6 @@ func generateDeletionTreeEntries(ctx context.Context, c *Context, path *string, 
 	return nil
 }
 
-func generateBumpTreeEntiesForCommit(treeEntries *[]*github.TreeEntry, c Context, defaultBranch string, filePath string, fileContent string) {
-	treeEntry := github.TreeEntry{
-		Path:    github.String(filePath),
-		Mode:    github.String("100644"),
-		Type:    github.String("blob"),
-		Content: github.String(fileContent),
-	}
-	*treeEntries = append(*treeEntries, &treeEntry)
-}
-
 func getDirectoryGitObjectSHA(ctx context.Context, c Context, dirPath string, branch string) (string, error) {
 	repoContentGetOptions := github.RepositoryContentGetOptions{
 		Ref: branch,
