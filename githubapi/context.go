@@ -93,9 +93,9 @@ func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
 func (c *Context) getBlameURLPrefix(ctx context.Context) string {
 	githubHost := getEnv("GITHUB_HOST", "")
 	if githubHost == "" {
-		githubHost = githubPublicBaseURL
+		return fmt.Sprintf("%s/%s/%s/blame", githubPublicBaseURL, c.Owner, c.Repo)
 	}
-	return fmt.Sprintf("%s/%s/%s/blame", githubHost, c.Owner, c.Repo)
+	return fmt.Sprintf("https://%s/%s/%s/blame", githubHost, c.Owner, c.Repo)
 }
 
 type prMetadata struct {
