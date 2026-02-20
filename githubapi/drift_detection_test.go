@@ -111,6 +111,7 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 		Repositories:  v3Client.Repositories,
 		Owner:         "AnOwner",
 		Repo:          "Arepo",
+		RepoURL:       "https://github.com/AnOwner/Arepo",
 		PrNumber:      120,
 		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
@@ -119,7 +120,6 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 		),
 	}
 
-	// TODO move this to file
 	expectedDiffOutput := "\n```" + `diff
 --- source-path/file-1.text
 +++ target-path/file-1.text

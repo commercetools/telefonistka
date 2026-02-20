@@ -56,7 +56,7 @@ func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[stri
 
 	if len(filesWithDiff) != 0 {
 		diffOutput.WriteString("\n### Blame Links:\n")
-		blameUrlPrefix := c.getBlameURLPrefix(ctx)
+		blameUrlPrefix := c.getBlameURLPrefix()
 
 		for _, f := range filesWithDiff {
 			diffOutput.WriteString("[" + f + "](" + blameUrlPrefix + "/HEAD/" + f + ")\n") // TODO consider switching HEAD to specific SHA

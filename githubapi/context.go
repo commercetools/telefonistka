@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"regexp"
 
@@ -45,8 +44,6 @@ type graphQLClient interface {
 	Query(ctx context.Context, q any, variables map[string]any) error
 	Mutate(ctx context.Context, m any, input githubv4.Input, variables map[string]any) error
 }
-
-const githubPublicBaseURL = "https://github.com"
 
 var prMetadataRegex = regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
 
@@ -90,12 +87,8 @@ func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
 	}
 }
 
-func (c *Context) getBlameURLPrefix(ctx context.Context) string {
-	githubHost := getEnv("GITHUB_HOST", "")
-	if githubHost == "" {
-		return fmt.Sprintf("%s/%s/%s/blame", githubPublicBaseURL, c.Owner, c.Repo)
-	}
-	return fmt.Sprintf("https://%s/%s/%s/blame", githubHost, c.Owner, c.Repo)
+func (c *Context) getBlameURLPrefix() string {
+	return c.RepoURL + "/blame"
 }
 
 type prMetadata struct {

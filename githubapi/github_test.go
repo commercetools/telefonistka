@@ -476,32 +476,22 @@ func TestPrBodyMultiComponent(t *testing.T) {
 func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		Host      string
-		Owner     string
-		Repo      string
+		RepoURL   string
 		ExpectURL string
 	}{
 		{
-			"",
-			"commercetools",
-			"test",
-			fmt.Sprintf("%s/commercetools/test/blame", githubPublicBaseURL),
+			"https://github.com/commercetools/test",
+			"https://github.com/commercetools/test/blame",
 		},
 		{
-			"myserver.github.com",
-			"some-other-owner",
-			"some-other-repo",
+			"https://myserver.github.com/some-other-owner/some-other-repo",
 			"https://myserver.github.com/some-other-owner/some-other-repo/blame",
 		},
 	}
 
-	// reset the GITHUB_HOST env to prevent conflicts with other tests.
-	defer os.Unsetenv("GITHUB_HOST")
-
 	for _, tc := range tests {
-		os.Setenv("GITHUB_HOST", tc.Host)
-		ghPrClientDetails := &Context{Owner: tc.Owner, Repo: tc.Repo}
-		blameURLPrefix := ghPrClientDetails.getBlameURLPrefix(t.Context())
+		c := &Context{RepoURL: tc.RepoURL}
+		blameURLPrefix := c.getBlameURLPrefix()
 		assert.Equal(t, tc.ExpectURL, blameURLPrefix)
 	}
 }
