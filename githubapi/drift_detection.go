@@ -91,8 +91,8 @@ func compareRepoDirectories(ctx context.Context, c Context, sourcePath string, t
 		targetFilesSHAs := make(map[string]string)
 		hasDiff := false
 
-		generateFlatMapfromFileTree(ctx, &c, &sourcePath, &sourcePath, &defaultBranch, sourceFilesSHAs)
-		generateFlatMapfromFileTree(ctx, &c, &targetPath, &targetPath, &defaultBranch, targetFilesSHAs)
+		generateFlatMapfromFileTree(ctx, &c, sourcePath, sourcePath, defaultBranch, sourceFilesSHAs)
+		generateFlatMapfromFileTree(ctx, &c, targetPath, targetPath, defaultBranch, targetFilesSHAs)
 		// ghPrClientDetails.PrLogger.Infoln(sourceFilesSHAs)
 		hasDiff, diffOutput, err := generateDiffOutput(ctx, c, sourceFilesSHAs, targetFilesSHAs, sourcePath, targetPath)
 
@@ -100,20 +100,20 @@ func compareRepoDirectories(ctx context.Context, c Context, sourcePath string, t
 	}
 }
 
-func generateFlatMapfromFileTree(ctx context.Context, c *Context, workingPath *string, rootPath *string, branch *string, listOfFiles map[string]string) {
+func generateFlatMapfromFileTree(ctx context.Context, c *Context, workingPath string, rootPath string, branch string, listOfFiles map[string]string) {
 	getContentOpts := &github.RepositoryContentGetOptions{
-		Ref: *branch,
+		Ref: branch,
 	}
-	_, directoryContent, resp, _ := c.Repositories.GetContents(ctx, c.Owner, c.Repo, *workingPath, getContentOpts)
+	_, directoryContent, resp, _ := c.Repositories.GetContents(ctx, c.Owner, c.Repo, workingPath, getContentOpts)
 	prom.InstrumentGhCall(resp)
 	for _, elementInDir := range directoryContent {
-		if *elementInDir.Type == "file" {
-			relativeName := strings.TrimPrefix(*elementInDir.Path, *rootPath+"/")
-			listOfFiles[relativeName] = *elementInDir.SHA
-		} else if *elementInDir.Type == "dir" {
-			generateFlatMapfromFileTree(ctx, c, elementInDir.Path, rootPath, branch, listOfFiles)
+		if elementInDir.GetType() == "file" {
+			relativeName := strings.TrimPrefix(elementInDir.GetPath(), rootPath+"/")
+			listOfFiles[relativeName] = elementInDir.GetSHA()
+		} else if elementInDir.GetType() == "dir" {
+			generateFlatMapfromFileTree(ctx, c, elementInDir.GetPath(), rootPath, branch, listOfFiles)
 		} else {
-			c.PrLogger.Info("Ignoring type for path", "type", *elementInDir.Type, "path", *elementInDir.Path)
+			c.PrLogger.Info("Ignoring type for path", "type", elementInDir.GetType(), "path", elementInDir.GetPath())
 		}
 	}
 }

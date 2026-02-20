@@ -325,7 +325,7 @@ func TestGenerateDeletionTreeEntries(t *testing.T) {
 			var entries []*github.TreeEntry
 			path := "target/app"
 			branch := "main"
-			err := generateDeletionTreeEntries(t.Context(), &c, &path, &branch, &entries)
+			err := generateDeletionTreeEntries(t.Context(), &c, path, branch, &entries)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

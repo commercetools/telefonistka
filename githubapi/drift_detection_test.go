@@ -79,7 +79,7 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 
 	defaultBranch := "main"
 	targetPath := "some/path"
-	generateFlatMapfromFileTree(t.Context(), &ghPrClientDetails, &targetPath, &targetPath, &defaultBranch, filesSHAs)
+	generateFlatMapfromFileTree(t.Context(), &ghPrClientDetails, targetPath, targetPath, defaultBranch, filesSHAs)
 	if diff := deep.Equal(expectedFilesSHAs, filesSHAs); diff != nil {
 		for _, l := range diff {
 			t.Error(l)

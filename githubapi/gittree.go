@@ -17,7 +17,7 @@ func generateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*githu
 
 	if sourcePathSHA == "" {
 		c.PrLogger.Info("Source directory wasn't found, assuming a deletion PR")
-		err := generateDeletionTreeEntries(ctx, &c, &targetPath, &defaultBranch, treeEntries)
+		err := generateDeletionTreeEntries(ctx, &c, targetPath, defaultBranch, treeEntries)
 		if err != nil {
 			c.PrLogger.Error("Failed to build deletion tree", "err", err)
 			return err
@@ -36,8 +36,8 @@ func generateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*githu
 		// TODO compare sourcePath targetPath Git object SHA to avoid costly tree compare where possible?
 		sourceFilesSHAs := make(map[string]string)
 		targetFilesSHAs := make(map[string]string)
-		generateFlatMapfromFileTree(ctx, &c, &sourcePath, &sourcePath, &defaultBranch, sourceFilesSHAs)
-		generateFlatMapfromFileTree(ctx, &c, &targetPath, &targetPath, &defaultBranch, targetFilesSHAs)
+		generateFlatMapfromFileTree(ctx, &c, sourcePath, sourcePath, defaultBranch, sourceFilesSHAs)
+		generateFlatMapfromFileTree(ctx, &c, targetPath, targetPath, defaultBranch, targetFilesSHAs)
 
 		for filename := range targetFilesSHAs {
 			if _, found := sourceFilesSHAs[filename]; !found {
@@ -57,19 +57,19 @@ func generateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*githu
 	return err
 }
 
-func generateDeletionTreeEntries(ctx context.Context, c *Context, path *string, branch *string, treeEntries *[]*github.TreeEntry) error {
+func generateDeletionTreeEntries(ctx context.Context, c *Context, path string, branch string, treeEntries *[]*github.TreeEntry) error {
 	// GH tree API doesn't allow deletion a whole dir, so this recursive function traverse the whole tree
 	// and create a tree entry array that would delete all the files in that path
 	getContentOpts := &github.RepositoryContentGetOptions{
-		Ref: *branch,
+		Ref: branch,
 	}
-	_, directoryContent, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, *path, getContentOpts)
+	_, directoryContent, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, path, getContentOpts)
 	prom.InstrumentGhCall(resp)
 	if resp.StatusCode == 404 {
-		c.PrLogger.Info("Skipping deletion of non-existing path", "path", *path)
+		c.PrLogger.Info("Skipping deletion of non-existing path", "path", path)
 		return nil
 	} else if err != nil {
-		c.PrLogger.Error("Could not fetch content", "path", *path, "err", err, "resp", resp)
+		c.PrLogger.Error("Could not fetch content", "path", path, "err", err, "resp", resp)
 		return err
 	}
 	for _, elementInDir := range directoryContent {
@@ -83,7 +83,7 @@ func generateDeletionTreeEntries(ctx context.Context, c *Context, path *string, 
 			}
 			*treeEntries = append(*treeEntries, &treeEntry)
 		} else if elementInDir.GetType() == "dir" {
-			err := generateDeletionTreeEntries(ctx, c, elementInDir.Path, branch, treeEntries)
+			err := generateDeletionTreeEntries(ctx, c, elementInDir.GetPath(), branch, treeEntries)
 			if err != nil {
 				return err
 			}
