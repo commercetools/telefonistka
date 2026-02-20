@@ -71,15 +71,15 @@ func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEve
 	}
 
 	c := Context{
-		Repositories: clients.Main.v3Client.Repositories,
-		Owner:        repoOwner,
-		Repo:         event.GetRepo().GetName(),
-		RepoURL:      event.GetRepo().GetHTMLURL(),
+		Repositories:  clients.Main.v3Client.Repositories,
+		Owner:         repoOwner,
+		Repo:          event.GetRepo().GetName(),
+		RepoURL:       event.GetRepo().GetHTMLURL(),
+		DefaultBranch: event.GetRepo().GetDefaultBranch(),
 	}
 	c.PrLogger = slog.Default().With("context", c)
 
-	defaultBranch := event.GetRepo().GetDefaultBranch()
-	if event.GetRef() != "refs/heads/"+defaultBranch {
+	if event.GetRef() != "refs/heads/"+c.DefaultBranch {
 		return
 	}
 
