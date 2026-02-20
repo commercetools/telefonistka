@@ -490,7 +490,7 @@ func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		c := &Context{RepoURL: tc.RepoURL}
+		c := &Context{RepoRef: RepoRef{RepoURL: tc.RepoURL}}
 		blameURLPrefix := c.getBlameURLPrefix()
 		assert.Equal(t, tc.ExpectURL, blameURLPrefix)
 	}
@@ -713,9 +713,11 @@ func TestGetFileContent(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
 				Repositories: repos,
-				Owner:        "owner",
-				Repo:         "repo",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
@@ -779,9 +781,11 @@ func TestGetInRepoConfig(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
 				Repositories: repos,
-				Owner:        "owner",
-				Repo:         "repo",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 

@@ -20,12 +20,16 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 	labelName := "fast-promotion"
 
 	ghPrClientDetails := Context{
+		RepoRef: RepoRef{
+			Owner:        "AnOwner",
+			Repo:         "Arepo",
+		},
+		PRRef: PRRef{
+			PrNumber:     120,
+			Ref:          "Abranch",
+		},
 		Repositories: v3Client.Repositories,
 		PullRequests: v3Client.PullRequests,
-		Owner:        "AnOwner",
-		Repo:         "Arepo",
-		PrNumber:     120,
-		Ref:          "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -56,12 +60,16 @@ func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTT
 	labelName := "fast-promotion"
 
 	ghPrClientDetails := Context{
+		RepoRef: RepoRef{
+			Owner:        "AnOwner",
+			Repo:         "Arepo",
+		},
+		PRRef: PRRef{
+			PrNumber:     120,
+			Ref:          "Abranch",
+		},
 		Repositories: v3Client.Repositories,
 		PullRequests: v3Client.PullRequests,
-		Owner:        "AnOwner",
-		Repo:         "Arepo",
-		PrNumber:     120,
-		Ref:          "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -722,9 +730,11 @@ func TestGetComponentConfig(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
 				Repositories: repos,
-				Owner:        "owner",
-				Repo:         "repo",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 

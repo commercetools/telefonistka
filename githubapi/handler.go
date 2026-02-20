@@ -71,11 +71,13 @@ func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEve
 	}
 
 	c := Context{
-		Repositories:  clients.Main.v3Client.Repositories,
-		Owner:         repoOwner,
-		Repo:          event.GetRepo().GetName(),
-		RepoURL:       event.GetRepo().GetHTMLURL(),
-		DefaultBranch: event.GetRepo().GetDefaultBranch(),
+		RepoRef: RepoRef{
+			Owner:         repoOwner,
+			Repo:          event.GetRepo().GetName(),
+			RepoURL:       event.GetRepo().GetHTMLURL(),
+			DefaultBranch: event.GetRepo().GetDefaultBranch(),
+		},
+		Repositories: clients.Main.v3Client.Repositories,
 	}
 	c.PrLogger = slog.Default().With("context", c)
 
@@ -100,15 +102,19 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 	}
 
 	c := Context{
+		RepoRef: RepoRef{
+			Owner:         repoOwner,
+			Repo:          event.GetRepo().GetName(),
+			RepoURL:       event.GetRepo().GetHTMLURL(),
+			DefaultBranch: event.GetRepo().GetDefaultBranch(),
+		},
+		PRRef: PRRef{
+			PrNumber: event.GetPullRequest().GetNumber(),
+			PrAuthor: event.GetPullRequest().GetUser().GetLogin(),
+			PrSHA:    event.GetPullRequest().GetHead().GetSHA(),
+			Ref:      event.GetPullRequest().GetHead().GetRef(),
+		},
 		Labels: event.GetPullRequest().Labels,
-		Owner:                       repoOwner,
-		Repo:                        event.GetRepo().GetName(),
-		RepoURL:                     event.GetRepo().GetHTMLURL(),
-		PrNumber:                    event.GetPullRequest().GetNumber(),
-		Ref:                         event.GetPullRequest().GetHead().GetRef(),
-		PrAuthor:                    event.GetPullRequest().GetUser().GetLogin(),
-		PrSHA:                       event.GetPullRequest().GetHead().GetSHA(),
-		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
 	}
 	clients.setServices(&c)
 	c.PrLogger = slog.Default().With("context", c)
@@ -154,13 +160,17 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 		return
 	}
 	c := Context{
-		Owner:         repoOwner,
-		Repo:          event.GetRepo().GetName(),
-		RepoURL:       event.GetRepo().GetHTMLURL(),
-		PrNumber:      event.GetIssue().GetNumber(),
-		PrAuthor:      event.GetIssue().GetUser().GetLogin(),
-		Labels:        event.GetIssue().Labels,
-		DefaultBranch: event.GetRepo().GetDefaultBranch(),
+		RepoRef: RepoRef{
+			Owner:         repoOwner,
+			Repo:          event.GetRepo().GetName(),
+			RepoURL:       event.GetRepo().GetHTMLURL(),
+			DefaultBranch: event.GetRepo().GetDefaultBranch(),
+		},
+		PRRef: PRRef{
+			PrNumber: event.GetIssue().GetNumber(),
+			PrAuthor: event.GetIssue().GetUser().GetLogin(),
+		},
+		Labels: event.GetIssue().Labels,
 	}
 	clients.setServices(&c)
 	c.PrLogger = slog.Default().With("context", c)

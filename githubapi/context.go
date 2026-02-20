@@ -88,7 +88,26 @@ type promotionInstanceMetaData struct {
 	TargetPaths []string `json:"targetPaths"`
 }
 
+// RepoRef identifies a GitHub repository.
+type RepoRef struct {
+	Owner         string
+	Repo          string
+	RepoURL       string
+	DefaultBranch string
+}
+
+// PRRef identifies a pull request within a repository.
+type PRRef struct {
+	PrNumber int
+	PrAuthor string
+	PrSHA    string
+	Ref      string
+}
+
 type Context struct {
+	RepoRef
+	PRRef
+
 	Repositories repoService        `json:"-"`
 	PullRequests pullRequestService `json:"-"`
 	Issues       issueService       `json:"-"`
@@ -96,18 +115,10 @@ type Context struct {
 	GraphQL      graphQLClient      `json:"-"`
 	ApproverPRs  pullRequestService `json:"-"`
 
-	DefaultBranch string
-	Owner         string
-	Repo          string
-	PrAuthor      string
-	PrNumber      int
-	PrSHA         string
-	Ref           string
-	RepoURL       string
-	PrLogger      *slog.Logger `json:"-"`
-	Labels        []*github.Label
-	PrMetadata    prMetadata
-	Config        *configuration.Config
+	PrLogger   *slog.Logger             `json:"-"`
+	Labels     []*github.Label
+	PrMetadata prMetadata
+	Config     *configuration.Config    `json:"-"`
 }
 
 func (c *Context) getPrMetadata(ctx context.Context, prBody string) {

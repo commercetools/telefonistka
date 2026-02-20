@@ -60,11 +60,15 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
+		RepoRef: RepoRef{
+			Owner:        "AnOwner",
+			Repo:         "Arepo",
+		},
+		PRRef: PRRef{
+			PrNumber:     120,
+			Ref:          "Abranch",
+		},
 		Repositories: v3Client.Repositories,
-		Owner:        "AnOwner",
-		Repo:         "Arepo",
-		PrNumber:     120,
-		Ref:          "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -107,13 +111,17 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
-		DefaultBranch: "main",
+		RepoRef: RepoRef{
+			DefaultBranch: "main",
+			Owner:         "AnOwner",
+			Repo:          "Arepo",
+			RepoURL:       "https://github.com/AnOwner/Arepo",
+		},
+		PRRef: PRRef{
+			PrNumber:      120,
+			Ref:           "Abranch",
+		},
 		Repositories:  v3Client.Repositories,
-		Owner:         "AnOwner",
-		Repo:          "Arepo",
-		RepoURL:       "https://github.com/AnOwner/Arepo",
-		PrNumber:      120,
-		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -160,12 +168,16 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
-		DefaultBranch: "main",
+		RepoRef: RepoRef{
+			DefaultBranch: "main",
+			Owner:         "AnOwner",
+			Repo:          "Arepo",
+		},
+		PRRef: PRRef{
+			PrNumber:      120,
+			Ref:           "Abranch",
+		},
 		Repositories:  v3Client.Repositories,
-		Owner:         "AnOwner",
-		Repo:          "Arepo",
-		PrNumber:      120,
-		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -206,12 +218,16 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
-		DefaultBranch: "main",
+		RepoRef: RepoRef{
+			DefaultBranch: "main",
+			Owner:         "AnOwner",
+			Repo:          "Arepo",
+		},
+		PRRef: PRRef{
+			PrNumber:      120,
+			Ref:           "Abranch",
+		},
 		Repositories:  v3Client.Repositories,
-		Owner:         "AnOwner",
-		Repo:          "Arepo",
-		PrNumber:      120,
-		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,
@@ -257,12 +273,16 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
-		DefaultBranch: "main",
+		RepoRef: RepoRef{
+			DefaultBranch: "main",
+			Owner:         "AnOwner",
+			Repo:          "Arepo",
+		},
+		PRRef: PRRef{
+			PrNumber:      120,
+			Ref:           "Abranch",
+		},
 		Repositories:  v3Client.Repositories,
-		Owner:         "AnOwner",
-		Repo:          "Arepo",
-		PrNumber:      120,
-		Ref:           "Abranch",
 		PrLogger: slog.Default().With(
 			"repo", "AnOwner/Arepo",
 			"prNumber", 120,

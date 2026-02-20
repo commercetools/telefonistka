@@ -43,10 +43,14 @@ func TestSetCommitStatus(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
+				PRRef: PRRef{
+					PrSHA:        "abc123",
+				},
 				Repositories: repos,
-				Owner:        "owner",
-				Repo:         "repo",
-				PrSHA:        "abc123",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
@@ -121,11 +125,15 @@ func TestToggleCommitStatus(t *testing.T) {
 			}
 
 			c := &Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
+				PRRef: PRRef{
+					Ref:          "refs/heads/main",
+					PrSHA:        "abc123",
+				},
 				Repositories: repos,
-				Owner:        "owner",
-				Repo:         "repo",
-				Ref:          "refs/heads/main",
-				PrSHA:        "abc123",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 

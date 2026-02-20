@@ -42,9 +42,11 @@ func TestCreateBranch(t *testing.T) {
 
 			commitSHA := "deadbeef"
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:    "owner",
+					Repo:     "repo",
+				},
 				Git:      git,
-				Owner:    "owner",
-				Repo:     "repo",
 				PrLogger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
@@ -138,9 +140,11 @@ func TestCreateCommit(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:    "owner",
+					Repo:     "repo",
+				},
 				Git:      git,
-				Owner:    "owner",
-				Repo:     "repo",
 				PrLogger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
@@ -221,9 +225,11 @@ func TestGetDirectoryGitObjectSHA(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
 				Repositories: repos,
-				Owner:        "owner",
-				Repo:         "repo",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
@@ -316,9 +322,11 @@ func TestGenerateDeletionTreeEntries(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
 				Repositories: repos,
-				Owner:        "owner",
-				Repo:         "repo",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 

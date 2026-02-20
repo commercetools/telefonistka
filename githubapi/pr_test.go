@@ -48,10 +48,14 @@ func TestCommentOnPr(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:    "owner",
+					Repo:     "repo",
+				},
+				PRRef: PRRef{
+					PrNumber: 42,
+				},
 				Issues:   issues,
-				Owner:    "owner",
-				Repo:     "repo",
-				PrNumber: 42,
 				PrLogger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
@@ -118,10 +122,14 @@ func TestApprovePr(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:       "owner",
+					Repo:        "repo",
+				},
+				PRRef: PRRef{
+					PrNumber:    42,
+				},
 				ApproverPRs: approver,
-				Owner:       "owner",
-				Repo:        "repo",
-				PrNumber:    42,
 				PrLogger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 				Config: &configuration.Config{
 					AutoApprovePromotionPrs: tc.autoApprove,
@@ -175,10 +183,14 @@ func TestMergePr(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
+				PRRef: PRRef{
+					PrNumber:     99,
+				},
 				PullRequests: prs,
-				Owner:        "owner",
-				Repo:         "repo",
-				PrNumber:     99,
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
@@ -259,10 +271,12 @@ func TestCreatePrObject(t *testing.T) {
 			}
 
 			c := Context{
+				RepoRef: RepoRef{
+					Owner:        "owner",
+					Repo:         "repo",
+				},
 				PullRequests: prs,
 				Issues:       issues,
-				Owner:        "owner",
-				Repo:         "repo",
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 

@@ -143,9 +143,13 @@ func TestMinimizeStalePRComments(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
 	c := Context{
-		Owner:    "owner",
-		Repo:     "repo",
-		PrNumber: 123,
+		RepoRef: RepoRef{
+			Owner:    "owner",
+			Repo:     "repo",
+		},
+		PRRef: PRRef{
+			PrNumber: 123,
+		},
 		PrLogger: logger,
 		GraphQL:  v4client,
 	}
