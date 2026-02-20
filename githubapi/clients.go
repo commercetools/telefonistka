@@ -19,6 +19,15 @@ type GhClient struct {
 	v4Client *githubv4.Client
 }
 
+// setServices populates the Context's GitHub service fields from this client.
+func (gc GhClient) setServices(c *Context) {
+	c.Repositories = gc.v3Client.Repositories
+	c.PullRequests = gc.v3Client.PullRequests
+	c.Issues = gc.v3Client.Issues
+	c.Git = gc.v3Client.Git
+	c.GraphQL = gc.v4Client
+}
+
 func getAppInstallationId(ctx context.Context, keyPath string, appID int64, restURL string, owner string) (int64, error) {
 	atr, err := ghinstallation.NewAppsTransportKeyFromFile(http.DefaultTransport, appID, keyPath)
 	if err != nil {

@@ -106,13 +106,6 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 	}
 
 	c := Context{
-		Repositories: mainPair.v3Client.Repositories,
-		PullRequests: mainPair.v3Client.PullRequests,
-		Issues:       mainPair.v3Client.Issues,
-		Git:          mainPair.v3Client.Git,
-		GraphQL:      mainPair.v4Client,
-		ApproverPRs:  approverPair.v3Client.PullRequests,
-
 		TemplatesFS:                 cfg.TemplatesFS,
 		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
 		Labels:                      event.GetPullRequest().Labels,
@@ -125,6 +118,8 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 		PrSHA:                       event.GetPullRequest().GetHead().GetSHA(),
 		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
 	}
+	mainPair.setServices(&c)
+	c.ApproverPRs = approverPair.v3Client.PullRequests
 	c.PrLogger = slog.Default().With("context", c)
 
 	config, err := getInRepoConfig(ctx, c)
@@ -173,13 +168,6 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 		return
 	}
 	c := Context{
-		Repositories: mainPair.v3Client.Repositories,
-		PullRequests: mainPair.v3Client.PullRequests,
-		Issues:       mainPair.v3Client.Issues,
-		Git:          mainPair.v3Client.Git,
-		GraphQL:      mainPair.v4Client,
-		ApproverPRs:  approverPair.v3Client.PullRequests,
-
 		TemplatesFS:                 cfg.TemplatesFS,
 		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
 		Owner:                       repoOwner,
@@ -190,6 +178,8 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 		Labels:                      event.GetIssue().Labels,
 		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
 	}
+	mainPair.setServices(&c)
+	c.ApproverPRs = approverPair.v3Client.PullRequests
 	c.PrLogger = slog.Default().With("context", c)
 
 	config, err := getInRepoConfig(ctx, c)
