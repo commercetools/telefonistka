@@ -14,7 +14,7 @@ import (
 
 const githubCommentMaxSize = 65536
 
-type DiffCommentData struct {
+type diffCommentData struct {
 	DiffOfChangedComponents   []argocd.DiffResult
 	DisplaySyncBranchCheckBox bool
 	BranchName                string
@@ -96,7 +96,7 @@ func commentDiff(ctx context.Context, c Context) error {
 	}
 
 	if len(diffOfChangedComponents) > 0 {
-		diffCommentData := DiffCommentData{
+		diffCommentData := diffCommentData{
 			DiffOfChangedComponents: diffOfChangedComponents,
 			BranchName:              c.Ref,
 		}
@@ -120,7 +120,7 @@ func commentDiff(ctx context.Context, c Context) error {
 	return nil
 }
 
-func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, partNumber int, totalParts int) (string, error) {
+func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, partNumber int, totalParts int) (string, error) {
 	buf := new(bytes.Buffer)
 	md := markdown.NewMarkdown(buf)
 	const argoSmallLogo = `<img src="https://argo-cd.readthedocs.io/en/stable/assets/favicon.png" width="20"/>`
@@ -185,7 +185,7 @@ func buildArgoCdDiffComment(diffCommentData DiffCommentData, beConcise bool, par
 	return buf.String(), err
 }
 
-func generateArgoCdDiffComments(diffCommentData DiffCommentData, githubCommentMaxSize int) (comments []string, err error) {
+func generateArgoCdDiffComments(diffCommentData diffCommentData, githubCommentMaxSize int) (comments []string, err error) {
 	commentBody, err := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
 	if err != nil {
 		slog.Error("Failed to build ArgoCD diff comment", "err", err)

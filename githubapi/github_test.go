@@ -309,7 +309,7 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			var diffCommentData DiffCommentData
+			var diffCommentData diffCommentData
 			readJSONFromFile(t, tc.diffCommentDataTestDataFileName, &diffCommentData)
 
 			result, err := generateArgoCdDiffComments(diffCommentData, tc.maxCommentLength)
@@ -377,7 +377,7 @@ func TestMarkdownGenerator(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			var diffCommentData DiffCommentData
+			var diffCommentData diffCommentData
 			diffCommentDataTestDataFileName := "./testdata/data/" + t.Name() + ".json"
 			expectedOutputContentFile := "./testdata/output/" + t.Name() + ".md"
 			readJSONFromFile(t, diffCommentDataTestDataFileName, &diffCommentData)
