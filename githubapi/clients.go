@@ -150,35 +150,34 @@ func createGhTokenClientPair(ctx context.Context, oauthToken string, endpoints G
 	}
 }
 
-func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPair], creds ClientConfig, endpoints GithubEndpoints, repoOwner string, ctx context.Context) error {
-	if creds.AppID != 0 {
-		var keyExist bool
-		*gcp, keyExist = ghClientCache.Get(repoOwner)
-		if keyExist {
-			slog.Debug("Found cached client for owner", "owner", repoOwner)
-			return nil
-		}
-		slog.Info("Did not find cached client for owner, creating one", "owner", repoOwner, "app_id", creds.AppID)
-		pair, err := createGhAppClientPair(ctx, creds.AppID, creds.AppKeyPath, endpoints, repoOwner)
-		if err != nil {
-			return fmt.Errorf("creating app client pair: %w", err)
-		}
-		*gcp = pair
-		ghClientCache.Add(repoOwner, *gcp)
-		return nil
+// GetOrCreateClient retrieves a cached client pair or creates one.
+// App-auth clients are cached per owner; token-auth clients are cached globally.
+func GetOrCreateClient(ctx context.Context, cache *lru.Cache[string, GhClientPair], creds ClientConfig, endpoints GithubEndpoints, owner string) (GhClientPair, error) {
+	key := owner
+	if creds.AppID == 0 {
+		key = "global"
 	}
-	var keyExist bool
-	*gcp, keyExist = ghClientCache.Get("global")
-	if keyExist {
-		slog.Debug("Found global cached client")
-		return nil
-	}
-	slog.Info("Did not find global cached client, creating one")
-	if creds.OAuthToken == "" {
-		return fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
+	if pair, ok := cache.Get(key); ok {
+		slog.Debug("Found cached client", "key", key)
+		return pair, nil
 	}
 
-	*gcp = createGhTokenClientPair(ctx, creds.OAuthToken, endpoints)
-	ghClientCache.Add("global", *gcp)
-	return nil
+	slog.Info("Creating new GitHub client", "key", key, "app_auth", creds.AppID != 0)
+
+	var pair GhClientPair
+	if creds.AppID != 0 {
+		var err error
+		pair, err = createGhAppClientPair(ctx, creds.AppID, creds.AppKeyPath, endpoints, owner)
+		if err != nil {
+			return GhClientPair{}, fmt.Errorf("creating app client pair: %w", err)
+		}
+	} else {
+		if creds.OAuthToken == "" {
+			return GhClientPair{}, fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
+		}
+		pair = createGhTokenClientPair(ctx, creds.OAuthToken, endpoints)
+	}
+
+	cache.Add(key, pair)
+	return pair, nil
 }

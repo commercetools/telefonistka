@@ -49,21 +49,20 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 	// But we do want to stop the event handling after a certain point, so:
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	var mainGithubClientPair GhClientPair
-	var approverGithubClientPair GhClientPair
 
 	switch event := e.(type) {
 	case *github.PushEvent:
 		// this is a commit push, do something with it?
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		if err := mainGithubClientPair.GetAndCache(cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner, ctx); err != nil {
+		mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+		if err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
 
 		c := Context{
-			Repositories:                mainGithubClientPair.v3Client.Repositories,
+			Repositories:                mainPair.v3Client.Repositories,
 			TemplatesFS:                 cfg.TemplatesFS,
 			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
 			Owner:                       repoOwner,
@@ -92,22 +91,24 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 	case *github.PullRequestEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		if err := mainGithubClientPair.GetAndCache(cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner, ctx); err != nil {
+		mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+		if err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
-		if err := approverGithubClientPair.GetAndCache(cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner, ctx); err != nil {
+		approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
+		if err != nil {
 			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
 
 		c := Context{
-			Repositories: mainGithubClientPair.v3Client.Repositories,
-			PullRequests: mainGithubClientPair.v3Client.PullRequests,
-			Issues:       mainGithubClientPair.v3Client.Issues,
-			Git:          mainGithubClientPair.v3Client.Git,
-			GraphQL:      mainGithubClientPair.v4Client,
-			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
+			Repositories: mainPair.v3Client.Repositories,
+			PullRequests: mainPair.v3Client.PullRequests,
+			Issues:       mainPair.v3Client.Issues,
+			Git:          mainPair.v3Client.Git,
+			GraphQL:      mainPair.v4Client,
+			ApproverPRs:  approverPair.v3Client.PullRequests,
 
 			TemplatesFS:                 cfg.TemplatesFS,
 			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
@@ -151,16 +152,18 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 
 	case *github.IssueCommentEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
-		if err := mainGithubClientPair.GetAndCache(cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner, ctx); err != nil {
+		mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+		if err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
-		if err := approverGithubClientPair.GetAndCache(cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner, ctx); err != nil {
+		approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
+		if err != nil {
 			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
 
-		botIdentity, _ := getBotIdentity(ctx, mainGithubClientPair.v4Client)
+		botIdentity, _ := getBotIdentity(ctx, mainPair.v4Client)
 
 		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 		//
@@ -172,12 +175,12 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 			return
 		}
 		c := Context{
-			Repositories: mainGithubClientPair.v3Client.Repositories,
-			PullRequests: mainGithubClientPair.v3Client.PullRequests,
-			Issues:       mainGithubClientPair.v3Client.Issues,
-			Git:          mainGithubClientPair.v3Client.Git,
-			GraphQL:      mainGithubClientPair.v4Client,
-			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
+			Repositories: mainPair.v3Client.Repositories,
+			PullRequests: mainPair.v3Client.PullRequests,
+			Issues:       mainPair.v3Client.Issues,
+			Git:          mainPair.v3Client.Git,
+			GraphQL:      mainPair.v4Client,
+			ApproverPRs:  approverPair.v3Client.PullRequests,
 
 			TemplatesFS:                 cfg.TemplatesFS,
 			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
