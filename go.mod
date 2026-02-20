@@ -1,6 +1,6 @@
 module github.com/commercetools/telefonistka
 
-go 1.24.1
+go 1.26
 
 require github.com/alexliesenfeld/health v0.8.0
 
