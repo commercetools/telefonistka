@@ -1,11 +1,13 @@
 package githubapi
 
 import (
+	"bytes"
 	"context"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 
 	prom "github.com/commercetools/telefonistka/prometheus"
@@ -99,13 +101,17 @@ func commitStatusTargetURL(commitTime time.Time, tmplFile string) string {
 	}{
 		CommitTime: commitTime,
 	}
-	renderedURL, err := executeTemplateFile(tmplName, tmplFile, p)
+	var buf bytes.Buffer
+	tmpl, err := template.New(tmplName).ParseFiles(tmplFile)
 	if err != nil {
 		slog.Debug("Failed to render target URL template", "err", err)
 		return targetURL
 	}
-
+	if err := tmpl.ExecuteTemplate(&buf, tmplName, p); err != nil {
+		slog.Debug("Failed to render target URL template", "err", err)
+		return targetURL
+	}
 	// trim any leading/trailing whitespace
-	renderedURL = strings.TrimSpace(renderedURL)
+	renderedURL := strings.TrimSpace(buf.String())
 	return renderedURL
 }

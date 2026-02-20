@@ -33,18 +33,6 @@ func executeTemplate(templateName string, templateFile string, data any) (string
 	return buf.String(), nil
 }
 
-func executeTemplateFile(templateName string, templateFile string, data any) (string, error) {
-	var buf bytes.Buffer
-	tmpl, err := template.New(templateName).ParseFiles(templateFile)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
-	}
-	if err := tmpl.ExecuteTemplate(&buf, templateName, data); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
-	}
-	return buf.String(), nil
-}
-
 func GetInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
 	inRepoConfigFileContentString, err := getFileContent(ctx, c, c.DefaultBranch, "telefonistka.yaml")
 	if err != nil {
