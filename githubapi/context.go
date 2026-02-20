@@ -9,15 +9,13 @@ import (
 	"regexp"
 
 	"github.com/commercetools/telefonistka/configuration"
-	prom "github.com/commercetools/telefonistka/prometheus"
-	"github.com/google/go-github/v62/github"
+"github.com/google/go-github/v62/github"
 	"github.com/shurcooL/githubv4"
 )
 
 type repoService interface {
 	GetContents(ctx context.Context, owner, repo, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error)
-	Get(ctx context.Context, owner, repo string) (*github.Repository, *github.Response, error)
-	CreateStatus(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error)
+CreateStatus(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error)
 	ListStatuses(ctx context.Context, owner, repo, ref string, opts *github.ListOptions) ([]*github.RepoStatus, *github.Response, error)
 }
 
@@ -124,16 +122,3 @@ func (pm *prMetadata) deserialize(s string) error {
 	return err
 }
 
-func (p *Context) getDefaultBranch(ctx context.Context) (string, error) {
-	if p.DefaultBranch != "" {
-		return p.DefaultBranch, nil
-	}
-	repo, resp, err := p.Repositories.Get(ctx, p.Owner, p.Repo)
-	if err != nil {
-		p.PrLogger.Error("Could not get repo default branch", "err", err, "resp", resp)
-		return "", err
-	}
-	prom.InstrumentGhCall(resp)
-	p.DefaultBranch = repo.GetDefaultBranch()
-	return p.DefaultBranch, nil
-}

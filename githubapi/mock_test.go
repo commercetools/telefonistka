@@ -22,17 +22,12 @@ func ghResp(statusCode int) *github.Response {
 // mockRepoService implements repoService for testing.
 type mockRepoService struct {
 	getContentsFn  func(ctx context.Context, owner, repo, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error)
-	getFn          func(ctx context.Context, owner, repo string) (*github.Repository, *github.Response, error)
-	createStatusFn func(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error)
+createStatusFn func(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error)
 	listStatusesFn func(ctx context.Context, owner, repo, ref string, opts *github.ListOptions) ([]*github.RepoStatus, *github.Response, error)
 }
 
 func (m *mockRepoService) GetContents(ctx context.Context, owner, repo, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
 	return m.getContentsFn(ctx, owner, repo, path, opts)
-}
-
-func (m *mockRepoService) Get(ctx context.Context, owner, repo string) (*github.Repository, *github.Response, error) {
-	return m.getFn(ctx, owner, repo)
 }
 
 func (m *mockRepoService) CreateStatus(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error) {

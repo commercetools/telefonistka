@@ -320,7 +320,7 @@ func generateListOfChangedComponentPaths(ctx context.Context, c Context) (change
 }
 
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
-func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]promotionInstance, err error) {
+func generatePlanBasedOnChangedComponent(ctx context.Context, c Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]promotionInstance, err error) {
 	promotions = make(map[string]promotionInstance)
 	for component := range relevantComponents {
 		componentConfig, err := getComponentConfig(ctx, c, component.SourcePath+component.ComponentName, configBranch)
@@ -344,6 +344,6 @@ func generatePromotionPlan(ctx context.Context, c Context, configBranch string) 
 	if err != nil {
 		return nil, err
 	}
-	promotions, err := generatePlanBasedOnChangeddComponent(ctx, c, relevantComponents, configBranch)
+	promotions, err := generatePlanBasedOnChangedComponent(ctx, c, relevantComponents, configBranch)
 	return promotions, err
 }

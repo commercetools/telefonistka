@@ -38,7 +38,7 @@ func minimizeStalePRComments(ctx context.Context, c Context) error {
 	for _, comment := range comments {
 		if shouldMinimize(comment, botIdentity) {
 			c.PrLogger.Info("Minimizing Comment", "comment_id", comment.Id)
-			err := minimizeComment(ctx, c, comment.Id, botIdentity)
+			err := minimizeComment(ctx, c, comment.Id)
 			if err != nil {
 				c.PrLogger.Error("Failed to minimize comment", "comment_id", comment.Id, "err", err)
 				// Continue to next comment even if one fails
@@ -97,7 +97,7 @@ func shouldMinimize(comment prComment, botIdentity string) bool {
 		strings.Contains(string(comment.Body), "<!-- telefonistka_tag -->")
 }
 
-func minimizeComment(ctx context.Context, c Context, commentId githubv4.ID, botIdentity string) error {
+func minimizeComment(ctx context.Context, c Context, commentId githubv4.ID) error {
 	var mutation struct {
 		MinimizeComment struct {
 			MinimizedComment struct {

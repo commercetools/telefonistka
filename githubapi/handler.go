@@ -389,8 +389,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 }
 
 func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommentEvent, botIdentity string) error {
-	var err error
-	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonsitka only creates PRs at this point)
+	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonistka only creates PRs at this point)
 	if ce.GetAction() == "edited" && ce.GetComment().GetUser().GetLogin() == botIdentity && ce.GetIssue().GetState() == "open" {
 		const checkboxIdentifier = "telefonistka-argocd-branch-sync"
 		checkboxWaschecked, checkboxIsChecked := analyzeCommentUpdateCheckBox(ce.GetComment().GetBody(), ce.GetChanges().GetBody().GetFrom(), checkboxIdentifier)
@@ -427,7 +426,7 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 		}
 	}
 
-	return err
+	return nil
 }
 
 func analyzeCommentUpdateCheckBox(newBody string, oldBody string, checkboxIdentifier string) (wasCheckedBefore bool, isCheckedNow bool) {
