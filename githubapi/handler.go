@@ -52,189 +52,174 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 
 	switch event := e.(type) {
 	case *github.PushEvent:
-		// this is a commit push, do something with it?
-		repoOwner := event.GetRepo().GetOwner().GetLogin()
-
-		mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
-		if err != nil {
-			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
-			return
-		}
-
-		c := Context{
-			Repositories:                mainPair.v3Client.Repositories,
-			TemplatesFS:                 cfg.TemplatesFS,
-			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
-			Owner:                       repoOwner,
-			Repo:                        event.GetRepo().GetName(),
-			RepoURL:                     event.GetRepo().GetHTMLURL(),
-		}
-
-		prLogger := slog.Default().With(
-			"context", c,
-		)
-
-		c.PrLogger = prLogger
-
-		defaultBranch := event.GetRepo().GetDefaultBranch()
-
-		if event.GetRef() != "refs/heads/"+defaultBranch {
-			return
-		}
-
-		config, _ := getInRepoConfig(ctx, c)
-		c.Config = config
-		listOfChangedFiles := generateListOfChangedFiles(event)
-
-		c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
-		handleProxyForward(ctx, config, listOfChangedFiles, r, payload)
+		handlePushEvent(ctx, cfg, event, r, payload)
 	case *github.PullRequestEvent:
-		repoOwner := event.GetRepo().GetOwner().GetLogin()
-
-		mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
-		if err != nil {
-			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
-			return
-		}
-		approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
-		if err != nil {
-			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
-			return
-		}
-
-		c := Context{
-			Repositories: mainPair.v3Client.Repositories,
-			PullRequests: mainPair.v3Client.PullRequests,
-			Issues:       mainPair.v3Client.Issues,
-			Git:          mainPair.v3Client.Git,
-			GraphQL:      mainPair.v4Client,
-			ApproverPRs:  approverPair.v3Client.PullRequests,
-
-			TemplatesFS:                 cfg.TemplatesFS,
-			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
-			Labels:                      event.GetPullRequest().Labels,
-			Owner:                       repoOwner,
-			Repo:                        event.GetRepo().GetName(),
-			RepoURL:                     event.GetRepo().GetHTMLURL(),
-			PrNumber:                    event.GetPullRequest().GetNumber(),
-			Ref:                         event.GetPullRequest().GetHead().GetRef(),
-			PrAuthor:                    event.GetPullRequest().GetUser().GetLogin(),
-			PrSHA:                       event.GetPullRequest().GetHead().GetSHA(),
-			DefaultBranch:               event.GetRepo().GetDefaultBranch(),
-		}
-
-		prLogger := slog.Default().With(
-			"context", c,
-		)
-
-		c.PrLogger = prLogger
-
-		config, err := getInRepoConfig(ctx, c)
-		if err != nil {
-			_ = c.commentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
-			prLogger.Error("Failed to get config", "err", err)
-			return
-		}
-
-		c.Config = config
-
-		c.getPrMetadata(ctx, event.GetPullRequest().GetBody())
-
-		c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
-		switch {
-		case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
-			handlePREvent(ctx, "merged", c)
-		case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
-			handlePREvent(ctx, "changed", c)
-		case event.GetAction() == "labeled" && doesPRHaveLabel(event.GetPullRequest().Labels, "show-plan"):
-			handlePREvent(ctx, "show-plan", c)
-		}
-
+		handlePullRequestEvent(ctx, cfg, event)
 	case *github.IssueCommentEvent:
-		repoOwner := event.GetRepo().GetOwner().GetLogin()
-		mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
-		if err != nil {
-			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
-			return
-		}
-		approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
-		if err != nil {
-			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
-			return
-		}
+		handleIssueCommentEvent(ctx, cfg, event)
+	}
+}
 
-		botIdentity, _ := getBotIdentity(ctx, mainPair.v4Client)
+func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEvent, r *http.Request, payload []byte) {
+	repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
-		//
-		// Allowing override makes it easier to test locally using a personal
-		// token. In those cases Telefonistka can be run with
-		// HANDLE_SELF_COMMENT=true to handle comments made manually.
-		if !cfg.HandleSelfComment && event.GetSender().GetLogin() == botIdentity {
-			slog.Debug("Ignoring self comment")
-			return
-		}
-		c := Context{
-			Repositories: mainPair.v3Client.Repositories,
-			PullRequests: mainPair.v3Client.PullRequests,
-			Issues:       mainPair.v3Client.Issues,
-			Git:          mainPair.v3Client.Git,
-			GraphQL:      mainPair.v4Client,
-			ApproverPRs:  approverPair.v3Client.PullRequests,
-
-			TemplatesFS:                 cfg.TemplatesFS,
-			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
-			Owner:                       repoOwner,
-			Repo:                        event.GetRepo().GetName(),
-			RepoURL:                     event.GetRepo().GetHTMLURL(),
-			PrNumber:                    event.GetIssue().GetNumber(),
-			PrAuthor:                    event.GetIssue().GetUser().GetLogin(),
-			Labels:                      event.GetIssue().Labels,
-			DefaultBranch:               event.GetRepo().GetDefaultBranch(),
-		}
-
-		prLogger := slog.Default().With(
-			"context", c,
-		)
-
-		c.PrLogger = prLogger
-
-		config, err := getInRepoConfig(ctx, c)
-		if err != nil {
-			prLogger.Error("Failed to get config", "err", err)
-			return
-		}
-		c.Config = config
-		c.getPrMetadata(ctx, event.GetIssue().GetBody())
-
-		issue := event.GetIssue()
-		owner := c.Owner
-		repo := c.Repo
-
-		// Check if this comment has an attached PR. If it does not we want to skip moving along.
-		pr, resp, err := c.PullRequests.Get(ctx, owner, repo, issue.GetNumber())
-		prom.InstrumentGhCall(resp)
-		if pr == nil || err != nil {
-			c.PrLogger.Debug("Issue is not a PR")
-			return
-		}
-
-		// Comment events doesn't have Ref/SHA in payload, enriching the object:
-		c.Ref = pr.GetHead().GetRef()
-		c.PrSHA = pr.GetHead().GetSHA()
-
-		c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
-		retrigger := event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody())
-		if retrigger {
-			handlePREvent(ctx, "retriggered", c)
-			return
-		}
-
-		if err := handleCommentPrEvent(ctx, c, event, botIdentity); err != nil {
-			prLogger.Error("Failed to handle comment event", "err", err)
-		}
-	default:
+	mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+	if err != nil {
+		slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 		return
+	}
+
+	c := Context{
+		Repositories:                mainPair.v3Client.Repositories,
+		TemplatesFS:                 cfg.TemplatesFS,
+		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
+		Owner:                       repoOwner,
+		Repo:                        event.GetRepo().GetName(),
+		RepoURL:                     event.GetRepo().GetHTMLURL(),
+	}
+	c.PrLogger = slog.Default().With("context", c)
+
+	defaultBranch := event.GetRepo().GetDefaultBranch()
+	if event.GetRef() != "refs/heads/"+defaultBranch {
+		return
+	}
+
+	config, _ := getInRepoConfig(ctx, c)
+	c.Config = config
+
+	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
+	handleProxyForward(ctx, config, generateListOfChangedFiles(event), r, payload)
+}
+
+func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.PullRequestEvent) {
+	repoOwner := event.GetRepo().GetOwner().GetLogin()
+
+	mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+	if err != nil {
+		slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
+		return
+	}
+	approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
+	if err != nil {
+		slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
+		return
+	}
+
+	c := Context{
+		Repositories: mainPair.v3Client.Repositories,
+		PullRequests: mainPair.v3Client.PullRequests,
+		Issues:       mainPair.v3Client.Issues,
+		Git:          mainPair.v3Client.Git,
+		GraphQL:      mainPair.v4Client,
+		ApproverPRs:  approverPair.v3Client.PullRequests,
+
+		TemplatesFS:                 cfg.TemplatesFS,
+		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
+		Labels:                      event.GetPullRequest().Labels,
+		Owner:                       repoOwner,
+		Repo:                        event.GetRepo().GetName(),
+		RepoURL:                     event.GetRepo().GetHTMLURL(),
+		PrNumber:                    event.GetPullRequest().GetNumber(),
+		Ref:                         event.GetPullRequest().GetHead().GetRef(),
+		PrAuthor:                    event.GetPullRequest().GetUser().GetLogin(),
+		PrSHA:                       event.GetPullRequest().GetHead().GetSHA(),
+		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
+	}
+	c.PrLogger = slog.Default().With("context", c)
+
+	config, err := getInRepoConfig(ctx, c)
+	if err != nil {
+		_ = c.commentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
+		c.PrLogger.Error("Failed to get config", "err", err)
+		return
+	}
+	c.Config = config
+
+	c.getPrMetadata(ctx, event.GetPullRequest().GetBody())
+
+	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
+	switch {
+	case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
+		handlePREvent(ctx, "merged", c)
+	case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
+		handlePREvent(ctx, "changed", c)
+	case event.GetAction() == "labeled" && doesPRHaveLabel(event.GetPullRequest().Labels, "show-plan"):
+		handlePREvent(ctx, "show-plan", c)
+	}
+}
+
+func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github.IssueCommentEvent) {
+	repoOwner := event.GetRepo().GetOwner().GetLogin()
+	mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+	if err != nil {
+		slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
+		return
+	}
+	approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
+	if err != nil {
+		slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
+		return
+	}
+
+	botIdentity, _ := getBotIdentity(ctx, mainPair.v4Client)
+
+	// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
+	//
+	// Allowing override makes it easier to test locally using a personal
+	// token. In those cases Telefonistka can be run with
+	// HANDLE_SELF_COMMENT=true to handle comments made manually.
+	if !cfg.HandleSelfComment && event.GetSender().GetLogin() == botIdentity {
+		slog.Debug("Ignoring self comment")
+		return
+	}
+	c := Context{
+		Repositories: mainPair.v3Client.Repositories,
+		PullRequests: mainPair.v3Client.PullRequests,
+		Issues:       mainPair.v3Client.Issues,
+		Git:          mainPair.v3Client.Git,
+		GraphQL:      mainPair.v4Client,
+		ApproverPRs:  approverPair.v3Client.PullRequests,
+
+		TemplatesFS:                 cfg.TemplatesFS,
+		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
+		Owner:                       repoOwner,
+		Repo:                        event.GetRepo().GetName(),
+		RepoURL:                     event.GetRepo().GetHTMLURL(),
+		PrNumber:                    event.GetIssue().GetNumber(),
+		PrAuthor:                    event.GetIssue().GetUser().GetLogin(),
+		Labels:                      event.GetIssue().Labels,
+		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
+	}
+	c.PrLogger = slog.Default().With("context", c)
+
+	config, err := getInRepoConfig(ctx, c)
+	if err != nil {
+		c.PrLogger.Error("Failed to get config", "err", err)
+		return
+	}
+	c.Config = config
+	c.getPrMetadata(ctx, event.GetIssue().GetBody())
+
+	// Check if this comment has an attached PR. If it does not we want to skip moving along.
+	pr, resp, err := c.PullRequests.Get(ctx, c.Owner, c.Repo, event.GetIssue().GetNumber())
+	prom.InstrumentGhCall(resp)
+	if pr == nil || err != nil {
+		c.PrLogger.Debug("Issue is not a PR")
+		return
+	}
+
+	// Comment events don't have Ref/SHA in payload, enrich from the PR.
+	c.Ref = pr.GetHead().GetRef()
+	c.PrSHA = pr.GetHead().GetSHA()
+
+	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
+	if event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody()) {
+		handlePREvent(ctx, "retriggered", c)
+		return
+	}
+
+	if err := handleCommentPrEvent(ctx, c, event, botIdentity); err != nil {
+		c.PrLogger.Error("Failed to handle comment event", "err", err)
 	}
 }
 
