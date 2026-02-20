@@ -1,6 +1,9 @@
 package githubapi
 
 import (
+	"context"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -657,4 +660,99 @@ func TestAutoMerge(t *testing.T) {
 		".ci-config/random-file.json",
 	})
 	generatePromotionPlanMetadataTestHelper(t, config, expectedPromotion, mockedHTTPClient)
+}
+
+func TestGetComponentConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		content   string
+		apiErr    error
+		respCode  int
+		wantErr   bool
+		wantBlock []string
+		wantAllow []string
+	}{
+		"valid config": {
+			content:   "promotionTargetBlockList:\n- \"prod/.*\"\npromotionTargetAllowList:\n- \"staging/.*\"\n",
+			respCode:  200,
+			wantBlock: []string{"prod/.*"},
+			wantAllow: []string{"staging/.*"},
+		},
+		"file not found (404) returns empty config": {
+			apiErr:   errors.New("not found"),
+			respCode: 404,
+		},
+		"API error (non-404)": {
+			apiErr:   errors.New("server error"),
+			respCode: 500,
+			wantErr:  true,
+		},
+		"invalid YAML": {
+			content:  ":::invalid",
+			respCode: 200,
+			wantErr:  true,
+		},
+		"empty file returns empty config": {
+			content:  "",
+			respCode: 200,
+		},
+		"disableArgoCDDiff flag": {
+			content:  "disableArgoCDDiff: true\n",
+			respCode: 200,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var gotPath string
+
+			repos := &mockRepoService{
+				getContentsFn: func(_ context.Context, _, _, path string, _ *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+					gotPath = path
+					if tc.apiErr != nil {
+						return nil, nil, ghResp(tc.respCode), tc.apiErr
+					}
+					return &github.RepositoryContent{
+						Content:  github.String(tc.content),
+						Encoding: github.String(""),
+					}, nil, ghResp(tc.respCode), nil
+				},
+			}
+
+			c := Context{
+				Repositories: repos,
+				Owner:        "owner",
+				Repo:         "repo",
+				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+			}
+
+			conf, err := getComponentConfig(t.Context(), c, "env/dev/myapp", "main")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if conf == nil {
+				t.Fatal("config is nil")
+			}
+			if gotPath != "env/dev/myapp/telefonistka.yaml" {
+				t.Errorf("path: got %q, want %q", gotPath, "env/dev/myapp/telefonistka.yaml")
+			}
+			if diff := deep.Equal(conf.PromotionTargetBlockList, tc.wantBlock); diff != nil {
+				t.Errorf("BlockList: %v", diff)
+			}
+			if diff := deep.Equal(conf.PromotionTargetAllowList, tc.wantAllow); diff != nil {
+				t.Errorf("AllowList: %v", diff)
+			}
+			if tc.content == "disableArgoCDDiff: true\n" && !conf.DisableArgoCDDiff {
+				t.Error("expected DisableArgoCDDiff to be true")
+			}
+		})
+	}
 }

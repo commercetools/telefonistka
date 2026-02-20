@@ -2,10 +2,22 @@ package githubapi
 
 import (
 	"context"
+	"net/http"
+	"net/url"
 
 	"github.com/google/go-github/v62/github"
 	"github.com/shurcooL/githubv4"
 )
+
+// ghResp returns a *github.Response suitable for prom.InstrumentGhCall.
+func ghResp(statusCode int) *github.Response {
+	return &github.Response{
+		Response: &http.Response{
+			StatusCode: statusCode,
+			Request:    &http.Request{URL: &url.URL{Path: "/repos/owner/repo/contents/path"}},
+		},
+	}
+}
 
 // mockRepoService implements repoService for testing.
 type mockRepoService struct {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"testing"
 
 	"github.com/google/go-github/v62/github"
@@ -162,6 +163,198 @@ func TestCreateCommit(t *testing.T) {
 			}
 			if commit.GetSHA() != commitSHA {
 				t.Errorf("commit SHA: got %q, want %q", commit.GetSHA(), commitSHA)
+			}
+		})
+	}
+}
+
+func TestGetDirecotyGitObjectSha(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		dirPath  string
+		dirItems []*github.RepositoryContent
+		apiErr   error
+		respCode int
+		wantSHA  string
+		wantErr  bool
+	}{
+		"found in parent listing": {
+			dirPath: "env/dev",
+			dirItems: []*github.RepositoryContent{
+				{Path: github.String("env/staging"), SHA: github.String("aaa")},
+				{Path: github.String("env/dev"), SHA: github.String("bbb")},
+			},
+			respCode: 200,
+			wantSHA:  "bbb",
+		},
+		"not found in parent listing": {
+			dirPath: "env/dev",
+			dirItems: []*github.RepositoryContent{
+				{Path: github.String("env/staging"), SHA: github.String("aaa")},
+			},
+			respCode: 200,
+			wantSHA:  "",
+		},
+		"parent dir missing (404)": {
+			dirPath:  "env/dev",
+			apiErr:   errors.New("not found"),
+			respCode: 404,
+			wantSHA:  "",
+		},
+		"API error (non-404)": {
+			dirPath:  "env/dev",
+			apiErr:   errors.New("server error"),
+			respCode: 500,
+			wantErr:  true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			repos := &mockRepoService{
+				getContentsFn: func(_ context.Context, _, _, _ string, _ *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+					return nil, tc.dirItems, ghResp(tc.respCode), tc.apiErr
+				},
+			}
+
+			c := Context{
+				Repositories: repos,
+				Owner:        "owner",
+				Repo:         "repo",
+				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+			}
+
+			sha, err := getDirecotyGitObjectSha(t.Context(), c, tc.dirPath, "main")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if sha != tc.wantSHA {
+				t.Errorf("SHA: got %q, want %q", sha, tc.wantSHA)
+			}
+		})
+	}
+}
+
+func TestGenerateDeletionTreeEntries(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		// contents maps path → directory listing returned by GetContents
+		contents map[string][]*github.RepositoryContent
+		// respCodes maps path → HTTP status code
+		respCodes map[string]int
+		// errors maps path → error
+		errors    map[string]error
+		wantPaths []string
+		wantErr   bool
+	}{
+		"flat directory": {
+			contents: map[string][]*github.RepositoryContent{
+				"target/app": {
+					{Path: github.String("target/app/values.yaml"), Type: github.String("file")},
+					{Path: github.String("target/app/chart.yaml"), Type: github.String("file")},
+				},
+			},
+			respCodes: map[string]int{"target/app": 200},
+			wantPaths: []string{"target/app/values.yaml", "target/app/chart.yaml"},
+		},
+		"nested directory": {
+			contents: map[string][]*github.RepositoryContent{
+				"target/app": {
+					{Path: github.String("target/app/file.yaml"), Type: github.String("file")},
+					{Path: github.String("target/app/sub"), Type: github.String("dir")},
+				},
+				"target/app/sub": {
+					{Path: github.String("target/app/sub/nested.yaml"), Type: github.String("file")},
+				},
+			},
+			respCodes: map[string]int{"target/app": 200, "target/app/sub": 200},
+			wantPaths: []string{"target/app/file.yaml", "target/app/sub/nested.yaml"},
+		},
+		"path does not exist (404)": {
+			respCodes: map[string]int{"target/app": 404},
+			wantPaths: nil,
+		},
+		"API error": {
+			respCodes: map[string]int{"target/app": 500},
+			errors:    map[string]error{"target/app": errors.New("server error")},
+			wantErr:   true,
+		},
+		"ignores non-file non-dir types": {
+			contents: map[string][]*github.RepositoryContent{
+				"target/app": {
+					{Path: github.String("target/app/file.yaml"), Type: github.String("file")},
+					{Path: github.String("target/app/link"), Type: github.String("symlink")},
+				},
+			},
+			respCodes: map[string]int{"target/app": 200},
+			wantPaths: []string{"target/app/file.yaml"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			repos := &mockRepoService{
+				getContentsFn: func(_ context.Context, _, _, path string, _ *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+					code := tc.respCodes[path]
+					if code == 0 {
+						code = 200
+					}
+					return nil, tc.contents[path], ghResp(code), tc.errors[path]
+				},
+			}
+
+			c := Context{
+				Repositories: repos,
+				Owner:        "owner",
+				Repo:         "repo",
+				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+			}
+
+			var entries []*github.TreeEntry
+			path := "target/app"
+			branch := "main"
+			err := generateDeletionTreeEntries(t.Context(), &c, &path, &branch, &entries)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			var gotPaths []string
+			for _, e := range entries {
+				gotPaths = append(gotPaths, e.GetPath())
+				if e.SHA != nil {
+					t.Errorf("deletion entry for %q should have nil SHA", e.GetPath())
+				}
+			}
+
+			slices.Sort(gotPaths)
+			want := slices.Clone(tc.wantPaths)
+			slices.Sort(want)
+
+			if len(gotPaths) != len(want) {
+				t.Fatalf("entries: got %v, want %v", gotPaths, want)
+			}
+			for i := range gotPaths {
+				if gotPaths[i] != want[i] {
+					t.Errorf("entry[%d]: got %q, want %q", i, gotPaths[i], want[i])
+				}
 			}
 		})
 	}
