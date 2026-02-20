@@ -26,8 +26,6 @@ func generatePromotionPrBody(ctx context.Context, c Context, components string, 
 		TargetPaths: promotion.Metadata.TargetPaths,
 		SourcePath:  promotion.Metadata.SourcePath,
 	}
-	// newPrMetadata.PreviousPromotionMetadata[ghPrClientDetails.PrNumber].TargetPaths = targetPaths
-	// newPrMetadata.PreviousPromotionMetadata[ghPrClientDetails.PrNumber].SourcePath = sourcePath
 
 	newPrMetadata.PromotedPaths = slices.Collect(maps.Keys(promotion.ComputedSyncPaths))
 
@@ -35,11 +33,7 @@ func generatePromotionPrBody(ctx context.Context, c Context, components string, 
 
 	newPrBody = fmt.Sprintf("Promotion path(%s):\n\n", components)
 
-	keys := make([]int, 0)
-	for k := range newPrMetadata.PreviousPromotionMetadata {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
+	keys := slices.Sorted(maps.Keys(newPrMetadata.PreviousPromotionMetadata))
 
 	newPrBody = prBody(keys, newPrMetadata, newPrBody, promotionSkipPaths)
 
@@ -112,22 +106,11 @@ func prBody(keys []int, newPrMetadata prMetadata, newPrBody string, promotionSki
 
 // filterSkipPaths filters out the paths that are marked as skipped
 func filterSkipPaths(targetPaths []string, promotionSkipPaths map[string]bool) []string {
-	pathSkip := make(map[string]bool)
-	for _, targetPath := range targetPaths {
-		if _, ok := promotionSkipPaths[targetPath]; ok {
-			pathSkip[targetPath] = true
-		} else {
-			pathSkip[targetPath] = false
-		}
-	}
-
 	var paths []string
-
-	for path, skip := range pathSkip {
-		if !skip {
-			paths = append(paths, path)
+	for _, p := range targetPaths {
+		if !promotionSkipPaths[p] {
+			paths = append(paths, p)
 		}
 	}
-
 	return paths
 }
