@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -15,20 +13,6 @@ import (
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/oauth2"
 )
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
-func getCrucialEnv(key string) (string, error) {
-	if value, ok := os.LookupEnv(key); ok {
-		return value, nil
-	}
-	return "", fmt.Errorf("required environment variable %s is not set", key)
-}
 
 type GhClientPair struct {
 	v3Client *github.Client
@@ -127,33 +111,24 @@ func createGithubGraphQlClient(githubOauthToken string, githubGraphqlAltURL stri
 	return client
 }
 
-func createGhAppClientPair(ctx context.Context, githubAppId int64, owner string, ghAppPKeyPathEnvVarName string) (GhClientPair, error) {
-	var githubRestAltURL string
-	var githubGraphqlAltURL string
-	githubAppPrivateKeyPath, err := getCrucialEnv(ghAppPKeyPathEnvVarName)
-	if err != nil {
-		return GhClientPair{}, err
-	}
-	githubHost := getEnv("GITHUB_HOST", "")
-	if githubHost != "" {
-		githubRestAltURL = fmt.Sprintf("https://%s/api/v3", githubHost)
-		githubGraphqlAltURL = fmt.Sprintf("https://%s/api/graphql", githubHost)
-		slog.Info("Github REST API endpoint is configured", "url", githubRestAltURL)
-		slog.Info("Github graphql API endpoint is configured", "url", githubGraphqlAltURL)
+func createGhAppClientPair(ctx context.Context, appID int64, keyPath string, endpoints GithubEndpoints, owner string) (GhClientPair, error) {
+	if endpoints.RestURL != "" {
+		slog.Info("Github REST API endpoint is configured", "url", endpoints.RestURL)
+		slog.Info("Github graphql API endpoint is configured", "url", endpoints.GraphqlURL)
 	} else {
 		slog.Debug("Using public Github API endpoint")
 	}
 
-	githubAppInstallationId, err := getAppInstallationId(githubAppPrivateKeyPath, githubAppId, githubRestAltURL, ctx, owner)
+	githubAppInstallationId, err := getAppInstallationId(keyPath, appID, endpoints.RestURL, ctx, owner)
 	if err != nil {
 		return GhClientPair{}, fmt.Errorf("getting app installation ID for owner %s: %w", owner, err)
 	}
 
-	v3, err := createGithubAppRestClient(githubAppPrivateKeyPath, githubAppId, githubAppInstallationId, githubRestAltURL, ctx)
+	v3, err := createGithubAppRestClient(keyPath, appID, githubAppInstallationId, endpoints.RestURL, ctx)
 	if err != nil {
 		return GhClientPair{}, fmt.Errorf("creating REST client: %w", err)
 	}
-	v4, err := createGithubAppGraphQlClient(githubAppPrivateKeyPath, githubAppId, githubAppInstallationId, githubGraphqlAltURL, githubRestAltURL, ctx)
+	v4, err := createGithubAppGraphQlClient(keyPath, appID, githubAppInstallationId, endpoints.GraphqlURL, endpoints.RestURL, ctx)
 	if err != nil {
 		return GhClientPair{}, fmt.Errorf("creating GraphQL client: %w", err)
 	}
@@ -161,40 +136,30 @@ func createGhAppClientPair(ctx context.Context, githubAppId int64, owner string,
 	return GhClientPair{v3Client: v3, v4Client: v4}, nil
 }
 
-func createGhTokenClientPair(ctx context.Context, ghOauthToken string) GhClientPair {
-	var githubRestAltURL string
-	var githubGraphqlAltURL string
-	githubHost := getEnv("GITHUB_HOST", "")
-	if githubHost != "" {
-		githubRestAltURL = fmt.Sprintf("https://%s/api/v3", githubHost)
-		githubGraphqlAltURL = fmt.Sprintf("https://%s/api/graphql", githubHost)
-		slog.Info("Github REST API endpoint is configured", "url", githubRestAltURL)
-		slog.Info("Github graphql API endpoint is configured", "url", githubGraphqlAltURL)
+func createGhTokenClientPair(ctx context.Context, oauthToken string, endpoints GithubEndpoints) GhClientPair {
+	if endpoints.RestURL != "" {
+		slog.Info("Github REST API endpoint is configured", "url", endpoints.RestURL)
+		slog.Info("Github graphql API endpoint is configured", "url", endpoints.GraphqlURL)
 	} else {
 		slog.Debug("Using public Github API endpoint")
 	}
 
 	return GhClientPair{
-		v3Client: createGithubRestClient(ghOauthToken, githubRestAltURL, ctx),
-		v4Client: createGithubGraphQlClient(ghOauthToken, githubGraphqlAltURL),
+		v3Client: createGithubRestClient(oauthToken, endpoints.RestURL, ctx),
+		v4Client: createGithubGraphQlClient(oauthToken, endpoints.GraphqlURL),
 	}
 }
 
-func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPair], ghAppIdEnvVarName string, ghAppPKeyPathEnvVarName string, ghOauthTokenEnvVarName string, repoOwner string, ctx context.Context) error {
-	githubAppId := getEnv(ghAppIdEnvVarName, "")
-	var keyExist bool
-	if githubAppId != "" {
+func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPair], creds ClientConfig, endpoints GithubEndpoints, repoOwner string, ctx context.Context) error {
+	if creds.AppID != 0 {
+		var keyExist bool
 		*gcp, keyExist = ghClientCache.Get(repoOwner)
 		if keyExist {
 			slog.Debug("Found cached client for owner", "owner", repoOwner)
 			return nil
 		}
-		slog.Info("Did not find cached client for owner, creating one", "owner", repoOwner, "github_app_id_env", ghAppIdEnvVarName, "github_app_key_env", ghAppPKeyPathEnvVarName)
-		githubAppIdint, err := strconv.ParseInt(githubAppId, 10, 64)
-		if err != nil {
-			return fmt.Errorf("parsing %s value %q as int64: %w", ghAppIdEnvVarName, githubAppId, err)
-		}
-		pair, err := createGhAppClientPair(ctx, githubAppIdint, repoOwner, ghAppPKeyPathEnvVarName)
+		slog.Info("Did not find cached client for owner, creating one", "owner", repoOwner, "app_id", creds.AppID)
+		pair, err := createGhAppClientPair(ctx, creds.AppID, creds.AppKeyPath, endpoints, repoOwner)
 		if err != nil {
 			return fmt.Errorf("creating app client pair: %w", err)
 		}
@@ -202,18 +167,18 @@ func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPa
 		ghClientCache.Add(repoOwner, *gcp)
 		return nil
 	}
+	var keyExist bool
 	*gcp, keyExist = ghClientCache.Get("global")
 	if keyExist {
 		slog.Debug("Found global cached client")
 		return nil
 	}
-	slog.Info("Did not find global cached client, creating one with env var", "env", ghOauthTokenEnvVarName)
-	ghOauthToken, err := getCrucialEnv(ghOauthTokenEnvVarName)
-	if err != nil {
-		return err
+	slog.Info("Did not find global cached client, creating one")
+	if creds.OAuthToken == "" {
+		return fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
 	}
 
-	*gcp = createGhTokenClientPair(ctx, ghOauthToken)
+	*gcp = createGhTokenClientPair(ctx, creds.OAuthToken, endpoints)
 	ghClientCache.Add("global", *gcp)
 	return nil
 }

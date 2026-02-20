@@ -69,12 +69,24 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 	tmplFS := resolveTemplatesFS()
 	commitStatusURLTmplPath := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH")
 
+	endpoints := NewGithubEndpoints(os.Getenv("GITHUB_HOST"))
+	mainCreds := ClientConfig{
+		AppID:      parseOptionalInt64(os.Getenv("GITHUB_APP_ID")),
+		AppKeyPath: os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH"),
+		OAuthToken: os.Getenv("GITHUB_OAUTH_TOKEN"),
+	}
+	approverCreds := ClientConfig{
+		AppID:      parseOptionalInt64(os.Getenv("APPROVER_GITHUB_APP_ID")),
+		AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
+		OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
+	}
+
 	switch event := e.(type) {
 	case *github.PushEvent:
 		// this is a commit push, do something with it?
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, mainCreds, endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
@@ -109,11 +121,11 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 	case *github.PullRequestEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, mainCreds, endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
-		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, approverCreds, endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
@@ -168,11 +180,11 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 
 	case *github.IssueCommentEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
-		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, mainCreds, endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
-		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, approverCreds, endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
@@ -509,4 +521,12 @@ func generateListOfChangedFiles(eventPayload *github.PushEvent) []string {
 	}
 
 	return slices.Collect(maps.Keys(fileList))
+}
+
+// parseOptionalInt64 parses s as an int64, returning 0 for empty or
+// unparseable values. This is intentionally lenient: a zero AppID
+// signals "use OAuth token instead".
+func parseOptionalInt64(s string) int64 {
+	v, _ := strconv.ParseInt(s, 10, 64)
+	return v
 }

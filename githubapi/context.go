@@ -13,6 +13,32 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
+// ClientConfig holds pre-resolved credentials for one GitHub client pair.
+type ClientConfig struct {
+	AppID      int64  // 0 → use OAuthToken
+	AppKeyPath string
+	OAuthToken string
+}
+
+// GithubEndpoints holds resolved GitHub API base URLs.
+// Zero value means public github.com.
+type GithubEndpoints struct {
+	RestURL    string // e.g. "https://ghes.example.com/api/v3"
+	GraphqlURL string // e.g. "https://ghes.example.com/api/graphql"
+}
+
+// NewGithubEndpoints computes REST and GraphQL URLs from a hostname.
+// Empty host means public github.com (zero-value endpoints).
+func NewGithubEndpoints(host string) GithubEndpoints {
+	if host == "" {
+		return GithubEndpoints{}
+	}
+	return GithubEndpoints{
+		RestURL:    "https://" + host + "/api/v3",
+		GraphqlURL: "https://" + host + "/api/graphql",
+	}
+}
+
 type repoService interface {
 	GetContents(ctx context.Context, owner, repo, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error)
 CreateStatus(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error)
