@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/alexliesenfeld/health"
-	"github.com/commercetools/telefonistka/internal/pkg/githubapi"
+	"github.com/commercetools/telefonistka/githubapi"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"

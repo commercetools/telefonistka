@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/commercetools/telefonistka/internal/pkg/configuration"
-	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
+	"github.com/commercetools/telefonistka/configuration"
+	prom "github.com/commercetools/telefonistka/prometheus"
 	"golang.org/x/exp/maps"
 )
 

@@ -12,7 +12,7 @@ VENDOR_DIR = vendor
 get-deps: $(VENDOR_DIR)
 
 $(VENDOR_DIR):
-	go generate $$(go list ./internal/pkg/mocks/...)
+	go generate $$(go list ./mocks/...)
 	go mod download
 
 .PHONY: build
@@ -25,5 +25,5 @@ clean:
 
 .PHONY: test
 test: $(VENDOR_DIR)
-	TEMPLATES_PATH=../../../templates/ go test -v -timeout 30s ./...
+	TEMPLATES_PATH=../templates/ go test -v -timeout 30s ./...
 

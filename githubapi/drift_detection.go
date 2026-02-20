@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
+	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"

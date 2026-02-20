@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/commercetools/telefonistka/internal/pkg/argocd"
+	"github.com/commercetools/telefonistka/argocd"
 	"github.com/google/go-github/v62/github"
 	"github.com/stretchr/testify/assert"
 )
@@ -326,7 +326,7 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		},
 	}
 
-	if err := os.Setenv("TEMPLATES_PATH", "../../../templates/"); err != nil { //nolint:tenv
+	if err := os.Setenv("TEMPLATES_PATH", "../templates/"); err != nil { //nolint:tenv
 		t.Fatal(err)
 	}
 

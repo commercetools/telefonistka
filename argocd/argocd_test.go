@@ -18,7 +18,7 @@ import (
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	reposerverApiClient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
-	"github.com/commercetools/telefonistka/internal/pkg/mocks"
+	"github.com/commercetools/telefonistka/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"

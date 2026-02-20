@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
+	cfg "github.com/commercetools/telefonistka/configuration"
 	"github.com/go-test/deep"
 	"github.com/google/go-github/v62/github"
 	"github.com/migueleliasweb/go-github-mock/src/mock"

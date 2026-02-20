@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	cfg "github.com/commercetools/telefonistka/internal/pkg/configuration"
-	prom "github.com/commercetools/telefonistka/internal/pkg/prometheus"
+	cfg "github.com/commercetools/telefonistka/configuration"
+	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
 	yaml "gopkg.in/yaml.v2"
 )
