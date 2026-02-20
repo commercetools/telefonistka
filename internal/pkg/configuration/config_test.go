@@ -6,6 +6,39 @@ import (
 	"testing"
 )
 
+func TestParseConfigFromYamlEdgeCases(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		input   string
+		wantErr bool
+	}{
+		"empty string": {
+			input:   "",
+			wantErr: false,
+		},
+		"malformed yaml": {
+			input:   "invalid: [yaml",
+			wantErr: true,
+		},
+		"unknown fields": {
+			input:   "unknownKey: value",
+			wantErr: false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := ParseConfigFromYaml(tc.input)
+			if tc.wantErr && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestConfigurationParse(t *testing.T) {
 	t.Parallel()
 
