@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -35,6 +36,121 @@ func TestGetPR(t *testing.T) {
 			t.Errorf("Expected to get a PR object")
 		}
 	})
+}
+
+func TestIsMergeErrorRetryable(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		errMessage string
+		want       bool
+	}{
+		"retryable 405 error": {
+			errMessage: "405 try the merge again",
+			want:       true,
+		},
+		"non-retryable 405": {
+			errMessage: "405 something else",
+			want:       false,
+		},
+		"non-405 with merge text": {
+			errMessage: "try the merge again",
+			want:       false,
+		},
+		"empty string": {
+			errMessage: "",
+			want:       false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := isMergeErrorRetryable(tc.errMessage); got != tc.want {
+				t.Errorf("isMergeErrorRetryable(%q) = %v, want %v", tc.errMessage, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDoesPRHaveLabel(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		labels []*github.Label
+		name   string
+		want   bool
+	}{
+		"label present": {
+			labels: []*github.Label{{Name: github.String("deploy")}},
+			name:   "deploy",
+			want:   true,
+		},
+		"label absent": {
+			labels: []*github.Label{{Name: github.String("deploy")}},
+			name:   "nope",
+			want:   false,
+		},
+		"nil labels": {
+			labels: nil,
+			name:   "any",
+			want:   false,
+		},
+		"nil label name": {
+			labels: []*github.Label{{}},
+			name:   "any",
+			want:   false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := doesPRHaveLabel(tc.labels, tc.name); got != tc.want {
+				t.Errorf("doesPRHaveLabel() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFilterSkipPaths(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		targetPaths        []string
+		promotionSkipPaths map[string]bool
+		want               []string
+	}{
+		"no skip paths": {
+			targetPaths:        []string{"a", "b", "c"},
+			promotionSkipPaths: map[string]bool{},
+			want:               []string{"a", "b", "c"},
+		},
+		"all skipped": {
+			targetPaths:        []string{"a", "b"},
+			promotionSkipPaths: map[string]bool{"a": true, "b": true},
+			want:               []string{},
+		},
+		"partial skip": {
+			targetPaths:        []string{"a", "b", "c"},
+			promotionSkipPaths: map[string]bool{"b": true},
+			want:               []string{"a", "c"},
+		},
+		"empty targets": {
+			targetPaths:        []string{},
+			promotionSkipPaths: map[string]bool{"a": true},
+			want:               []string{},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := filterSkipPaths(tc.targetPaths, tc.promotionSkipPaths)
+			slices.Sort(got)
+			slices.Sort(tc.want)
+			if len(got) == 0 && len(tc.want) == 0 {
+				return
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("filterSkipPaths() = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }
 
 func TestGenerateSafePromotionBranchName(t *testing.T) {
