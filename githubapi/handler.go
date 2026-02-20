@@ -119,7 +119,7 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 
 		config, err := GetInRepoConfig(ctx, c)
 		if err != nil {
-			_ = c.CommentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
+			_ = c.commentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
 			prLogger.Error("Failed to get config", "err", err)
 			return
 		}
@@ -285,7 +285,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 
 			var treeEntries []*github.TreeEntry
 			for trgt, src := range promotion.ComputedSyncPaths {
-				err = GenerateSyncTreeEntriesForCommit(ctx, &treeEntries, c, src, trgt, c.DefaultBranch)
+				err = generateSyncTreeEntriesForCommit(ctx, &treeEntries, c, src, trgt, c.DefaultBranch)
 				if err != nil {
 					c.PrLogger.Error("Failed to generate treeEntries", "source", src, "target", trgt, "err", err)
 				} else {

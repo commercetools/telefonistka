@@ -209,7 +209,7 @@ func DetectDrift(ctx context.Context, c Context) error {
 	for _, promotion := range promotions {
 		c.PrLogger.Debug("Checking drift for source", "source", promotion.Metadata.SourcePath)
 		for trgt, src := range promotion.ComputedSyncPaths {
-			hasDiff, diffOutput, _ := CompareRepoDirectories(ctx, c, src, trgt, c.DefaultBranch)
+			hasDiff, diffOutput, _ := compareRepoDirectories(ctx, c, src, trgt, c.DefaultBranch)
 			if hasDiff {
 				mapKey := fmt.Sprintf("`%s` ↔️  `%s`", src, trgt)
 				diffOutputMap[mapKey] = diffOutput

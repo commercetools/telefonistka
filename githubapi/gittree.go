@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-github/v62/github"
 )
 
-func GenerateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*github.TreeEntry, c Context, sourcePath string, targetPath string, defaultBranch string) error {
+func generateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*github.TreeEntry, c Context, sourcePath string, targetPath string, defaultBranch string) error {
 	sourcePathSHA, err := getDirectoryGitObjectSHA(ctx, c, sourcePath, defaultBranch)
 
 	if sourcePathSHA == "" {

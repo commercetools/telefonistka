@@ -36,8 +36,8 @@ func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[stri
 
 		c.PrLogger.Debug("Source s is different from target", "source", sourcePath+"/"+filename, "target", targetPath+"/"+filename)
 		hasDiff = true
-		sourceFileContent, _ := GetFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
-		targetFileContent, _ := GetFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
+		sourceFileContent, _ := getFileContent(ctx, c, c.DefaultBranch, sourcePath+"/"+filename)
+		targetFileContent, _ := getFileContent(ctx, c, c.DefaultBranch, targetPath+"/"+filename)
 
 		edits := myers.ComputeEdits(span.URIFromPath(filename), sourceFileContent, targetFileContent)
 		diffOutput.WriteString(fmt.Sprint(gotextdiff.ToUnified(sourcePath+"/"+filename, targetPath+"/"+filename, sourceFileContent, edits)))
@@ -66,7 +66,7 @@ func generateDiffOutput(ctx context.Context, c Context, sourceFilesSHAs map[stri
 	return hasDiff, diffOutput.String(), nil
 }
 
-func CompareRepoDirectories(ctx context.Context, c Context, sourcePath string, targetPath string, defaultBranch string) (bool, string, error) {
+func compareRepoDirectories(ctx context.Context, c Context, sourcePath string, targetPath string, defaultBranch string) (bool, string, error) {
 	// Compares two directories content
 
 	// comparing sourcePath targetPath Git object SHA to avoid costly tree compare:

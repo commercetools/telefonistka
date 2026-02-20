@@ -55,7 +55,7 @@ func TestCommentOnPr(t *testing.T) {
 				PrLogger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
-			err := c.CommentOnPr(t.Context(), tc.body)
+			err := c.commentOnPr(t.Context(), tc.body)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

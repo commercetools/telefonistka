@@ -101,7 +101,7 @@ func ApprovePr(ctx context.Context, c Context) error {
 	return nil
 }
 
-func (p Context) CommentOnPr(ctx context.Context, commentBody string) error {
+func (p Context) commentOnPr(ctx context.Context, commentBody string) error {
 	commentBody = "<!-- telefonistka_tag -->\n" + commentBody
 
 	comment := &github.IssueComment{Body: &commentBody}
@@ -114,7 +114,7 @@ func (p Context) CommentOnPr(ctx context.Context, commentBody string) error {
 }
 
 func commentPR(ctx context.Context, c Context, commentBody string) error {
-	if err := c.CommentOnPr(ctx, commentBody); err != nil {
+	if err := c.commentOnPr(ctx, commentBody); err != nil {
 		c.PrLogger.Error("Failed to comment in PR", "err", err)
 		return err
 	}

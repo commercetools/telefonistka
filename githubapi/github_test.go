@@ -753,7 +753,7 @@ func TestGetFileContent(t *testing.T) {
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
-			got, err := GetFileContent(t.Context(), c, "main", "telefonistka.yaml")
+			got, err := getFileContent(t.Context(), c, "main", "telefonistka.yaml")
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

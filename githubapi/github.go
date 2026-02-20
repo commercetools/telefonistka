@@ -46,7 +46,7 @@ func executeTemplateFile(templateName string, templateFile string, data any) (st
 }
 
 func GetInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
-	inRepoConfigFileContentString, err := GetFileContent(ctx, c, c.DefaultBranch, "telefonistka.yaml")
+	inRepoConfigFileContentString, err := getFileContent(ctx, c, c.DefaultBranch, "telefonistka.yaml")
 	if err != nil {
 		c.PrLogger.Error("Could not get in-repo configuration", "err", err)
 		inRepoConfigFileContentString = ""
@@ -58,7 +58,7 @@ func GetInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
 	return conf, err
 }
 
-func GetFileContent(ctx context.Context, c Context, branch string, filePath string) (string, error) {
+func getFileContent(ctx context.Context, c Context, branch string, filePath string) (string, error) {
 	rGetContentOps := github.RepositoryContentGetOptions{Ref: branch}
 	fileContent, _, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, filePath, &rGetContentOps)
 	if err != nil {
