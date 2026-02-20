@@ -223,7 +223,7 @@ func DetectDrift(ctx context.Context, c Context) error {
 			return err
 		}
 
-		err = commentPR(ctx, c, templateOutput)
+		err = c.commentOnPr(ctx, templateOutput)
 		if err != nil {
 			return err
 		}

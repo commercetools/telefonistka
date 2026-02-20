@@ -49,12 +49,11 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 
 func MergePr(ctx context.Context, c Context) error {
 	operation := func() error {
-		err := tryMergePR(ctx, c, c.PrNumber)
+		_, resp, err := c.PullRequests.Merge(ctx, c.Owner, c.Repo, c.PrNumber, "Auto-merge", nil)
+		prom.InstrumentGhCall(resp)
 		if err != nil {
 			if isMergeErrorRetryable(err.Error()) {
-				if err != nil {
-					c.PrLogger.Warn("Failed to merge PR: transient error", "err", err)
-				}
+				c.PrLogger.Warn("Failed to merge PR: transient error", "err", err)
 				return err
 			}
 			c.PrLogger.Error("Failed to merge PR", "err", err)
@@ -69,12 +68,6 @@ func MergePr(ctx context.Context, c Context) error {
 		c.PrLogger.Error("Failed to merge PR: backoff failed", "err", err)
 	}
 
-	return err
-}
-
-func tryMergePR(ctx context.Context, details Context, number int) error {
-	_, resp, err := details.PullRequests.Merge(ctx, details.Owner, details.Repo, number, "Auto-merge", nil)
-	prom.InstrumentGhCall(resp)
 	return err
 }
 
@@ -113,19 +106,11 @@ func (p Context) commentOnPr(ctx context.Context, commentBody string) error {
 	return err
 }
 
-func commentPR(ctx context.Context, c Context, commentBody string) error {
-	if err := c.commentOnPr(ctx, commentBody); err != nil {
-		c.PrLogger.Error("Failed to comment in PR", "err", err)
-		return err
-	}
-	return nil
-}
-
 func commentPlanInPR(ctx context.Context, c Context, promotions map[string]PromotionInstance) {
 	templateOutput, err := executeTemplate("dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
 	if err != nil {
 		c.PrLogger.Error("Failed to generate dry-run comment template", "err", err)
 		return
 	}
-	commentPR(ctx, c, templateOutput)
+	c.commentOnPr(ctx, templateOutput)
 }

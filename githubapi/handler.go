@@ -191,7 +191,8 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 		repo := c.Repo
 
 		// Check if this comment has an attached PR. If it does not we want to skip moving along.
-		pr, err := getPR(ctx, c.PullRequests, owner, repo, issue.GetNumber())
+		pr, resp, err := c.PullRequests.Get(ctx, owner, repo, issue.GetNumber())
+		prom.InstrumentGhCall(resp)
 		if pr == nil || err != nil {
 			c.PrLogger.Debug("Issue is not a PR")
 			return
@@ -348,7 +349,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 					return err
 				}
 
-				if err := commentPR(ctx, c, templateOutput); err != nil {
+				if err := c.commentOnPr(ctx, templateOutput); err != nil {
 					return err
 				}
 
@@ -457,12 +458,6 @@ func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bo
 
 func isRetriggerComment(body string) bool {
 	return strings.TrimSpace(body) == "/retrigger"
-}
-
-func getPR(ctx context.Context, c pullRequestService, owner, repo string, number int) (*github.PullRequest, error) {
-	pr, res, err := c.Get(ctx, owner, repo, number)
-	prom.InstrumentGhCall(res)
-	return pr, err
 }
 
 func doesPRHaveLabel(labels []*github.Label, name string) bool {

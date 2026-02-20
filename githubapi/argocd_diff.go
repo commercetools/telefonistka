@@ -109,7 +109,7 @@ func CommentDiff(ctx context.Context, c Context) error {
 			return fmt.Errorf("generate diff comment: %w", err)
 		}
 		for _, comment := range comments {
-			err = commentPR(ctx, c, comment)
+			err = c.commentOnPr(ctx, comment)
 			if err != nil {
 				return fmt.Errorf("commenting on PR: %w", err)
 			}
