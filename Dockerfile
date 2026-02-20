@@ -29,8 +29,6 @@ CMD ["server"]
 
 
 FROM scratch
-ENV wf_version="0.0.5"
-ENV wf_description="K8s team GitOps prmoter webhook server"
 WORKDIR /telefonistka
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /go/src/github.com/commercetools/telefonistka/telefonistka /telefonistka/bin/telefonistka
