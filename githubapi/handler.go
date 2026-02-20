@@ -61,7 +61,10 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 		// this is a commit push, do something with it?
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
+		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
+			return
+		}
 
 		c := Context{
 			Repositories: mainGithubClientPair.v3Client.Repositories,
@@ -91,8 +94,14 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 	case *github.PullRequestEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
-		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
+		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
+			return
+		}
+		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
+			return
+		}
 
 		c := Context{
 			Repositories: mainGithubClientPair.v3Client.Repositories,
@@ -142,8 +151,14 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 
 	case *github.IssueCommentEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
-		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
-		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
+		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
+			return
+		}
+		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx); err != nil {
+			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
+			return
+		}
 
 		botIdentity, _ := getBotIdentity(ctx, mainGithubClientPair.v4Client)
 

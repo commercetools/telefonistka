@@ -72,21 +72,21 @@ func getAppInstallationId(githubAppPrivateKeyPath string, githubAppId int64, git
 	return 0, err
 }
 
-func createGithubAppRestClient(githubAppPrivateKeyPath string, githubAppId int64, githubAppInstallationId int64, githubRestAltURL string, ctx context.Context) *github.Client {
+func createGithubAppRestClient(githubAppPrivateKeyPath string, githubAppId int64, githubAppInstallationId int64, githubRestAltURL string, ctx context.Context) (*github.Client, error) {
 	itr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport, githubAppId, githubAppInstallationId, githubAppPrivateKeyPath)
 	if err != nil {
-		slog.Error("NewKeyFromFile", "err", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("loading installation key: %w", err)
 	}
-	var client *github.Client
 
 	if githubRestAltURL != "" {
 		itr.BaseURL = githubRestAltURL
-		client, _ = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(githubRestAltURL, githubRestAltURL)
-	} else {
-		client = github.NewClient(&http.Client{Transport: itr})
+		client, err := github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(githubRestAltURL, githubRestAltURL)
+		if err != nil {
+			return nil, fmt.Errorf("configuring enterprise REST URL: %w", err)
+		}
+		return client, nil
 	}
-	return client
+	return github.NewClient(&http.Client{Transport: itr}), nil
 }
 
 func createGithubRestClient(githubOauthToken string, githubRestAltURL string, ctx context.Context) *github.Client {
@@ -102,21 +102,17 @@ func createGithubRestClient(githubOauthToken string, githubRestAltURL string, ct
 	return client
 }
 
-func createGithubAppGraphQlClient(githubAppPrivateKeyPath string, githubAppId int64, githubAppInstallationId int64, githubGraphqlAltURL string, githubRestAltURL string, ctx context.Context) *githubv4.Client {
+func createGithubAppGraphQlClient(githubAppPrivateKeyPath string, githubAppId int64, githubAppInstallationId int64, githubGraphqlAltURL string, githubRestAltURL string, ctx context.Context) (*githubv4.Client, error) {
 	itr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport, githubAppId, githubAppInstallationId, githubAppPrivateKeyPath)
 	if err != nil {
-		slog.Error("NewKeyFromFile", "err", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("loading installation key: %w", err)
 	}
-	var client *githubv4.Client
 
 	if githubGraphqlAltURL != "" {
 		itr.BaseURL = githubRestAltURL
-		client = githubv4.NewEnterpriseClient(githubGraphqlAltURL, &http.Client{Transport: itr})
-	} else {
-		client = githubv4.NewClient(&http.Client{Transport: itr})
+		return githubv4.NewEnterpriseClient(githubGraphqlAltURL, &http.Client{Transport: itr}), nil
 	}
-	return client
+	return githubv4.NewClient(&http.Client{Transport: itr}), nil
 }
 
 func createGithubGraphQlClient(githubOauthToken string, githubGraphqlAltURL string) *githubv4.Client {
@@ -133,7 +129,7 @@ func createGithubGraphQlClient(githubOauthToken string, githubGraphqlAltURL stri
 	return client
 }
 
-func createGhAppClientPair(ctx context.Context, githubAppId int64, owner string, ghAppPKeyPathEnvVarName string) GhClientPair {
+func createGhAppClientPair(ctx context.Context, githubAppId int64, owner string, ghAppPKeyPathEnvVarName string) (GhClientPair, error) {
 	var githubRestAltURL string
 	var githubGraphqlAltURL string
 	githubAppPrivateKeyPath := getCrucialEnv(ghAppPKeyPathEnvVarName)
@@ -149,13 +145,19 @@ func createGhAppClientPair(ctx context.Context, githubAppId int64, owner string,
 
 	githubAppInstallationId, err := getAppInstallationId(githubAppPrivateKeyPath, githubAppId, githubRestAltURL, ctx, owner)
 	if err != nil {
-		slog.Error("Couldn't find installation for app ID and repo owner", "github_app_id", githubAppId, "owner", owner)
+		return GhClientPair{}, fmt.Errorf("getting app installation ID for owner %s: %w", owner, err)
 	}
 
-	return GhClientPair{
-		v3Client: createGithubAppRestClient(githubAppPrivateKeyPath, githubAppId, githubAppInstallationId, githubRestAltURL, ctx),
-		v4Client: createGithubAppGraphQlClient(githubAppPrivateKeyPath, githubAppId, githubAppInstallationId, githubGraphqlAltURL, githubRestAltURL, ctx),
+	v3, err := createGithubAppRestClient(githubAppPrivateKeyPath, githubAppId, githubAppInstallationId, githubRestAltURL, ctx)
+	if err != nil {
+		return GhClientPair{}, fmt.Errorf("creating REST client: %w", err)
 	}
+	v4, err := createGithubAppGraphQlClient(githubAppPrivateKeyPath, githubAppId, githubAppInstallationId, githubGraphqlAltURL, githubRestAltURL, ctx)
+	if err != nil {
+		return GhClientPair{}, fmt.Errorf("creating GraphQL client: %w", err)
+	}
+
+	return GhClientPair{v3Client: v3, v4Client: v4}, nil
 }
 
 func createGhTokenClientPair(ctx context.Context, ghOauthToken string) GhClientPair {
@@ -177,33 +179,37 @@ func createGhTokenClientPair(ctx context.Context, ghOauthToken string) GhClientP
 	}
 }
 
-func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPair], ghAppIdEnvVarName string, ghAppPKeyPathEnvVarName string, ghOauthTokenEnvVarName string, repoOwner string, ctx context.Context) {
+func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPair], ghAppIdEnvVarName string, ghAppPKeyPathEnvVarName string, ghOauthTokenEnvVarName string, repoOwner string, ctx context.Context) error {
 	githubAppId := getEnv(ghAppIdEnvVarName, "")
 	var keyExist bool
 	if githubAppId != "" {
 		*gcp, keyExist = ghClientCache.Get(repoOwner)
 		if keyExist {
 			slog.Debug("Found cached client for owner", "owner", repoOwner)
-			return
+			return nil
 		}
 		slog.Info("Did not find cached client for owner, creating one", "owner", repoOwner, "github_app_id_env", ghAppIdEnvVarName, "github_app_key_env", ghAppPKeyPathEnvVarName)
 		githubAppIdint, err := strconv.ParseInt(githubAppId, 10, 64)
 		if err != nil {
-			slog.Error("GITHUB_APP_ID value could not converted to int64", "err", err)
-			os.Exit(1)
+			return fmt.Errorf("parsing %s value %q as int64: %w", ghAppIdEnvVarName, githubAppId, err)
 		}
-		*gcp = createGhAppClientPair(ctx, githubAppIdint, repoOwner, ghAppPKeyPathEnvVarName)
+		pair, err := createGhAppClientPair(ctx, githubAppIdint, repoOwner, ghAppPKeyPathEnvVarName)
+		if err != nil {
+			return fmt.Errorf("creating app client pair: %w", err)
+		}
+		*gcp = pair
 		ghClientCache.Add(repoOwner, *gcp)
-		return
+		return nil
 	}
 	*gcp, keyExist = ghClientCache.Get("global")
 	if keyExist {
 		slog.Debug("Found global cached client")
-		return
+		return nil
 	}
 	slog.Info("Did not find global cached client, creating one with env var", "env", ghOauthTokenEnvVarName)
 	ghOauthToken := getCrucialEnv(ghOauthTokenEnvVarName)
 
 	*gcp = createGhTokenClientPair(ctx, ghOauthToken)
 	ghClientCache.Add("global", *gcp)
+	return nil
 }
