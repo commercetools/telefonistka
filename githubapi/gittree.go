@@ -13,7 +13,7 @@ import (
 )
 
 func GenerateSyncTreeEntriesForCommit(ctx context.Context, treeEntries *[]*github.TreeEntry, c Context, sourcePath string, targetPath string, defaultBranch string) error {
-	sourcePathSHA, err := getDirecotyGitObjectSha(ctx, c, sourcePath, defaultBranch)
+	sourcePathSHA, err := getDirectoryGitObjectSHA(ctx, c, sourcePath, defaultBranch)
 
 	if sourcePathSHA == "" {
 		c.PrLogger.Info("Source directory wasn't found, assuming a deletion PR")
@@ -104,12 +104,12 @@ func generateBumpTreeEntiesForCommit(treeEntries *[]*github.TreeEntry, c Context
 	*treeEntries = append(*treeEntries, &treeEntry)
 }
 
-func getDirecotyGitObjectSha(ctx context.Context, c Context, dirPath string, branch string) (string, error) {
+func getDirectoryGitObjectSHA(ctx context.Context, c Context, dirPath string, branch string) (string, error) {
 	repoContentGetOptions := github.RepositoryContentGetOptions{
 		Ref: branch,
 	}
 
-	direcotyGitObjectSha := ""
+	directoryGitObjectSHA := ""
 	// in GH API/go-github, to get directory SHA you need to scan the whole parent Dir 🤷
 	_, directoryContent, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, path.Dir(dirPath), &repoContentGetOptions)
 	prom.InstrumentGhCall(resp)
@@ -119,13 +119,13 @@ func getDirecotyGitObjectSha(ctx context.Context, c Context, dirPath string, bra
 	} else if err == nil { // scaning the parent dir
 		for _, dirElement := range directoryContent {
 			if dirElement.GetPath() == dirPath {
-				direcotyGitObjectSha = dirElement.GetSHA()
+				directoryGitObjectSHA = dirElement.GetSHA()
 				break
 			}
 		}
 	} // leaving out statusCode 404, this means the whole parent dir is missing, but the behavior is similar to the case we didn't find the dir
 
-	return direcotyGitObjectSha, nil
+	return directoryGitObjectSHA, nil
 }
 
 func createCommit(ctx context.Context, c Context, treeEntries []*github.TreeEntry, defaultBranch string, commitMsg string) (*github.Commit, error) {
@@ -173,13 +173,13 @@ func createBranch(ctx context.Context, c Context, commit *github.Commit, newBran
 	newBranchRef := "refs/heads/" + newBranchName
 	c.PrLogger.Info("New branch name", "name", newBranchName)
 
-	newRefGitObjct := &github.GitObject{
+	newRefGitObject := &github.GitObject{
 		SHA: commit.SHA,
 	}
 
 	newRefConfig := &github.Reference{
 		Ref:    github.String(newBranchRef),
-		Object: newRefGitObjct,
+		Object: newRefGitObject,
 	}
 
 	_, resp, err := c.Git.CreateRef(ctx, c.Owner, c.Repo, newRefConfig)

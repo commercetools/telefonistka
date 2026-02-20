@@ -73,7 +73,7 @@ func GetFileContent(ctx context.Context, c Context, branch string, filePath stri
 	}
 	fileContentString, err := fileContent.GetContent()
 	if err != nil {
-		c.PrLogger.Error("Fail to serlize file", "err", err)
+		c.PrLogger.Error("Failed to serialize file", "err", err)
 		return "", err
 	}
 	return fileContentString, nil

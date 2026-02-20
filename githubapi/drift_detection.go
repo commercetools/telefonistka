@@ -70,12 +70,12 @@ func CompareRepoDirectories(ctx context.Context, c Context, sourcePath string, t
 	// Compares two directories content
 
 	// comparing sourcePath targetPath Git object SHA to avoid costly tree compare:
-	sourcePathGitObjectSha, err := getDirecotyGitObjectSha(ctx, c, sourcePath, defaultBranch)
+	sourcePathGitObjectSha, err := getDirectoryGitObjectSHA(ctx, c, sourcePath, defaultBranch)
 	if err != nil {
 		c.PrLogger.Error("Couldn't get source, Git object sha", "path", sourcePath, "err", err)
 		return false, "", err
 	}
-	targetPathGitObjectSha, err := getDirecotyGitObjectSha(ctx, c, targetPath, defaultBranch)
+	targetPathGitObjectSha, err := getDirectoryGitObjectSHA(ctx, c, targetPath, defaultBranch)
 	if err != nil {
 		c.PrLogger.Error("Couldn't get targetv, Git object sha", "target", targetPath, "err", err)
 		return false, "", err

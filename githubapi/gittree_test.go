@@ -168,7 +168,7 @@ func TestCreateCommit(t *testing.T) {
 	}
 }
 
-func TestGetDirecotyGitObjectSha(t *testing.T) {
+func TestGetDirectoryGitObjectSHA(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
@@ -227,7 +227,7 @@ func TestGetDirecotyGitObjectSha(t *testing.T) {
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
-			sha, err := getDirecotyGitObjectSha(t.Context(), c, tc.dirPath, "main")
+			sha, err := getDirectoryGitObjectSHA(t.Context(), c, tc.dirPath, "main")
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
