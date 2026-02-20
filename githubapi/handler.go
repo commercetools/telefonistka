@@ -276,7 +276,10 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
 	// If we'l ever want to generate this plan on an unmerged PR the PR branch (c.Ref) should be used
-	promotions, _ := GeneratePromotionPlan(ctx, c, c.DefaultBranch)
+	promotions, err := GeneratePromotionPlan(ctx, c, c.DefaultBranch)
+	if err != nil {
+		return fmt.Errorf("generating promotion plan: %w", err)
+	}
 	if !c.Config.DryRunMode {
 		for _, promotion := range promotions {
 			// TODO this whole part shouldn't be in main, but I need to refactor some circular dep's
