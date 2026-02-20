@@ -9,8 +9,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/commercetools/telefonistka/argocd"
@@ -567,25 +569,29 @@ func TestShouldSyncBranchCheckBoxBeDisplayed(t *testing.T) {
 func TestCommitStatusTargetURL(t *testing.T) {
 	t.Parallel()
 
+	parseTmpl := func(file string) *template.Template {
+		return template.Must(
+			template.New(filepath.Base(file)).ParseFiles(file),
+		)
+	}
+
 	tests := map[string]struct {
 		expectedURL   string
-		templateFile  string
+		tmpl          *template.Template
 		validTemplate bool
 	}{
-		"Default URL when no env var is set": {
-			expectedURL:   "https://github.com/commercetools/telefonistka",
-			templateFile:  "",
-			validTemplate: false,
+		"nil template returns default URL": {
+			expectedURL: "https://github.com/commercetools/telefonistka",
+			tmpl:        nil,
 		},
 		"Custom URL from template": {
 			expectedURL:   "https://custom-url.com?time=%d&calculated_time=%d",
-			templateFile:  "./testdata/custom_commit_status_valid_template.gotmpl",
+			tmpl:          parseTmpl("./testdata/custom_commit_status_valid_template.gotmpl"),
 			validTemplate: true,
 		},
-		"Invalid template": {
-			expectedURL:   "https://github.com/commercetools/telefonistka",
-			templateFile:  "./testdata/custom_commit_status_invalid_template.gotmpl",
-			validTemplate: false,
+		"Invalid template execution returns default URL": {
+			expectedURL: "https://github.com/commercetools/telefonistka",
+			tmpl:        parseTmpl("./testdata/custom_commit_status_invalid_template.gotmpl"),
 		},
 	}
 
@@ -595,13 +601,11 @@ func TestCommitStatusTargetURL(t *testing.T) {
 			now := time.Now()
 
 			expectedURL := tc.expectedURL
-			if tc.templateFile != "" {
-				if tc.validTemplate {
-					expectedURL = fmt.Sprintf(expectedURL, now.UnixMilli(), now.Add(-10*time.Minute).UnixMilli())
-				}
+			if tc.validTemplate {
+				expectedURL = fmt.Sprintf(expectedURL, now.UnixMilli(), now.Add(-10*time.Minute).UnixMilli())
 			}
 
-			result := commitStatusTargetURL(now, tc.templateFile)
+			result := commitStatusTargetURL(now, tc.tmpl)
 			if result != expectedURL {
 				t.Errorf("%s: Expected URL to be %q, got %q", name, expectedURL, result)
 			}

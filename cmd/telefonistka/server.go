@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
+	"text/template"
 	"time"
 
 	"github.com/commercetools/telefonistka/argocd"
@@ -97,13 +99,20 @@ func serve() {
 		argoClients = &ac
 	}
 
+	var commitStatusURLTmpl *template.Template
+	if p := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH"); p != "" {
+		commitStatusURLTmpl = template.Must(
+			template.New(filepath.Base(p)).ParseFiles(p),
+		)
+	}
+
 	cfg := githubapi.EventConfig{
-		Clients:                     clients,
-		ArgoCD:                      argoClients,
-		TemplatesFS:                 resolveTemplatesFS(),
-		CommitStatusURLTemplatePath: os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH"),
-		HandleSelfComment:           os.Getenv("HANDLE_SELF_COMMENT") == "true",
-		WebhookSecret:               []byte(getCrucialEnv("GITHUB_WEBHOOK_SECRET")),
+		Clients:             clients,
+		ArgoCD:              argoClients,
+		TemplatesFS:         resolveTemplatesFS(),
+		CommitStatusURLTmpl: commitStatusURLTmpl,
+		HandleSelfComment:   os.Getenv("HANDLE_SELF_COMMENT") == "true",
+		WebhookSecret:       []byte(getCrucialEnv("GITHUB_WEBHOOK_SECRET")),
 	}
 
 	livenessChecker := health.NewChecker() // No checks for the moment, other then the http server availability

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/commercetools/telefonistka/argocd"
@@ -132,11 +133,11 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 	switch {
 	case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
-		handlePREvent(ctx, "merged", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath, cfg.ArgoCD)
+		handlePREvent(ctx, "merged", c, cfg.TemplatesFS, cfg.CommitStatusURLTmpl, cfg.ArgoCD)
 	case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
-		handlePREvent(ctx, "changed", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath, cfg.ArgoCD)
+		handlePREvent(ctx, "changed", c, cfg.TemplatesFS, cfg.CommitStatusURLTmpl, cfg.ArgoCD)
 	case event.GetAction() == "labeled" && doesPRHaveLabel(event.GetPullRequest().Labels, "show-plan"):
-		handlePREvent(ctx, "show-plan", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath, cfg.ArgoCD)
+		handlePREvent(ctx, "show-plan", c, cfg.TemplatesFS, cfg.CommitStatusURLTmpl, cfg.ArgoCD)
 	}
 }
 
@@ -197,7 +198,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 
 	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 	if event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody()) {
-		handlePREvent(ctx, "retriggered", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath, cfg.ArgoCD)
+		handlePREvent(ctx, "retriggered", c, cfg.TemplatesFS, cfg.CommitStatusURLTmpl, cfg.ArgoCD)
 		return
 	}
 
@@ -206,17 +207,17 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 	}
 }
 
-func handlePREvent(ctx context.Context, stat string, c Context, templatesFS fs.FS, commitStatusURLTemplatePath string, argoClients *argocd.ArgoCDClients) {
-	setCommitStatus(ctx, c, "pending", commitStatusURLTemplatePath)
+func handlePREvent(ctx context.Context, stat string, c Context, templatesFS fs.FS, commitStatusURLTmpl *template.Template, argoClients *argocd.ArgoCDClients) {
+	setCommitStatus(ctx, c, "pending", commitStatusURLTmpl)
 
 	var err error
 
 	defer func() {
 		if err != nil {
-			setCommitStatus(ctx, c, "error", commitStatusURLTemplatePath)
+			setCommitStatus(ctx, c, "error", commitStatusURLTmpl)
 			return
 		}
-		setCommitStatus(ctx, c, "success", commitStatusURLTemplatePath)
+		setCommitStatus(ctx, c, "success", commitStatusURLTmpl)
 	}()
 
 	switch stat {

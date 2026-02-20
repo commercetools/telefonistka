@@ -55,7 +55,7 @@ func TestSetCommitStatus(t *testing.T) {
 			}
 
 			// SetCommitStatus doesn't return an error, it logs failures.
-			setCommitStatus(t.Context(), c, tc.state, "")
+			setCommitStatus(t.Context(), c, tc.state, nil)
 
 			if gotRef != "abc123" {
 				t.Errorf("ref: got %q, want %q", gotRef, "abc123")

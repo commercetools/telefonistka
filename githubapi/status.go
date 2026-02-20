@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
-	"path/filepath"
 	"strings"
 	"text/template"
 	"time"
@@ -13,13 +12,12 @@ import (
 	"github.com/google/go-github/v62/github"
 )
 
-func setCommitStatus(_ context.Context, c Context, state string, commitStatusURLTemplatePath string) {
+func setCommitStatus(_ context.Context, c Context, state string, commitStatusURLTmpl *template.Template) {
 	tcontext := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
 	description := "Telefonistka GitOps Bot"
-	tmplFile := commitStatusURLTemplatePath
 
-	targetURL := commitStatusTargetURL(time.Now(), tmplFile)
+	targetURL := commitStatusTargetURL(time.Now(), commitStatusURLTmpl)
 
 	commitStatus := &github.RepoStatus{
 		TargetURL:   &targetURL,
@@ -76,33 +74,24 @@ func (p *Context) toggleCommitStatus(ctx context.Context, context string, user s
 	return nil
 }
 
-// commitStatusTargetURL generates a target URL based on an optional
-// template file specified by the environment variable CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH.
-// If the template file is not found or an error occurs during template execution,
-// it returns a default URL.
-// passed parameter commitTime can be used in the template as .CommitTime
-func commitStatusTargetURL(commitTime time.Time, tmplFile string) string {
-	const targetURL string = "https://github.com/commercetools/telefonistka"
+// commitStatusTargetURL renders a target URL from a pre-compiled template.
+// If tmpl is nil (no custom template configured), it returns the default URL.
+func commitStatusTargetURL(commitTime time.Time, tmpl *template.Template) string {
+	const defaultURL = "https://github.com/commercetools/telefonistka"
 
-	tmplName := filepath.Base(tmplFile)
+	if tmpl == nil {
+		return defaultURL
+	}
 
-	// dynamic parameters to be used in the template
 	p := struct {
 		CommitTime time.Time
 	}{
 		CommitTime: commitTime,
 	}
 	var buf bytes.Buffer
-	tmpl, err := template.New(tmplName).ParseFiles(tmplFile)
-	if err != nil {
+	if err := tmpl.Execute(&buf, p); err != nil {
 		slog.Debug("Failed to render target URL template", "err", err)
-		return targetURL
+		return defaultURL
 	}
-	if err := tmpl.ExecuteTemplate(&buf, tmplName, p); err != nil {
-		slog.Debug("Failed to render target URL template", "err", err)
-		return targetURL
-	}
-	// trim any leading/trailing whitespace
-	renderedURL := strings.TrimSpace(buf.String())
-	return renderedURL
+	return strings.TrimSpace(buf.String())
 }
