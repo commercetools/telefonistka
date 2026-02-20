@@ -18,8 +18,8 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// ReciveWebhook is the main entry point for the webhook handling it starts parases the webhook payload and start a thread to handle the event success/failure are dependant on the payload parsing only
-func ReciveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
+// ReceiveWebhook validates the webhook payload and spawns a goroutine to handle the event.
+func ReceiveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
 	payload, err := github.ValidatePayload(r, githubWebhookSecret)
 	if err != nil {
 		slog.Error("error reading request body", "err", err)

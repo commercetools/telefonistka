@@ -38,7 +38,7 @@ func init() { //nolint:gochecknoinits
 
 func handleWebhook(githubWebhookSecret []byte, mainGhClientCache *lru.Cache[string, githubapi.GhClientPair], prApproverGhClientCache *lru.Cache[string, githubapi.GhClientPair]) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := githubapi.ReciveWebhook(r, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret)
+		err := githubapi.ReceiveWebhook(r, mainGhClientCache, prApproverGhClientCache, githubWebhookSecret)
 		if err != nil {
 			slog.Error("error handling webhook", "err", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
