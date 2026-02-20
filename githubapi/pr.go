@@ -17,7 +17,7 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 		Head:  github.String(newBranchRef),
 	}
 
-	pull, resp, err := c.GhClientPair.v3Client.PullRequests.Create(ctx, c.Owner, c.Repo, newPrConfig)
+	pull, resp, err := c.PullRequests.Create(ctx, c.Owner, c.Repo, newPrConfig)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Could not create GitHub PR", "err", err, "resp", resp)
@@ -26,7 +26,7 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 		c.PrLogger.Info("PR opened")
 	}
 
-	prLables, resp, err := c.GhClientPair.v3Client.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, *pull.Number, []string{"promotion"})
+	prLables, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, *pull.Number, []string{"promotion"})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
@@ -35,7 +35,7 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 		c.PrLogger.Debug("PR labeled", "labels", prLables)
 	}
 
-	_, resp, err = c.GhClientPair.v3Client.Issues.AddAssignees(ctx, c.Owner, c.Repo, *pull.Number, []string{assignee})
+	_, resp, err = c.Issues.AddAssignees(ctx, c.Owner, c.Repo, *pull.Number, []string{assignee})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Warn("Could not set assignee on PR", "user", assignee, "err", err)
@@ -73,7 +73,7 @@ func MergePr(ctx context.Context, c Context) error {
 }
 
 func tryMergePR(ctx context.Context, details Context, number int) error {
-	_, resp, err := details.GhClientPair.v3Client.PullRequests.Merge(ctx, details.Owner, details.Repo, number, "Auto-merge", nil)
+	_, resp, err := details.PullRequests.Merge(ctx, details.Owner, details.Repo, number, "Auto-merge", nil)
 	prom.InstrumentGhCall(resp)
 	return err
 }
@@ -91,7 +91,7 @@ func ApprovePr(ctx context.Context, c Context) error {
 		Event: github.String("APPROVE"),
 	}
 
-	_, resp, err := c.Approver.v3Client.PullRequests.CreateReview(ctx, c.Owner, c.Repo, c.PrNumber, reviewRequest)
+	_, resp, err := c.ApproverPRs.CreateReview(ctx, c.Owner, c.Repo, c.PrNumber, reviewRequest)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Could not create review", "err", err, "resp", resp)
@@ -105,7 +105,7 @@ func (p Context) CommentOnPr(ctx context.Context, commentBody string) error {
 	commentBody = "<!-- telefonistka_tag -->\n" + commentBody
 
 	comment := &github.IssueComment{Body: &commentBody}
-	_, resp, err := p.GhClientPair.v3Client.Issues.CreateComment(ctx, p.Owner, p.Repo, p.PrNumber, comment)
+	_, resp, err := p.Issues.CreateComment(ctx, p.Owner, p.Repo, p.PrNumber, comment)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		p.PrLogger.Error("Could not comment in PR", "err", err, "resp", resp)

@@ -63,7 +63,7 @@ func generateDeletionTreeEntries(ctx context.Context, c *Context, path *string, 
 	getContentOpts := &github.RepositoryContentGetOptions{
 		Ref: *branch,
 	}
-	_, directoryContent, resp, err := c.GhClientPair.v3Client.Repositories.GetContents(ctx, c.Owner, c.Repo, *path, getContentOpts)
+	_, directoryContent, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, *path, getContentOpts)
 	prom.InstrumentGhCall(resp)
 	if resp.StatusCode == 404 {
 		c.PrLogger.Info("Skipping deletion of non-existing path", "path", *path)
@@ -111,7 +111,7 @@ func getDirecotyGitObjectSha(ctx context.Context, c Context, dirPath string, bra
 
 	direcotyGitObjectSha := ""
 	// in GH API/go-github, to get directory SHA you need to scan the whole parent Dir 🤷
-	_, directoryContent, resp, err := c.GhClientPair.v3Client.Repositories.GetContents(ctx, c.Owner, c.Repo, path.Dir(dirPath), &repoContentGetOptions)
+	_, directoryContent, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, path.Dir(dirPath), &repoContentGetOptions)
 	prom.InstrumentGhCall(resp)
 	if err != nil && resp.StatusCode != 404 {
 		c.PrLogger.Error("Could not fetch source directory SHA", "err", err, "resp", resp)
@@ -132,21 +132,21 @@ func createCommit(ctx context.Context, c Context, treeEntries []*github.TreeEntr
 	// To avoid cloning the repo locally, I'm using GitHub low level GIT Tree API to sync the source folder "over" the target folders
 	// This works by getting the source dir git object SHA, and overwriting(Git.CreateTree) the target directory git object SHA with the source's SHA.
 
-	ref, resp, err := c.GhClientPair.v3Client.Git.GetRef(ctx, c.Owner, c.Repo, "heads/"+defaultBranch)
+	ref, resp, err := c.Git.GetRef(ctx, c.Owner, c.Repo, "heads/"+defaultBranch)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Failed to get main branch ref", "err", err)
 		return nil, err
 	}
 	baseTreeSHA := ref.Object.SHA
-	tree, resp, err := c.GhClientPair.v3Client.Git.CreateTree(ctx, c.Owner, c.Repo, *baseTreeSHA, treeEntries)
+	tree, resp, err := c.Git.CreateTree(ctx, c.Owner, c.Repo, *baseTreeSHA, treeEntries)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Failed to create Git Tree object", "err", err, "resp", resp)
 		c.PrLogger.Error("These are the treeEntries", "entries", treeEntries)
 		return nil, err
 	}
-	parentCommit, resp, err := c.GhClientPair.v3Client.Git.GetCommit(ctx, c.Owner, c.Repo, *baseTreeSHA)
+	parentCommit, resp, err := c.Git.GetCommit(ctx, c.Owner, c.Repo, *baseTreeSHA)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Failed to get parent commit", "err", err)
@@ -159,7 +159,7 @@ func createCommit(ctx context.Context, c Context, treeEntries []*github.TreeEntr
 		Tree:    tree,
 	}
 
-	commit, resp, err := c.GhClientPair.v3Client.Git.CreateCommit(ctx, c.Owner, c.Repo, newCommitConfig, nil)
+	commit, resp, err := c.Git.CreateCommit(ctx, c.Owner, c.Repo, newCommitConfig, nil)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Failed to create Git commit", "err", err) // TODO comment this error to PR
@@ -182,7 +182,7 @@ func createBranch(ctx context.Context, c Context, commit *github.Commit, newBran
 		Object: newRefGitObjct,
 	}
 
-	_, resp, err := c.GhClientPair.v3Client.Git.CreateRef(ctx, c.Owner, c.Repo, newRefConfig)
+	_, resp, err := c.Git.CreateRef(ctx, c.Owner, c.Repo, newRefConfig)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Could not create Git Ref", "err", err, "resp", resp)

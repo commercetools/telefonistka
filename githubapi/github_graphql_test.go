@@ -147,9 +147,7 @@ func TestMinimizeStalePRComments(t *testing.T) {
 		Repo:     "repo",
 		PrNumber: 123,
 		PrLogger: logger,
-		GhClientPair: &GhClientPair{
-			v4Client: v4client,
-		},
+		GraphQL:  v4client,
 	}
 
 	err := MinimizeStalePRComments(t.Context(), c)

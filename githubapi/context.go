@@ -11,7 +11,42 @@ import (
 	"github.com/commercetools/telefonistka/configuration"
 	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
+	"github.com/shurcooL/githubv4"
 )
+
+type repoService interface {
+	GetContents(ctx context.Context, owner, repo, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error)
+	Get(ctx context.Context, owner, repo string) (*github.Repository, *github.Response, error)
+	CreateStatus(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error)
+	ListStatuses(ctx context.Context, owner, repo, ref string, opts *github.ListOptions) ([]*github.RepoStatus, *github.Response, error)
+}
+
+type pullRequestService interface {
+	Create(ctx context.Context, owner, repo string, pull *github.NewPullRequest) (*github.PullRequest, *github.Response, error)
+	Get(ctx context.Context, owner, repo string, number int) (*github.PullRequest, *github.Response, error)
+	Merge(ctx context.Context, owner, repo string, number int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error)
+	ListFiles(ctx context.Context, owner, repo string, number int, opts *github.ListOptions) ([]*github.CommitFile, *github.Response, error)
+	CreateReview(ctx context.Context, owner, repo string, number int, review *github.PullRequestReviewRequest) (*github.PullRequestReview, *github.Response, error)
+}
+
+type issueService interface {
+	CreateComment(ctx context.Context, owner, repo string, number int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error)
+	AddLabelsToIssue(ctx context.Context, owner, repo string, number int, labels []string) ([]*github.Label, *github.Response, error)
+	AddAssignees(ctx context.Context, owner, repo string, number int, assignees []string) (*github.Issue, *github.Response, error)
+}
+
+type gitService interface {
+	GetRef(ctx context.Context, owner, repo, ref string) (*github.Reference, *github.Response, error)
+	CreateTree(ctx context.Context, owner, repo, baseTree string, entries []*github.TreeEntry) (*github.Tree, *github.Response, error)
+	GetCommit(ctx context.Context, owner, repo, sha string) (*github.Commit, *github.Response, error)
+	CreateCommit(ctx context.Context, owner, repo string, commit *github.Commit, opts *github.CreateCommitOptions) (*github.Commit, *github.Response, error)
+	CreateRef(ctx context.Context, owner, repo string, ref *github.Reference) (*github.Reference, *github.Response, error)
+}
+
+type graphQLClient interface {
+	Query(ctx context.Context, q any, variables map[string]any) error
+	Mutate(ctx context.Context, m any, input githubv4.Input, variables map[string]any) error
+}
 
 const githubPublicBaseURL = "https://github.com"
 
@@ -21,9 +56,13 @@ type promotionInstanceMetaData struct {
 }
 
 type Context struct {
-	GhClientPair *GhClientPair `json:"-"`
-	Approver     *GhClientPair `json:"-"`
-	// This whole struct describe the metadata of the PR, so it makes sense to share the context with everything to generate HTTP calls related to that PR, right?
+	Repositories repoService        `json:"-"`
+	PullRequests pullRequestService `json:"-"`
+	Issues       issueService       `json:"-"`
+	Git          gitService         `json:"-"`
+	GraphQL      graphQLClient      `json:"-"`
+	ApproverPRs  pullRequestService `json:"-"`
+
 	DefaultBranch string
 	Owner         string
 	Repo          string
@@ -86,7 +125,7 @@ func (pm *prMetadata) DeSerialize(s string) error {
 
 func (p *Context) GetDefaultBranch(ctx context.Context) (string, error) {
 	if p.DefaultBranch == "" {
-		repo, resp, err := p.GhClientPair.v3Client.Repositories.Get(ctx, p.Owner, p.Repo)
+		repo, resp, err := p.Repositories.Get(ctx, p.Owner, p.Repo)
 		if err != nil {
 			p.PrLogger.Error("Could not get repo default branch", "err", err, "resp", resp)
 			return "", err

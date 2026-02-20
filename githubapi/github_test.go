@@ -2,8 +2,12 @@ package githubapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"slices"
 	"testing"
@@ -699,6 +703,135 @@ func Test_getPromotionSkipPaths(t *testing.T) {
 			t.Parallel()
 			got := getPromotionSkipPaths(tt.args.promotion)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestGetFileContent(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		content string
+		apiErr  error
+		want    string
+		wantErr bool
+	}{
+		"success": {
+			content: "key: value\n",
+			want:    "key: value\n",
+		},
+		"API error with nil response": {
+			apiErr:  errors.New("not found"),
+			wantErr: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var gotPath, gotRef string
+
+			repos := &mockRepoService{
+				getContentsFn: func(_ context.Context, _, _, path string, opts *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+					gotPath = path
+					gotRef = opts.Ref
+					if tc.apiErr != nil {
+						return nil, nil, nil, tc.apiErr
+					}
+					encoded := github.String(tc.content)
+					return &github.RepositoryContent{
+						Content:  encoded,
+						Encoding: github.String(""),
+					}, nil, nil, nil
+				},
+			}
+
+			c := Context{
+				Repositories: repos,
+				Owner:        "owner",
+				Repo:         "repo",
+				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+			}
+
+			got, err := GetFileContent(t.Context(), c, "main", "telefonistka.yaml")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("content: got %q, want %q", got, tc.want)
+			}
+			if gotPath != "telefonistka.yaml" {
+				t.Errorf("path: got %q, want %q", gotPath, "telefonistka.yaml")
+			}
+			if gotRef != "main" {
+				t.Errorf("ref: got %q, want %q", gotRef, "main")
+			}
+		})
+	}
+}
+
+func TestGetInRepoConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		fileContent string
+		apiErr      error
+		wantErr     bool
+	}{
+		"valid config": {
+			fileContent: "promotionPaths:\n- sourcePath: env/dev\n  targetPaths:\n  - env/staging\n",
+		},
+		"missing file returns default config": {
+			apiErr: errors.New("not found"),
+		},
+		"invalid YAML": {
+			fileContent: ":::invalid",
+			wantErr:     true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			repos := &mockRepoService{
+				getContentsFn: func(_ context.Context, _, _, _ string, _ *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+					if tc.apiErr != nil {
+						return nil, nil, nil, tc.apiErr
+					}
+					return &github.RepositoryContent{
+						Content:  github.String(tc.fileContent),
+						Encoding: github.String(""),
+					}, nil, nil, nil
+				},
+			}
+
+			c := Context{
+				Repositories: repos,
+				Owner:        "owner",
+				Repo:         "repo",
+				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+			}
+
+			conf, err := GetInRepoConfig(t.Context(), c)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if conf == nil {
+				t.Fatal("config is nil")
+			}
 		})
 	}
 }

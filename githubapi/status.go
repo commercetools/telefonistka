@@ -35,7 +35,7 @@ func SetCommitStatus(_ context.Context, c Context, state string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	_, resp, err := c.GhClientPair.v3Client.Repositories.CreateStatus(ctx, c.Owner, c.Repo, c.PrSHA, commitStatus)
+	_, resp, err := c.Repositories.CreateStatus(ctx, c.Owner, c.Repo, c.PrSHA, commitStatus)
 	prom.InstrumentGhCall(resp)
 	repoSlug := c.Owner + "/" + c.Repo
 	prom.IncCommitStatusUpdateCounter(repoSlug, state)
@@ -48,7 +48,7 @@ func (p *Context) ToggleCommitStatus(ctx context.Context, context string, user s
 	var r error
 	listOpts := &github.ListOptions{}
 
-	initialStatuses, resp, err := p.GhClientPair.v3Client.Repositories.ListStatuses(ctx, p.Owner, p.Repo, p.Ref, listOpts)
+	initialStatuses, resp, err := p.Repositories.ListStatuses(ctx, p.Owner, p.Repo, p.Ref, listOpts)
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		p.PrLogger.Error("Failed to fetch  existing statuses for commit", "commit", p.Ref, "err", err)
@@ -60,7 +60,7 @@ func (p *Context) ToggleCommitStatus(ctx context.Context, context string, user s
 			if commitStatus.GetState() != "success" {
 				p.PrLogger.Info("User toggled state to success", "user", user, "context", context, "state", commitStatus.GetState())
 				commitStatus.State = github.String("success")
-				_, resp, err := p.GhClientPair.v3Client.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
+				_, resp, err := p.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
 				prom.InstrumentGhCall(resp)
 				if err != nil {
 					p.PrLogger.Error("Failed to create context", "context", context, "err", err)
@@ -69,7 +69,7 @@ func (p *Context) ToggleCommitStatus(ctx context.Context, context string, user s
 			} else {
 				p.PrLogger.Info("User toggled state to failure", "user", user, "context", context, "state", commitStatus.GetState())
 				commitStatus.State = github.String("failure")
-				_, resp, err := p.GhClientPair.v3Client.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
+				_, resp, err := p.Repositories.CreateStatus(ctx, p.Owner, p.Repo, p.PrSHA, commitStatus)
 				prom.InstrumentGhCall(resp)
 				if err != nil {
 					p.PrLogger.Error("Failed to create context", "context", context, "err", err)

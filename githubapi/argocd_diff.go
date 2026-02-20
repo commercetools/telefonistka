@@ -77,7 +77,7 @@ func CommentDiff(ctx context.Context, c Context) error {
 	c.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", c.Ref)
 	if !hasComponentDiffErrors && !hasComponentDiff {
 		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state")
-		prLables, resp, err := c.GhClientPair.v3Client.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
+		prLables, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
 		prom.InstrumentGhCall(resp)
 		if err != nil {
 			c.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)

@@ -60,7 +60,7 @@ func GetInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
 
 func GetFileContent(ctx context.Context, c Context, branch string, filePath string) (string, error) {
 	rGetContentOps := github.RepositoryContentGetOptions{Ref: branch}
-	fileContent, _, resp, err := c.GhClientPair.v3Client.Repositories.GetContents(ctx, c.Owner, c.Repo, filePath, &rGetContentOps)
+	fileContent, _, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, filePath, &rGetContentOps)
 	if err != nil {
 		c.PrLogger.Error("Fail to get file", "err", err, "resp", resp)
 		if resp == nil {

@@ -13,11 +13,12 @@ import (
 
 func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, expectedPromotion map[string]PromotionInstance, mockedHTTPClient *http.Client) {
 	t.Helper()
-	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
+	v3Client := github.NewClient(mockedHTTPClient)
 	labelName := "fast-promotion"
 
 	ghPrClientDetails := Context{
-		GhClientPair: &ghClientPair,
+		Repositories: v3Client.Repositories,
+		PullRequests: v3Client.PullRequests,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
 		PrNumber:     120,
@@ -48,11 +49,12 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 
 func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTTPClient *http.Client, expectedPromotions ...map[string]PromotionInstance) {
 	t.Helper()
-	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
+	v3Client := github.NewClient(mockedHTTPClient)
 	labelName := "fast-promotion"
 
 	ghPrClientDetails := Context{
-		GhClientPair: &ghClientPair,
+		Repositories: v3Client.Repositories,
+		PullRequests: v3Client.PullRequests,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
 		PrNumber:     120,

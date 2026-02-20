@@ -237,7 +237,7 @@ func DetectDrift(ctx context.Context, c Context) error {
 func getComponentConfig(ctx context.Context, c Context, componentPath string, branch string) (*cfg.ComponentConfig, error) {
 	componentConfig := &cfg.ComponentConfig{}
 	rGetContentOps := &github.RepositoryContentGetOptions{Ref: branch}
-	componentConfigFileContent, _, resp, err := c.GhClientPair.v3Client.Repositories.GetContents(ctx, c.Owner, c.Repo, componentPath+"/telefonistka.yaml", rGetContentOps)
+	componentConfigFileContent, _, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, componentPath+"/telefonistka.yaml", rGetContentOps)
 	prom.InstrumentGhCall(resp)
 	if resp != nil && resp.StatusCode == 404 { // The file is optional
 		c.PrLogger.Debug("No in-component config in path", "path", componentPath)
@@ -265,7 +265,7 @@ func generateListOfRelevantComponents(ctx context.Context, c Context) (relevantC
 	prFiles := []*github.CommitFile{}
 
 	for {
-		perPagePrFiles, resp, err := c.GhClientPair.v3Client.PullRequests.ListFiles(ctx, c.Owner, c.Repo, c.PrNumber, opts)
+		perPagePrFiles, resp, err := c.PullRequests.ListFiles(ctx, c.Owner, c.Repo, c.PrNumber, opts)
 		prom.InstrumentGhCall(resp)
 		if err != nil {
 			c.PrLogger.Error("could not get file list from GH API", "err", err, "status_code", resp.Response.Status)

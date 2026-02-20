@@ -12,7 +12,7 @@ import (
 // Note that go-github is the preferred way of interacting with GitHub because
 // of types and easy API mocking, however some functionality is not available
 // in GH V3 rest API.
-func getBotIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
+func getBotIdentity(ctx context.Context, c graphQLClient) (string, error) {
 	var query struct {
 		Viewer struct {
 			Login githubv4.String
@@ -27,7 +27,7 @@ func getBotIdentity(ctx context.Context, c *githubv4.Client) (string, error) {
 }
 
 func MinimizeStalePRComments(ctx context.Context, c Context) error {
-	botIdentity, _ := getBotIdentity(ctx, c.GhClientPair.v4Client)
+	botIdentity, _ := getBotIdentity(ctx, c.GraphQL)
 	comments, err := getUnminimizedComments(ctx, c)
 	if err != nil {
 		c.PrLogger.Error("Failed to get unminimized comments", "err", err)
@@ -77,7 +77,7 @@ func getUnminimizedComments(ctx context.Context, c Context) ([]prComment, error)
 		"prNumber": githubv4.Int(c.PrNumber),
 	}
 
-	err := c.GhClientPair.v4Client.Query(ctx, &query, params)
+	err := c.GraphQL.Query(ctx, &query, params)
 	if err != nil {
 		return nil, err
 	}
@@ -111,5 +111,5 @@ func minimizeComment(ctx context.Context, c Context, commentId githubv4.ID, botI
 		Classifier: githubv4.ReportedContentClassifiersOutdated,
 	}
 
-	return c.GhClientPair.v4Client.Mutate(ctx, &mutation, input, nil)
+	return c.GraphQL.Mutate(ctx, &mutation, input, nil)
 }

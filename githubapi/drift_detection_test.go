@@ -57,10 +57,10 @@ func TestGenerateFlatMapfromFileTree(t *testing.T) {
 			},
 		),
 	)
-	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
+	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
-		GhClientPair: &ghClientPair,
+		Repositories: v3Client.Repositories,
 		Owner:        "AnOwner",
 		Repo:         "Arepo",
 		PrNumber:     120,
@@ -102,11 +102,11 @@ func TestGenerateDiffOutputDiffFileContent(t *testing.T) {
 		),
 	)
 
-	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
+	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
 		DefaultBranch: "main",
-		GhClientPair:  &ghClientPair,
+		Repositories:  v3Client.Repositories,
 		Owner:         "AnOwner",
 		Repo:          "Arepo",
 		PrNumber:      120,
@@ -155,11 +155,11 @@ func TestGenerateDiffOutputIdenticalFiles(t *testing.T) {
 
 	mockedHTTPClient := mock.NewMockedHTTPClient()
 
-	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
+	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
 		DefaultBranch: "main",
-		GhClientPair:  &ghClientPair,
+		Repositories:  v3Client.Repositories,
 		Owner:         "AnOwner",
 		Repo:          "Arepo",
 		PrNumber:      120,
@@ -201,11 +201,11 @@ func TestGenerateDiffOutputMissingSourceFile(t *testing.T) {
 		),
 	)
 
-	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
+	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
 		DefaultBranch: "main",
-		GhClientPair:  &ghClientPair,
+		Repositories:  v3Client.Repositories,
 		Owner:         "AnOwner",
 		Repo:          "Arepo",
 		PrNumber:      120,
@@ -252,11 +252,11 @@ func TestGenerateDiffOutputMissingTargetFile(t *testing.T) {
 		),
 	)
 
-	ghClientPair := GhClientPair{v3Client: github.NewClient(mockedHTTPClient)}
+	v3Client := github.NewClient(mockedHTTPClient)
 
 	ghPrClientDetails := Context{
 		DefaultBranch: "main",
-		GhClientPair:  &ghClientPair,
+		Repositories:  v3Client.Repositories,
 		Owner:         "AnOwner",
 		Repo:          "Arepo",
 		PrNumber:      120,

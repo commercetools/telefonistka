@@ -62,7 +62,7 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 		mainGithubClientPair.GetAndCache(mainGhClientCache, "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		c := Context{
-			GhClientPair: &mainGithubClientPair,
+			Repositories: mainGithubClientPair.v3Client.Repositories,
 			Owner:        repoOwner,
 			Repo:         event.GetRepo().GetName(),
 			RepoURL:      event.GetRepo().GetHTMLURL(),
@@ -93,8 +93,13 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 		approverGithubClientPair.GetAndCache(prApproverGhClientCache, "APPROVER_GITHUB_APP_ID", "APPROVER_GITHUB_APP_PRIVATE_KEY_PATH", "APPROVER_GITHUB_OAUTH_TOKEN", repoOwner, ctx)
 
 		c := Context{
-			GhClientPair:  &mainGithubClientPair,
-			Approver:      &approverGithubClientPair,
+			Repositories: mainGithubClientPair.v3Client.Repositories,
+			PullRequests: mainGithubClientPair.v3Client.PullRequests,
+			Issues:       mainGithubClientPair.v3Client.Issues,
+			Git:          mainGithubClientPair.v3Client.Git,
+			GraphQL:      mainGithubClientPair.v4Client,
+			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
+
 			Labels:        event.GetPullRequest().Labels,
 			Owner:         repoOwner,
 			Repo:          event.GetRepo().GetName(),
@@ -151,8 +156,13 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 			return
 		}
 		c := Context{
-			GhClientPair:  &mainGithubClientPair,
-			Approver:      &approverGithubClientPair,
+			Repositories: mainGithubClientPair.v3Client.Repositories,
+			PullRequests: mainGithubClientPair.v3Client.PullRequests,
+			Issues:       mainGithubClientPair.v3Client.Issues,
+			Git:          mainGithubClientPair.v3Client.Git,
+			GraphQL:      mainGithubClientPair.v4Client,
+			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
+
 			Owner:         repoOwner,
 			Repo:          event.GetRepo().GetName(),
 			RepoURL:       event.GetRepo().GetHTMLURL(),
@@ -181,7 +191,7 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 		repo := c.Repo
 
 		// Check if this comment has an attached PR. If it does not we want to skip moving along.
-		pr, err := getPR(ctx, c.GhClientPair.v3Client.PullRequests, owner, repo, issue.GetNumber())
+		pr, err := getPR(ctx, c.PullRequests, owner, repo, issue.GetNumber())
 		if pr == nil || err != nil {
 			c.PrLogger.Debug("Issue is not a PR")
 			return
@@ -449,7 +459,7 @@ func isRetriggerComment(body string) bool {
 	return strings.TrimSpace(body) == "/retrigger"
 }
 
-func getPR(ctx context.Context, c *github.PullRequestsService, owner, repo string, number int) (*github.PullRequest, error) {
+func getPR(ctx context.Context, c pullRequestService, owner, repo string, number int) (*github.PullRequest, error) {
 	pr, res, err := c.Get(ctx, owner, repo, number)
 	prom.InstrumentGhCall(res)
 	return pr, err

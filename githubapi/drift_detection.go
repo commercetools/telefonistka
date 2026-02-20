@@ -104,7 +104,7 @@ func generateFlatMapfromFileTree(ctx context.Context, c *Context, workingPath *s
 	getContentOpts := &github.RepositoryContentGetOptions{
 		Ref: *branch,
 	}
-	_, directoryContent, resp, _ := c.GhClientPair.v3Client.Repositories.GetContents(ctx, c.Owner, c.Repo, *workingPath, getContentOpts)
+	_, directoryContent, resp, _ := c.Repositories.GetContents(ctx, c.Owner, c.Repo, *workingPath, getContentOpts)
 	prom.InstrumentGhCall(resp)
 	for _, elementInDir := range directoryContent {
 		if *elementInDir.Type == "file" {
