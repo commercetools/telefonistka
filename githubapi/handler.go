@@ -433,27 +433,13 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 func analyzeCommentUpdateCheckBox(newBody string, oldBody string, checkboxIdentifier string) (wasCheckedBefore bool, isCheckedNow bool) {
 	checkboxPattern := fmt.Sprintf(`(?m)^\s*-\s*\[(.)\]\s*<!-- %s -->.*$`, checkboxIdentifier)
 	checkBoxRegex := regexp.MustCompile(checkboxPattern)
-	oldCheckBoxContent := checkBoxRegex.FindStringSubmatch(oldBody)
-	newCheckBoxContent := checkBoxRegex.FindStringSubmatch(newBody)
+	oldMatch := checkBoxRegex.FindStringSubmatch(oldBody)
+	newMatch := checkBoxRegex.FindStringSubmatch(newBody)
 
-	// I'm grabbing the second group of the regex, which is the checkbox content (either "x" or " ")
-	// The first element of the result is the whole match
-	if len(newCheckBoxContent) < 2 || len(oldCheckBoxContent) < 2 {
+	if len(newMatch) < 2 || len(oldMatch) < 2 {
 		return false, false
 	}
-	if len(newCheckBoxContent) >= 2 {
-		if newCheckBoxContent[1] == "x" {
-			isCheckedNow = true
-		}
-	}
-
-	if len(oldCheckBoxContent) >= 2 {
-		if oldCheckBoxContent[1] == "x" {
-			wasCheckedBefore = true
-		}
-	}
-
-	return
+	return oldMatch[1] == "x", newMatch[1] == "x"
 }
 
 func isSyncFromBranchAllowedForThisPath(allowedPathRegex string, path string) bool {
