@@ -13,11 +13,11 @@ import (
 	"github.com/google/go-github/v62/github"
 )
 
-func setCommitStatus(_ context.Context, c Context, state string) {
+func setCommitStatus(_ context.Context, c Context, state string, commitStatusURLTemplatePath string) {
 	tcontext := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
 	description := "Telefonistka GitOps Bot"
-	tmplFile := c.CommitStatusURLTemplatePath
+	tmplFile := commitStatusURLTemplatePath
 
 	targetURL := commitStatusTargetURL(time.Now(), tmplFile)
 

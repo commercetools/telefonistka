@@ -70,12 +70,11 @@ func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEve
 	}
 
 	c := Context{
-		Repositories:                clients.Main.v3Client.Repositories,
-		TemplatesFS:                 cfg.TemplatesFS,
-		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
-		Owner:                       repoOwner,
-		Repo:                        event.GetRepo().GetName(),
-		RepoURL:                     event.GetRepo().GetHTMLURL(),
+		Repositories: clients.Main.v3Client.Repositories,
+		TemplatesFS:  cfg.TemplatesFS,
+		Owner:        repoOwner,
+		Repo:         event.GetRepo().GetName(),
+		RepoURL:      event.GetRepo().GetHTMLURL(),
 	}
 	c.PrLogger = slog.Default().With("context", c)
 
@@ -101,9 +100,8 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 	}
 
 	c := Context{
-		TemplatesFS:                 cfg.TemplatesFS,
-		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
-		Labels:                      event.GetPullRequest().Labels,
+		TemplatesFS: cfg.TemplatesFS,
+		Labels:      event.GetPullRequest().Labels,
 		Owner:                       repoOwner,
 		Repo:                        event.GetRepo().GetName(),
 		RepoURL:                     event.GetRepo().GetHTMLURL(),
@@ -129,11 +127,11 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 	switch {
 	case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
-		handlePREvent(ctx, "merged", c)
+		handlePREvent(ctx, "merged", c, cfg.CommitStatusURLTemplatePath)
 	case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
-		handlePREvent(ctx, "changed", c)
+		handlePREvent(ctx, "changed", c, cfg.CommitStatusURLTemplatePath)
 	case event.GetAction() == "labeled" && doesPRHaveLabel(event.GetPullRequest().Labels, "show-plan"):
-		handlePREvent(ctx, "show-plan", c)
+		handlePREvent(ctx, "show-plan", c, cfg.CommitStatusURLTemplatePath)
 	}
 }
 
@@ -157,15 +155,14 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 		return
 	}
 	c := Context{
-		TemplatesFS:                 cfg.TemplatesFS,
-		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
-		Owner:                       repoOwner,
-		Repo:                        event.GetRepo().GetName(),
-		RepoURL:                     event.GetRepo().GetHTMLURL(),
-		PrNumber:                    event.GetIssue().GetNumber(),
-		PrAuthor:                    event.GetIssue().GetUser().GetLogin(),
-		Labels:                      event.GetIssue().Labels,
-		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
+		TemplatesFS:   cfg.TemplatesFS,
+		Owner:         repoOwner,
+		Repo:          event.GetRepo().GetName(),
+		RepoURL:       event.GetRepo().GetHTMLURL(),
+		PrNumber:      event.GetIssue().GetNumber(),
+		PrAuthor:      event.GetIssue().GetUser().GetLogin(),
+		Labels:        event.GetIssue().Labels,
+		DefaultBranch: event.GetRepo().GetDefaultBranch(),
 	}
 	clients.setServices(&c)
 	c.PrLogger = slog.Default().With("context", c)
@@ -192,7 +189,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 
 	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 	if event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody()) {
-		handlePREvent(ctx, "retriggered", c)
+		handlePREvent(ctx, "retriggered", c, cfg.CommitStatusURLTemplatePath)
 		return
 	}
 
@@ -201,17 +198,17 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 	}
 }
 
-func handlePREvent(ctx context.Context, stat string, c Context) {
-	setCommitStatus(ctx, c, "pending")
+func handlePREvent(ctx context.Context, stat string, c Context, commitStatusURLTemplatePath string) {
+	setCommitStatus(ctx, c, "pending", commitStatusURLTemplatePath)
 
 	var err error
 
 	defer func() {
 		if err != nil {
-			setCommitStatus(ctx, c, "error")
+			setCommitStatus(ctx, c, "error", commitStatusURLTemplatePath)
 			return
 		}
-		setCommitStatus(ctx, c, "success")
+		setCommitStatus(ctx, c, "success", commitStatusURLTemplatePath)
 	}()
 
 	switch stat {
