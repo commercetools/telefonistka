@@ -622,7 +622,7 @@ func TestCommitStatusTargetURL(t *testing.T) {
 func Test_getPromotionSkipPaths(t *testing.T) {
 	t.Parallel()
 	type args struct {
-		promotion PromotionInstance
+		promotion promotionInstance
 	}
 	tests := []struct {
 		name string
@@ -632,8 +632,8 @@ func Test_getPromotionSkipPaths(t *testing.T) {
 		{
 			name: "No skip paths",
 			args: args{
-				promotion: PromotionInstance{
-					Metadata: PromotionInstanceMetaData{
+				promotion: promotionInstance{
+					Metadata: promotionMeta{
 						PerComponentSkippedTargetPaths: map[string][]string{},
 					},
 				},
@@ -643,8 +643,8 @@ func Test_getPromotionSkipPaths(t *testing.T) {
 		{
 			name: "one skip path",
 			args: args{
-				promotion: PromotionInstance{
-					Metadata: PromotionInstanceMetaData{
+				promotion: promotionInstance{
+					Metadata: promotionMeta{
 						PerComponentSkippedTargetPaths: map[string][]string{
 							"component1": {"targetPath1", "targetPath2"},
 						},
@@ -659,8 +659,8 @@ func Test_getPromotionSkipPaths(t *testing.T) {
 		{
 			name: "multiple skip path",
 			args: args{
-				promotion: PromotionInstance{
-					Metadata: PromotionInstanceMetaData{
+				promotion: promotionInstance{
+					Metadata: promotionMeta{
 						PerComponentSkippedTargetPaths: map[string][]string{
 							"component1": {"targetPath1", "targetPath2", "targetPath3"},
 							"component2": {"targetPath3"},
@@ -795,7 +795,7 @@ func TestGetInRepoConfig(t *testing.T) {
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
-			conf, err := GetInRepoConfig(t.Context(), c)
+			conf, err := getInRepoConfig(t.Context(), c)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

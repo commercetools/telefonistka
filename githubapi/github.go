@@ -33,7 +33,7 @@ func executeTemplate(templateName string, templateFile string, data any) (string
 	return buf.String(), nil
 }
 
-func GetInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
+func getInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
 	inRepoConfigFileContentString, err := getFileContent(ctx, c, c.DefaultBranch, "telefonistka.yaml")
 	if err != nil {
 		c.PrLogger.Error("Could not get in-repo configuration", "err", err)

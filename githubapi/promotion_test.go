@@ -14,7 +14,7 @@ import (
 	"github.com/migueleliasweb/go-github-mock/src/mock"
 )
 
-func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, expectedPromotion map[string]PromotionInstance, mockedHTTPClient *http.Client) {
+func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, expectedPromotion map[string]promotionInstance, mockedHTTPClient *http.Client) {
 	t.Helper()
 	v3Client := github.NewClient(mockedHTTPClient)
 	labelName := "fast-promotion"
@@ -36,7 +36,7 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 		Config: config,
 	}
 
-	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, "main")
+	promotionPlan, err := generatePromotionPlan(t.Context(), ghPrClientDetails, "main")
 	if err != nil {
 		t.Fatalf("Failed to generate promotion plan: err=%s", err)
 	}
@@ -50,7 +50,7 @@ func generatePromotionPlanMetadataTestHelper(t *testing.T, config *cfg.Config, e
 	}
 }
 
-func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTTPClient *http.Client, expectedPromotions ...map[string]PromotionInstance) {
+func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTTPClient *http.Client, expectedPromotions ...map[string]promotionInstance) {
 	t.Helper()
 	v3Client := github.NewClient(mockedHTTPClient)
 	labelName := "fast-promotion"
@@ -72,7 +72,7 @@ func generatePromotionPlanTestHelper(t *testing.T, config *cfg.Config, mockedHTT
 		Config: config,
 	}
 
-	promotionPlan, err := GeneratePromotionPlan(t.Context(), ghPrClientDetails, "main")
+	promotionPlan, err := generatePromotionPlan(t.Context(), ghPrClientDetails, "main")
 	if err != nil {
 		t.Fatalf("Failed to generate promotion plan: err=%s", err)
 	}
@@ -181,7 +181,7 @@ func TestGeneratePromotionConditionalPlan(t *testing.T) {
 		},
 	}
 
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
@@ -231,7 +231,7 @@ func TestAggregatePromotionPlan(t *testing.T) {
 		},
 	}
 
-	expectedPromotions := []map[string]PromotionInstance{
+	expectedPromotions := []map[string]promotionInstance{
 		{
 			"dev/[^/]*/>prod/eu-east-1/|prod/eu-west-1/": {
 				ComputedSyncPaths: map[string]string{
@@ -287,7 +287,7 @@ func TestGenerateSourceRegexPromotionPlan(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/[^/]*/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
@@ -322,7 +322,7 @@ func TestGeneratePromotionPlan(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
@@ -357,7 +357,7 @@ func TestGeneratePromotionPlanBlockList(t *testing.T) {
 		},
 	}
 
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
@@ -395,7 +395,7 @@ func TestGeneratePromotionPlanAllowList(t *testing.T) {
 		},
 	}
 
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-west-1/componentA": "prod/us-east-4/componentA",
@@ -431,7 +431,7 @@ func TestGeneratePromotionPlanTwoComponents(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
@@ -465,7 +465,7 @@ func TestGenerateNestedSourceRegexPromotionPlan(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-west-1/teamA/namespaceB/componentA": "prod/us-east-4/teamA/namespaceB/componentA",
@@ -497,7 +497,7 @@ func TestGeneratePromotionPlanWithPagination(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
@@ -551,13 +551,13 @@ func TestGeneratePromotionMetadataWithDesc(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
 				"prod/eu-west-1/componentA": "prod/us-east-4/componentA",
 			},
-			Metadata: PromotionInstanceMetaData{
+			Metadata: promotionMeta{
 				SourcePath:                     "prod/us-east-4/",
 				TargetDescription:              "foobar2", // This is tested config key
 				TargetPaths:                    []string{"prod/eu-east-1/", "prod/eu-west-1/"},
@@ -593,13 +593,13 @@ func TestGeneratePromotionMetadataWithOutDesc(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
 				"prod/eu-west-1/componentA": "prod/us-east-4/componentA",
 			},
-			Metadata: PromotionInstanceMetaData{
+			Metadata: promotionMeta{
 				SourcePath:                     "prod/us-east-4/",
 				TargetDescription:              "prod/eu-east-1/ prod/eu-west-1/", // This is tested config key
 				TargetPaths:                    []string{"prod/eu-east-1/", "prod/eu-west-1/"},
@@ -637,13 +637,13 @@ func TestAutoMerge(t *testing.T) {
 			},
 		},
 	}
-	expectedPromotion := map[string]PromotionInstance{
+	expectedPromotion := map[string]promotionInstance{
 		"prod/us-east-4/>prod/eu-east-1/|prod/eu-west-1/": {
 			ComputedSyncPaths: map[string]string{
 				"prod/eu-east-1/componentA": "prod/us-east-4/componentA",
 				"prod/eu-west-1/componentA": "prod/us-east-4/componentA",
 			},
-			Metadata: PromotionInstanceMetaData{
+			Metadata: promotionMeta{
 				SourcePath:                     "prod/us-east-4/",
 				TargetDescription:              "prod/eu-east-1/ prod/eu-west-1/",
 				TargetPaths:                    []string{"prod/eu-east-1/", "prod/eu-west-1/"},

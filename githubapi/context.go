@@ -83,7 +83,7 @@ func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
 	if len(serializedPrMetadata) == 2 {
 		if serializedPrMetadata[1] != "" {
 			c.PrLogger.Info("Found PR metadata")
-			err := c.PrMetadata.DeSerialize(serializedPrMetadata[1])
+			err := c.PrMetadata.deserialize(serializedPrMetadata[1])
 			if err != nil {
 				c.PrLogger.Error("Fail to parser PR metadata", "err", err)
 			}
@@ -114,7 +114,7 @@ func (pm prMetadata) serialize() (string, error) {
 	return base64.StdEncoding.EncodeToString(pmJson), nil
 }
 
-func (pm *prMetadata) DeSerialize(s string) error {
+func (pm *prMetadata) deserialize(s string) error {
 	decoded, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (pm *prMetadata) DeSerialize(s string) error {
 	return err
 }
 
-func (p *Context) GetDefaultBranch(ctx context.Context) (string, error) {
+func (p *Context) getDefaultBranch(ctx context.Context) (string, error) {
 	if p.DefaultBranch == "" {
 		repo, resp, err := p.Repositories.Get(ctx, p.Owner, p.Repo)
 		if err != nil {

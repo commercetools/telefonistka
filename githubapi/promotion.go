@@ -15,12 +15,12 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-type PromotionInstance struct {
-	Metadata          PromotionInstanceMetaData `deep:"-"` // Unit tests ignore Metadata currently
+type promotionInstance struct {
+	Metadata          promotionMeta `deep:"-"` // Unit tests ignore Metadata currently
 	ComputedSyncPaths map[string]string         // key is target, value is source
 }
 
-type PromotionInstanceMetaData struct {
+type promotionMeta struct {
 	SourcePath                     string
 	TargetPaths                    []string
 	TargetDescription              string
@@ -55,7 +55,7 @@ func hasAnyRequiredLabel(required []string, labels []*github.Label) bool {
 	return false
 }
 
-func shouldSkipTarget(componentConfig *cfg.ComponentConfig, componentName, target string, metadata *PromotionInstanceMetaData) bool {
+func shouldSkipTarget(componentConfig *cfg.ComponentConfig, componentName, target string, metadata *promotionMeta) bool {
 	if metadata.PerComponentSkippedTargetPaths == nil {
 		metadata.PerComponentSkippedTargetPaths = map[string][]string{}
 	}
@@ -130,14 +130,14 @@ func promotionMapKey(source string, targets []string) string {
 	return source + ">" + strings.Join(targets, "|")
 }
 
-func newPromotionInstance(component relevantComponent, targetPaths []string, description string) PromotionInstance {
+func newpromotionInstance(component relevantComponent, targetPaths []string, description string) promotionInstance {
 	desc := description
 	if desc == "" {
 		desc = strings.Join(targetPaths, " ")
 	}
 
-	return PromotionInstance{
-		Metadata: PromotionInstanceMetaData{
+	return promotionInstance{
+		Metadata: promotionMeta{
 			TargetPaths:                    targetPaths,
 			TargetDescription:              desc,
 			SourcePath:                     component.SourcePath,
@@ -149,7 +149,7 @@ func newPromotionInstance(component relevantComponent, targetPaths []string, des
 	}
 }
 
-func updatePromotionInstance(instance PromotionInstance, component relevantComponent, componentConfig *cfg.ComponentConfig, targetPaths []string) PromotionInstance {
+func updatepromotionInstance(instance promotionInstance, component relevantComponent, componentConfig *cfg.ComponentConfig, targetPaths []string) promotionInstance {
 	if instance.ComputedSyncPaths == nil {
 		instance.ComputedSyncPaths = map[string]string{}
 	}
@@ -168,7 +168,7 @@ func updatePromotionInstance(instance PromotionInstance, component relevantCompo
 	return instance
 }
 
-func applyPromotionPath(promotions map[string]PromotionInstance, component relevantComponent, componentConfig *cfg.ComponentConfig, path cfg.PromotionPath, labels []*github.Label, logger *slog.Logger) bool {
+func applyPromotionPath(promotions map[string]promotionInstance, component relevantComponent, componentConfig *cfg.ComponentConfig, path cfg.PromotionPath, labels []*github.Label, logger *slog.Logger) bool {
 	if _, ok := matchSourcePrefix(path.SourcePath, component.SourcePath); !ok {
 		return false
 	}
@@ -184,24 +184,24 @@ func applyPromotionPath(promotions map[string]PromotionInstance, component relev
 		instance, found := promotions[key]
 		if !found {
 			logger.Debug("Adding key", "key", key)
-			instance = newPromotionInstance(component, targets, ppr.TargetDescription)
+			instance = newpromotionInstance(component, targets, ppr.TargetDescription)
 		}
 
-		instance = updatePromotionInstance(instance, component, componentConfig, targets)
+		instance = updatepromotionInstance(instance, component, componentConfig, targets)
 		promotions[key] = instance
 	}
 
 	return true
 }
 
-func DetectDrift(ctx context.Context, c Context) error {
+func detectDrift(ctx context.Context, c Context) error {
 	c.PrLogger.Debug("Checking for Drift")
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	diffOutputMap := make(map[string]string)
 
-	promotions, err := GeneratePromotionPlan(ctx, c, c.Ref)
+	promotions, err := generatePromotionPlan(ctx, c, c.Ref)
 	if err != nil {
 		return err
 	}
@@ -321,8 +321,8 @@ func generateListOfChangedComponentPaths(ctx context.Context, c Context) (change
 }
 
 // This function generates a promotion plan based on the list of relevant components that where "touched" and the in-repo telefonitka  configuration
-func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]PromotionInstance, err error) {
-	promotions = make(map[string]PromotionInstance)
+func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, relevantComponents map[relevantComponent]struct{}, configBranch string) (promotions map[string]promotionInstance, err error) {
+	promotions = make(map[string]promotionInstance)
 	for component := range relevantComponents {
 		componentConfig, err := getComponentConfig(ctx, c, component.SourcePath+component.ComponentName, configBranch)
 		if err != nil {
@@ -338,7 +338,7 @@ func generatePlanBasedOnChangeddComponent(ctx context.Context, c Context, releva
 	return promotions, nil
 }
 
-func GeneratePromotionPlan(ctx context.Context, c Context, configBranch string) (map[string]PromotionInstance, error) {
+func generatePromotionPlan(ctx context.Context, c Context, configBranch string) (map[string]promotionInstance, error) {
 	c.PrLogger.Debug("Generating promotion plan plan")
 	// TODO refactor tests to use the two functions below instead of this one
 	relevantComponents, err := generateListOfRelevantComponents(ctx, c)

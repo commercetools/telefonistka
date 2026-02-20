@@ -82,7 +82,7 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 			return
 		}
 
-		config, _ := GetInRepoConfig(ctx, c)
+		config, _ := getInRepoConfig(ctx, c)
 		c.Config = config
 		listOfChangedFiles := generateListOfChangedFiles(event)
 
@@ -119,7 +119,7 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 
 		c.PrLogger = prLogger
 
-		config, err := GetInRepoConfig(ctx, c)
+		config, err := getInRepoConfig(ctx, c)
 		if err != nil {
 			_ = c.commentOnPr(ctx, fmt.Sprintf("Failed to get configuration\n```\n%s\n```\n", err))
 			prLogger.Error("Failed to get config", "err", err)
@@ -180,7 +180,7 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 
 		c.PrLogger = prLogger
 
-		config, err := GetInRepoConfig(ctx, c)
+		config, err := getInRepoConfig(ctx, c)
 		if err != nil {
 			prLogger.Error("Failed to get config", "err", err)
 			return
@@ -220,16 +220,16 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 }
 
 func handlePREvent(ctx context.Context, stat string, c Context) {
-	SetCommitStatus(ctx, c, "pending")
+	setCommitStatus(ctx, c, "pending")
 
 	var err error
 
 	defer func() {
 		if err != nil {
-			SetCommitStatus(ctx, c, "error")
+			setCommitStatus(ctx, c, "error")
 			return
 		}
-		SetCommitStatus(ctx, c, "success")
+		setCommitStatus(ctx, c, "success")
 	}()
 
 	switch stat {
@@ -247,7 +247,7 @@ func handlePREvent(ctx context.Context, stat string, c Context) {
 }
 
 func handleShowPlanPREvent(ctx context.Context, c Context) error {
-	promotions, err := GeneratePromotionPlan(ctx, c, c.Ref)
+	promotions, err := generatePromotionPlan(ctx, c, c.Ref)
 	if err != nil {
 		return err
 	}
@@ -257,15 +257,15 @@ func handleShowPlanPREvent(ctx context.Context, c Context) error {
 
 func handleChangedPREvent(ctx context.Context, c Context) error {
 
-	if err := MinimizeStalePRComments(ctx, c); err != nil {
+	if err := minimizeStalePRComments(ctx, c); err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
 	}
 
-	if err := CommentDiff(ctx, c); err != nil {
+	if err := commentDiff(ctx, c); err != nil {
 		return fmt.Errorf("failed to comment diff: %w", err)
 	}
 
-	if err := DetectDrift(ctx, c); err != nil {
+	if err := detectDrift(ctx, c); err != nil {
 		return fmt.Errorf("detecting drift: %w", err)
 	}
 
@@ -278,7 +278,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
 	// If we'l ever want to generate this plan on an unmerged PR the PR branch (c.Ref) should be used
-	promotions, err := GeneratePromotionPlan(ctx, c, c.DefaultBranch)
+	promotions, err := generatePromotionPlan(ctx, c, c.DefaultBranch)
 	if err != nil {
 		return fmt.Errorf("generating promotion plan: %w", err)
 	}
@@ -338,7 +338,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 				return err
 			}
 
-			if err := ApprovePr(ctx, c); err != nil {
+			if err := approvePr(ctx, c); err != nil {
 				c.PrLogger.Error("PR auto approval failed", "err", err)
 				return err
 			}
@@ -358,7 +358,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 					return err
 				}
 
-				err = MergePr(ctx, c)
+				err = mergePr(ctx, c)
 				if err != nil {
 					c.PrLogger.Error("PR auto merge failed", "err", err)
 					return err
@@ -418,7 +418,7 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 	// The only reason I'm keeping it is that I don't have a clear feature depreciation policy and if I do remove it should be in a distinct PR
 	for commentSubstring, commitStatusContext := range c.Config.ToggleCommitStatus {
 		if strings.Contains(ce.GetComment().GetBody(), "/"+commentSubstring) {
-			err := c.ToggleCommitStatus(ctx, commitStatusContext, ce.GetSender().GetName())
+			err := c.toggleCommitStatus(ctx, commitStatusContext, ce.GetSender().GetName())
 			if err != nil {
 				c.PrLogger.Error("Failed to toggle s context", "context", commitStatusContext, "err", err)
 				return err

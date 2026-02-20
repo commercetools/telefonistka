@@ -14,7 +14,7 @@ import (
 	"github.com/google/go-github/v62/github"
 )
 
-func SetCommitStatus(_ context.Context, c Context, state string) {
+func setCommitStatus(_ context.Context, c Context, state string) {
 	// TODO change all these values
 	tcontext := "telefonistka"
 	avatarURL := "https://avatars.githubusercontent.com/u/1616153?s=64"
@@ -46,7 +46,7 @@ func SetCommitStatus(_ context.Context, c Context, state string) {
 	}
 }
 
-func (p *Context) ToggleCommitStatus(ctx context.Context, context string, user string) error {
+func (p *Context) toggleCommitStatus(ctx context.Context, context string, user string) error {
 	var r error
 	listOpts := &github.ListOptions{}
 

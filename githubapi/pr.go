@@ -47,7 +47,7 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 	return pull, nil // TODO
 }
 
-func MergePr(ctx context.Context, c Context) error {
+func mergePr(ctx context.Context, c Context) error {
 	operation := func() error {
 		_, resp, err := c.PullRequests.Merge(ctx, c.Owner, c.Repo, c.PrNumber, "Auto-merge", nil)
 		prom.InstrumentGhCall(resp)
@@ -75,7 +75,7 @@ func isMergeErrorRetryable(errMessage string) bool {
 	return strings.Contains(errMessage, "405") && strings.Contains(errMessage, "try the merge again")
 }
 
-func ApprovePr(ctx context.Context, c Context) error {
+func approvePr(ctx context.Context, c Context) error {
 	if !c.Config.AutoApprovePromotionPrs {
 		return nil
 	}
@@ -106,7 +106,7 @@ func (p Context) commentOnPr(ctx context.Context, commentBody string) error {
 	return err
 }
 
-func commentPlanInPR(ctx context.Context, c Context, promotions map[string]PromotionInstance) {
+func commentPlanInPR(ctx context.Context, c Context, promotions map[string]promotionInstance) {
 	templateOutput, err := executeTemplate("dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
 	if err != nil {
 		c.PrLogger.Error("Failed to generate dry-run comment template", "err", err)

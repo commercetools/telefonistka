@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func generatePromotionPrBody(ctx context.Context, c Context, components string, promotion PromotionInstance, originalPrAuthor string) string {
+func generatePromotionPrBody(ctx context.Context, c Context, components string, promotion promotionInstance, originalPrAuthor string) string {
 	// newPrMetadata will be serialized and persisted in the PR body for use when the PR is merged
 	var newPrMetadata prMetadata
 	var newPrBody string
@@ -53,7 +53,7 @@ func generatePromotionPrBody(ctx context.Context, c Context, components string, 
 
 // getPromotionSkipPaths returns a map of paths that are marked as skipped for this promotion
 // when we have multiple components, we are going to use the component that has the fewest skip paths
-func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
+func getPromotionSkipPaths(promotion promotionInstance) map[string]bool {
 	perComponentSkippedTargetPaths := promotion.Metadata.PerComponentSkippedTargetPaths
 	promotionSkipPaths := map[string]bool{}
 

@@ -42,7 +42,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func CommentDiff(ctx context.Context, c Context) error {
+func commentDiff(ctx context.Context, c Context) error {
 	if !c.Config.Argocd.CommentDiffonPR {
 		return nil
 	}
@@ -88,7 +88,7 @@ func CommentDiff(ctx context.Context, c Context) error {
 		// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
 		if doesPRHaveLabel(c.Labels, "promotion") && c.Config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
 			c.PrLogger.Info("Auto-merging (no diff) PR")
-			err := MergePr(ctx, c)
+			err := mergePr(ctx, c)
 			if err != nil {
 				return fmt.Errorf("PR auto merge: %w", err)
 			}

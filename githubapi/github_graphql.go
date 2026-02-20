@@ -26,7 +26,7 @@ func getBotIdentity(ctx context.Context, c graphQLClient) (string, error) {
 	return string(query.Viewer.Login), nil
 }
 
-func MinimizeStalePRComments(ctx context.Context, c Context) error {
+func minimizeStalePRComments(ctx context.Context, c Context) error {
 	botIdentity, _ := getBotIdentity(ctx, c.GraphQL)
 	comments, err := getUnminimizedComments(ctx, c)
 	if err != nil {

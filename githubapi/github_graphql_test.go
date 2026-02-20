@@ -150,7 +150,7 @@ func TestMinimizeStalePRComments(t *testing.T) {
 		GraphQL:  v4client,
 	}
 
-	err := MinimizeStalePRComments(t.Context(), c)
+	err := minimizeStalePRComments(t.Context(), c)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

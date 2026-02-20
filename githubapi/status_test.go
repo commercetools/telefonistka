@@ -51,7 +51,7 @@ func TestSetCommitStatus(t *testing.T) {
 			}
 
 			// SetCommitStatus doesn't return an error, it logs failures.
-			SetCommitStatus(t.Context(), c, tc.state)
+			setCommitStatus(t.Context(), c, tc.state)
 
 			if gotRef != "abc123" {
 				t.Errorf("ref: got %q, want %q", gotRef, "abc123")
@@ -129,7 +129,7 @@ func TestToggleCommitStatus(t *testing.T) {
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
-			err := c.ToggleCommitStatus(t.Context(), tc.context, "user")
+			err := c.toggleCommitStatus(t.Context(), tc.context, "user")
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

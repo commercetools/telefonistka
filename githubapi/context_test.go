@@ -54,7 +54,7 @@ func TestGetDefaultBranch(t *testing.T) {
 				PrLogger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
-			got, err := c.GetDefaultBranch(t.Context())
+			got, err := c.getDefaultBranch(t.Context())
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")

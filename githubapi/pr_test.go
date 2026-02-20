@@ -128,7 +128,7 @@ func TestApprovePr(t *testing.T) {
 				},
 			}
 
-			err := ApprovePr(t.Context(), c)
+			err := approvePr(t.Context(), c)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -182,7 +182,7 @@ func TestMergePr(t *testing.T) {
 				PrLogger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 			}
 
-			err := MergePr(t.Context(), c)
+			err := mergePr(t.Context(), c)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
