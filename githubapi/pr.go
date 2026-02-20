@@ -2,6 +2,7 @@ package githubapi
 
 import (
 	"context"
+	"io/fs"
 	"strings"
 
 	"github.com/cenkalti/backoff/v4"
@@ -103,8 +104,8 @@ func (p Context) commentOnPr(ctx context.Context, commentBody string) error {
 	return err
 }
 
-func commentPlanInPR(ctx context.Context, c Context, promotions map[string]promotionInstance) {
-	templateOutput, err := executeTemplate(c.TemplatesFS, "dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
+func commentPlanInPR(ctx context.Context, c Context, promotions map[string]promotionInstance, templatesFS fs.FS) {
+	templateOutput, err := executeTemplate(templatesFS, "dryRunMsg", "dry-run-pr-comment.gotmpl", promotions)
 	if err != nil {
 		c.PrLogger.Error("Failed to generate dry-run comment template", "err", err)
 		return

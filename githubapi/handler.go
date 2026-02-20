@@ -3,6 +3,7 @@ package githubapi
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -71,7 +72,6 @@ func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEve
 
 	c := Context{
 		Repositories: clients.Main.v3Client.Repositories,
-		TemplatesFS:  cfg.TemplatesFS,
 		Owner:        repoOwner,
 		Repo:         event.GetRepo().GetName(),
 		RepoURL:      event.GetRepo().GetHTMLURL(),
@@ -100,8 +100,7 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 	}
 
 	c := Context{
-		TemplatesFS: cfg.TemplatesFS,
-		Labels:      event.GetPullRequest().Labels,
+		Labels: event.GetPullRequest().Labels,
 		Owner:                       repoOwner,
 		Repo:                        event.GetRepo().GetName(),
 		RepoURL:                     event.GetRepo().GetHTMLURL(),
@@ -127,11 +126,11 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 	switch {
 	case event.GetAction() == "closed" && event.GetPullRequest().GetMerged():
-		handlePREvent(ctx, "merged", c, cfg.CommitStatusURLTemplatePath)
+		handlePREvent(ctx, "merged", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath)
 	case event.GetAction() == "opened" || event.GetAction() == "reopened" || event.GetAction() == "synchronize":
-		handlePREvent(ctx, "changed", c, cfg.CommitStatusURLTemplatePath)
+		handlePREvent(ctx, "changed", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath)
 	case event.GetAction() == "labeled" && doesPRHaveLabel(event.GetPullRequest().Labels, "show-plan"):
-		handlePREvent(ctx, "show-plan", c, cfg.CommitStatusURLTemplatePath)
+		handlePREvent(ctx, "show-plan", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath)
 	}
 }
 
@@ -155,7 +154,6 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 		return
 	}
 	c := Context{
-		TemplatesFS:   cfg.TemplatesFS,
 		Owner:         repoOwner,
 		Repo:          event.GetRepo().GetName(),
 		RepoURL:       event.GetRepo().GetHTMLURL(),
@@ -189,7 +187,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 
 	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
 	if event.GetAction() == "created" && isRetriggerComment(event.GetComment().GetBody()) {
-		handlePREvent(ctx, "retriggered", c, cfg.CommitStatusURLTemplatePath)
+		handlePREvent(ctx, "retriggered", c, cfg.TemplatesFS, cfg.CommitStatusURLTemplatePath)
 		return
 	}
 
@@ -198,7 +196,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 	}
 }
 
-func handlePREvent(ctx context.Context, stat string, c Context, commitStatusURLTemplatePath string) {
+func handlePREvent(ctx context.Context, stat string, c Context, templatesFS fs.FS, commitStatusURLTemplatePath string) {
 	setCommitStatus(ctx, c, "pending", commitStatusURLTemplatePath)
 
 	var err error
@@ -213,11 +211,11 @@ func handlePREvent(ctx context.Context, stat string, c Context, commitStatusURLT
 
 	switch stat {
 	case "merged":
-		err = handleMergedPrEvent(ctx, c)
+		err = handleMergedPrEvent(ctx, c, templatesFS)
 	case "changed", "retriggered":
-		err = handleChangedPREvent(ctx, c)
+		err = handleChangedPREvent(ctx, c, templatesFS)
 	case "show-plan":
-		err = handleShowPlanPREvent(ctx, c)
+		err = handleShowPlanPREvent(ctx, c, templatesFS)
 	}
 
 	if err != nil {
@@ -225,17 +223,16 @@ func handlePREvent(ctx context.Context, stat string, c Context, commitStatusURLT
 	}
 }
 
-func handleShowPlanPREvent(ctx context.Context, c Context) error {
+func handleShowPlanPREvent(ctx context.Context, c Context, templatesFS fs.FS) error {
 	promotions, err := generatePromotionPlan(ctx, c, c.Ref)
 	if err != nil {
 		return err
 	}
-	commentPlanInPR(ctx, c, promotions)
+	commentPlanInPR(ctx, c, promotions, templatesFS)
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, c Context) error {
-
+func handleChangedPREvent(ctx context.Context, c Context, templatesFS fs.FS) error {
 	if err := minimizeStalePRComments(ctx, c); err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
 	}
@@ -244,7 +241,7 @@ func handleChangedPREvent(ctx context.Context, c Context) error {
 		return fmt.Errorf("failed to comment diff: %w", err)
 	}
 
-	if err := detectDrift(ctx, c); err != nil {
+	if err := detectDrift(ctx, c, templatesFS); err != nil {
 		return fmt.Errorf("detecting drift: %w", err)
 	}
 
@@ -252,7 +249,7 @@ func handleChangedPREvent(ctx context.Context, c Context) error {
 }
 
 // handleMergedPrEvent processes a PR that has been merged, generating promotions and opening new PRs for each.
-func handleMergedPrEvent(ctx context.Context, c Context) error {
+func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS) error {
 	var err error
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
@@ -328,7 +325,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 					"prNumber": pull.GetNumber(),
 				}
 
-				templateOutput, err := executeTemplate(c.TemplatesFS, "autoMerge", "auto-merge-comment.gotmpl", templateData)
+				templateOutput, err := executeTemplate(templatesFS, "autoMerge", "auto-merge-comment.gotmpl", templateData)
 				if err != nil {
 					return err
 				}
@@ -345,7 +342,7 @@ func handleMergedPrEvent(ctx context.Context, c Context) error {
 			}
 		}
 	} else {
-		commentPlanInPR(ctx, c, promotions)
+		commentPlanInPR(ctx, c, promotions, templatesFS)
 	}
 
 	if c.Config.Argocd.AllowSyncfromBranchPathRegex != "" {

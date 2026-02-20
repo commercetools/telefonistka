@@ -3,6 +3,7 @@ package githubapi
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"regexp"
 	"slices"
@@ -193,7 +194,7 @@ func applyPromotionPath(promotions map[string]promotionInstance, component relev
 	return true
 }
 
-func detectDrift(ctx context.Context, c Context) error {
+func detectDrift(ctx context.Context, c Context, templatesFS fs.FS) error {
 	c.PrLogger.Debug("Checking for Drift")
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -217,7 +218,7 @@ func detectDrift(ctx context.Context, c Context) error {
 		}
 	}
 	if len(diffOutputMap) != 0 {
-		templateOutput, err := executeTemplate(c.TemplatesFS, "driftMsg", "drift-pr-comment.gotmpl", diffOutputMap)
+		templateOutput, err := executeTemplate(templatesFS, "driftMsg", "drift-pr-comment.gotmpl", diffOutputMap)
 		if err != nil {
 			return err
 		}

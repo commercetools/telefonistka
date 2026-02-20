@@ -96,8 +96,6 @@ type Context struct {
 	GraphQL      graphQLClient      `json:"-"`
 	ApproverPRs  pullRequestService `json:"-"`
 
-	TemplatesFS fs.FS `json:"-"`
-
 	DefaultBranch string
 	Owner         string
 	Repo          string
