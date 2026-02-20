@@ -108,6 +108,52 @@ func TestInstrumentProxyUpstreamRequestLables(t *testing.T) {
 	}
 }
 
+func TestInstrumentGhCallNilResponse(t *testing.T) {
+	t.Parallel()
+	got := InstrumentGhCall(nil)
+	if len(got) != 0 {
+		t.Errorf("InstrumentGhCall(nil) = %v, want empty labels", got)
+	}
+}
+
+func TestInstrumentProxyUpstreamRequestNilResponse(t *testing.T) {
+	t.Parallel()
+	got := InstrumentProxyUpstreamRequest(nil)
+	if len(got) != 0 {
+		t.Errorf("InstrumentProxyUpstreamRequest(nil) = %v, want empty labels", got)
+	}
+}
+
+func TestIncCommitStatusUpdateCounter(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("IncCommitStatusUpdateCounter panicked: %v", r)
+		}
+	}()
+	IncCommitStatusUpdateCounter("owner/repo", "success")
+}
+
+func TestInstrumentWebhookHit(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("InstrumentWebhookHit panicked: %v", r)
+		}
+	}()
+	InstrumentWebhookHit("success")
+}
+
+func TestPublishPrMetrics(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("PublishPrMetrics panicked: %v", r)
+		}
+	}()
+	PublishPrMetrics(PrCounters{OpenPrs: 5, OpenPromotionPrs: 2, PrWithStaleChecks: 1}, "owner/repo")
+}
+
 func instrumentGhCallTestHelper(t *testing.T, httpURL string, expectedLabels prometheus.Labels) {
 	t.Helper()
 	mockURL, _ := url.Parse("https://github.com/api/v3/content/foo/bar/file.txt")
