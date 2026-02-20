@@ -23,13 +23,11 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func getCrucialEnv(key string) string {
+func getCrucialEnv(key string) (string, error) {
 	if value, ok := os.LookupEnv(key); ok {
-		return value
+		return value, nil
 	}
-	slog.Error("environment variable is required", "key", key)
-	os.Exit(3)
-	return ""
+	return "", fmt.Errorf("required environment variable %s is not set", key)
 }
 
 type GhClientPair struct {
@@ -132,7 +130,10 @@ func createGithubGraphQlClient(githubOauthToken string, githubGraphqlAltURL stri
 func createGhAppClientPair(ctx context.Context, githubAppId int64, owner string, ghAppPKeyPathEnvVarName string) (GhClientPair, error) {
 	var githubRestAltURL string
 	var githubGraphqlAltURL string
-	githubAppPrivateKeyPath := getCrucialEnv(ghAppPKeyPathEnvVarName)
+	githubAppPrivateKeyPath, err := getCrucialEnv(ghAppPKeyPathEnvVarName)
+	if err != nil {
+		return GhClientPair{}, err
+	}
 	githubHost := getEnv("GITHUB_HOST", "")
 	if githubHost != "" {
 		githubRestAltURL = fmt.Sprintf("https://%s/api/v3", githubHost)
@@ -207,7 +208,10 @@ func (gcp *GhClientPair) GetAndCache(ghClientCache *lru.Cache[string, GhClientPa
 		return nil
 	}
 	slog.Info("Did not find global cached client, creating one with env var", "env", ghOauthTokenEnvVarName)
-	ghOauthToken := getCrucialEnv(ghOauthTokenEnvVarName)
+	ghOauthToken, err := getCrucialEnv(ghOauthTokenEnvVarName)
+	if err != nil {
+		return err
+	}
 
 	*gcp = createGhTokenClientPair(ctx, ghOauthToken)
 	ghClientCache.Add("global", *gcp)
