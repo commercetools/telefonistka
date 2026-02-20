@@ -65,9 +65,9 @@ func commentDiff(ctx context.Context, c Context) error {
 			c.PrLogger.Debug("ArgoCD diff disabled for path", "path", componentPath)
 		}
 	}
-	argoClients, err := argocd.CreateArgoCdClients()
+	argoClients, err := argocd.NewArgoCDClients(argocd.ClientOptions{})
 	if err != nil {
-		return fmt.Errorf("error creating ArgoCD clients: %w", err)
+		return fmt.Errorf("creating ArgoCD clients: %w", err)
 	}
 
 	hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.Config.Argocd.CreateTempAppObjectFroNewApps, argoClients)

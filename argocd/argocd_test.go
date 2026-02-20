@@ -374,9 +374,9 @@ func TestTempAppDeletedOnDiffError(t *testing.T) {
 	mockAppClient := mocks.NewMockApplicationServiceClient(ctrl)
 	mockAppSetClient := mocks.NewMockApplicationSetServiceClient(ctrl)
 
-	ac := argoCdClients{
-		app:    mockAppClient,
-		appSet: mockAppSetClient,
+	ac := ArgoCDClients{
+		App:    mockAppClient,
+		AppSet: mockAppSetClient,
 	}
 
 	componentPath := "clusters/test/app"
@@ -495,10 +495,10 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	mockProjectServiceClient := mocks.NewMockProjectServiceClient(mockCtrl)
 	// fake InitArgoClients
 
-	argoClients := argoCdClients{
-		app:     mockAppServiceClient,
-		setting: mockSettingsServiceClient,
-		project: mockProjectServiceClient,
+	argoClients := ArgoCDClients{
+		App:     mockAppServiceClient,
+		Setting: mockSettingsServiceClient,
+		Project: mockProjectServiceClient,
 	}
 	// slowReply simulates a slow reply from the server
 	slowReply := func(ctx context.Context, in any, opts ...any) {

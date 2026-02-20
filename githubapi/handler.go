@@ -356,16 +356,21 @@ func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS) erro
 	}
 
 	if c.Config.Argocd.AllowSyncfromBranchPathRegex != "" {
-		componentPathList, err := generateListOfChangedComponentPaths(ctx, c)
-		if err != nil {
-			c.PrLogger.Error("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD", "err", err)
-		}
-		for _, componentPath := range componentPathList {
-			if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-				c.PrLogger.Info("Ensuring ArgoCD app is set to HEAD", "path", componentPath)
-				err := argocd.SetArgoCDAppRevision(ctx, componentPath, "HEAD", c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery)
-				if err != nil {
-					c.PrLogger.Error("Failed to set ArgoCD app to HEAD", "path", componentPath, "err", err)
+		argoClients, argoErr := argocd.NewArgoCDClients(argocd.ClientOptions{})
+		if argoErr != nil {
+			c.PrLogger.Error("Failed to create ArgoCD clients", "err", argoErr)
+		} else {
+			componentPathList, err := generateListOfChangedComponentPaths(ctx, c)
+			if err != nil {
+				c.PrLogger.Error("Failed to get list of changed components for setting ArgoCD app targetRef to HEAD", "err", err)
+			}
+			for _, componentPath := range componentPathList {
+				if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
+					c.PrLogger.Info("Ensuring ArgoCD app is set to HEAD", "path", componentPath)
+					err := argocd.SetArgoCDAppRevision(ctx, argoClients, componentPath, "HEAD", c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery)
+					if err != nil {
+						c.PrLogger.Error("Failed to set ArgoCD app to HEAD", "path", componentPath, "err", err)
+					}
 				}
 			}
 		}
@@ -382,16 +387,21 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 		if !checkboxWaschecked && checkboxIsChecked {
 			c.PrLogger.Info("Sync Checkbox was checked")
 			if c.Config.Argocd.AllowSyncfromBranchPathRegex != "" {
-				componentPathList, err := generateListOfChangedComponentPaths(ctx, c)
-				if err != nil {
-					c.PrLogger.Error("Failed to get list of changed components", "err", err)
-				}
+				argoClients, argoErr := argocd.NewArgoCDClients(argocd.ClientOptions{})
+				if argoErr != nil {
+					c.PrLogger.Error("Failed to create ArgoCD clients", "err", argoErr)
+				} else {
+					componentPathList, err := generateListOfChangedComponentPaths(ctx, c)
+					if err != nil {
+						c.PrLogger.Error("Failed to get list of changed components", "err", err)
+					}
 
-				for _, componentPath := range componentPathList {
-					if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-						err := argocd.SetArgoCDAppRevision(ctx, componentPath, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery)
-						if err != nil {
-							c.PrLogger.Error("Failed to sync ArgoCD app from branch", "err", err)
+					for _, componentPath := range componentPathList {
+						if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
+							err := argocd.SetArgoCDAppRevision(ctx, argoClients, componentPath, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery)
+							if err != nil {
+								c.PrLogger.Error("Failed to sync ArgoCD app from branch", "err", err)
+							}
 						}
 					}
 				}
