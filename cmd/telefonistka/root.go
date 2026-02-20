@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	_ "golang.org/x/crypto/x509roots/fallback"
 )
 
 var rootCmd = &cobra.Command{

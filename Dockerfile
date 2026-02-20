@@ -30,7 +30,6 @@ CMD ["server"]
 
 FROM scratch
 WORKDIR /telefonistka
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /go/src/github.com/commercetools/telefonistka/telefonistka /telefonistka/bin/telefonistka
 COPY templates/ /telefonistka/templates/
 # This next line is hack to overcome GH actions lack of support for docker workdir override https://github.com/actions/runner/issues/878
