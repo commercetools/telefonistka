@@ -125,16 +125,15 @@ func (pm *prMetadata) deserialize(s string) error {
 }
 
 func (p *Context) getDefaultBranch(ctx context.Context) (string, error) {
-	if p.DefaultBranch == "" {
-		repo, resp, err := p.Repositories.Get(ctx, p.Owner, p.Repo)
-		if err != nil {
-			p.PrLogger.Error("Could not get repo default branch", "err", err, "resp", resp)
-			return "", err
-		}
-		prom.InstrumentGhCall(resp)
-		p.DefaultBranch = repo.GetDefaultBranch()
-		return repo.GetDefaultBranch(), err
-	} else {
+	if p.DefaultBranch != "" {
 		return p.DefaultBranch, nil
 	}
+	repo, resp, err := p.Repositories.Get(ctx, p.Owner, p.Repo)
+	if err != nil {
+		p.PrLogger.Error("Could not get repo default branch", "err", err, "resp", resp)
+		return "", err
+	}
+	prom.InstrumentGhCall(resp)
+	p.DefaultBranch = repo.GetDefaultBranch()
+	return p.DefaultBranch, nil
 }

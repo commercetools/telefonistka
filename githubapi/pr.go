@@ -22,29 +22,26 @@ func createPrObject(ctx context.Context, c Context, newBranchRef string, newPrTi
 	if err != nil {
 		c.PrLogger.Error("Could not create GitHub PR", "err", err, "resp", resp)
 		return nil, err
-	} else {
-		c.PrLogger.Info("PR opened")
 	}
+	c.PrLogger.Info("PR opened")
 
 	prLables, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, *pull.Number, []string{"promotion"})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Error("Could not label GitHub PR", "err", err, "resp", resp)
 		return pull, err
-	} else {
-		c.PrLogger.Debug("PR labeled", "labels", prLables)
 	}
+	c.PrLogger.Debug("PR labeled", "labels", prLables)
 
 	_, resp, err = c.Issues.AddAssignees(ctx, c.Owner, c.Repo, *pull.Number, []string{assignee})
 	prom.InstrumentGhCall(resp)
 	if err != nil {
 		c.PrLogger.Warn("Could not set assignee on PR", "user", assignee, "err", err)
-		// return pull, err
 	} else {
 		c.PrLogger.Debug("User was set as assignee on PR", "user", assignee)
 	}
 
-	return pull, nil // TODO
+	return pull, nil
 }
 
 func mergePr(ctx context.Context, c Context) error {

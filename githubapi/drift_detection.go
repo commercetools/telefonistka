@@ -84,23 +84,21 @@ func compareRepoDirectories(ctx context.Context, c Context, sourcePath string, t
 	if sourcePathGitObjectSha == targetPathGitObjectSha {
 		c.PrLogger.Debug("Source and target git object SHA matched.", "source", sourcePath, "source_sha", sourcePathGitObjectSha, "target", targetPath, "target_sha", targetPathGitObjectSha)
 		return false, "", nil
-	} else {
-		c.PrLogger.Debug("Source and target git object SHA didn't match! Will do a full tree compare",
-			"source", sourcePath, "source_sha", sourcePathGitObjectSha, "target", targetPath, "target_sha", targetPathGitObjectSha)
-		sourceFilesSHAs := make(map[string]string)
-		targetFilesSHAs := make(map[string]string)
-		hasDiff := false
-
-		if err := generateFlatMapfromFileTree(ctx, &c, sourcePath, sourcePath, defaultBranch, sourceFilesSHAs); err != nil {
-			return false, "", fmt.Errorf("listing source tree %s: %w", sourcePath, err)
-		}
-		if err := generateFlatMapfromFileTree(ctx, &c, targetPath, targetPath, defaultBranch, targetFilesSHAs); err != nil {
-			return false, "", fmt.Errorf("listing target tree %s: %w", targetPath, err)
-		}
-		hasDiff, diffOutput, err := generateDiffOutput(ctx, c, sourceFilesSHAs, targetFilesSHAs, sourcePath, targetPath)
-
-		return hasDiff, diffOutput, err
 	}
+
+	c.PrLogger.Debug("Source and target git object SHA didn't match! Will do a full tree compare",
+		"source", sourcePath, "source_sha", sourcePathGitObjectSha, "target", targetPath, "target_sha", targetPathGitObjectSha)
+	sourceFilesSHAs := make(map[string]string)
+	targetFilesSHAs := make(map[string]string)
+
+	if err := generateFlatMapfromFileTree(ctx, &c, sourcePath, sourcePath, defaultBranch, sourceFilesSHAs); err != nil {
+		return false, "", fmt.Errorf("listing source tree %s: %w", sourcePath, err)
+	}
+	if err := generateFlatMapfromFileTree(ctx, &c, targetPath, targetPath, defaultBranch, targetFilesSHAs); err != nil {
+		return false, "", fmt.Errorf("listing target tree %s: %w", targetPath, err)
+	}
+
+	return generateDiffOutput(ctx, c, sourceFilesSHAs, targetFilesSHAs, sourcePath, targetPath)
 }
 
 func generateFlatMapfromFileTree(ctx context.Context, c *Context, workingPath string, rootPath string, branch string, listOfFiles map[string]string) error {

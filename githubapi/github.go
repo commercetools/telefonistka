@@ -49,15 +49,12 @@ func getInRepoConfig(ctx context.Context, c Context) (*cfg.Config, error) {
 func getFileContent(ctx context.Context, c Context, branch string, filePath string) (string, error) {
 	rGetContentOps := github.RepositoryContentGetOptions{Ref: branch}
 	fileContent, _, resp, err := c.Repositories.GetContents(ctx, c.Owner, c.Repo, filePath, &rGetContentOps)
+	if resp != nil {
+		prom.InstrumentGhCall(resp)
+	}
 	if err != nil {
 		c.PrLogger.Error("Fail to get file", "err", err, "resp", resp)
-		if resp == nil {
-			return "", err
-		}
-		prom.InstrumentGhCall(resp)
 		return "", err
-	} else {
-		prom.InstrumentGhCall(resp)
 	}
 	fileContentString, err := fileContent.GetContent()
 	if err != nil {
