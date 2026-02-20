@@ -613,7 +613,7 @@ func createRepoHook(t *testing.T, c *github.Client, r *github.Repository, webhoo
 		if err != nil {
 			t.Logf("Failed to delete repository: %v", err)
 		}
-		t.Logf("Hook %q deleted", h.ID)
+		t.Logf("Hook %d deleted", h.ID)
 	})
 	return h.WSURL
 }
