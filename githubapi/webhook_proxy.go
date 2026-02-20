@@ -19,14 +19,18 @@ import (
 )
 
 func generateListOfEndpoints(listOfChangedFiles []string, config *configuration.Config) []string {
+	// Pre-compile regexes once instead of per-file.
+	compiled := make([]*regexp.Regexp, len(config.WebhookEndpointRegexs))
+	for i, r := range config.WebhookEndpointRegexs {
+		compiled[i] = regexp.MustCompile(r.Expression)
+	}
+
 	endpoints := map[string]bool{} // using map for uniqueness
 	for _, file := range listOfChangedFiles {
-		for _, regex := range config.WebhookEndpointRegexs {
-			m := regexp.MustCompile(regex.Expression)
-
-			if m.MatchString(file) {
+		for i, regex := range config.WebhookEndpointRegexs {
+			if compiled[i].MatchString(file) {
 				for _, replacement := range regex.Replacements {
-					endpoints[m.ReplaceAllString(file, replacement)] = true
+					endpoints[compiled[i].ReplaceAllString(file, replacement)] = true
 				}
 				break
 			}

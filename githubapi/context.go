@@ -50,6 +50,8 @@ type graphQLClient interface {
 
 const githubPublicBaseURL = "https://github.com"
 
+var prMetadataRegex = regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
+
 type promotionInstanceMetaData struct {
 	SourcePath  string   `json:"sourcePath"`
 	TargetPaths []string `json:"targetPaths"`
@@ -78,7 +80,6 @@ type Context struct {
 }
 
 func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
-	prMetadataRegex := regexp.MustCompile(`<!--\|.*\|(.*)\|-->`)
 	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
 	if len(serializedPrMetadata) == 2 {
 		if serializedPrMetadata[1] != "" {
