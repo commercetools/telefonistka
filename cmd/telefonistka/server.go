@@ -64,12 +64,10 @@ func handleWebhook(cfg githubapi.EventConfig) func(http.ResponseWriter, *http.Re
 }
 
 func serve() {
-	mainGhClientCache, _ := lru.New[string, githubapi.GhClient](128)
-	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClient](128)
+	clientCache, _ := lru.New[string, githubapi.GhClients](128)
 
 	cfg := githubapi.EventConfig{
-		MainClientCache:     mainGhClientCache,
-		ApproverClientCache: prApproverGhClientCache,
+		ClientCache: clientCache,
 		MainClient: githubapi.ClientConfig{
 			AppID:      parseOptionalInt64(os.Getenv("GITHUB_APP_ID")),
 			AppKeyPath: os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH"),
@@ -90,7 +88,7 @@ func serve() {
 	livenessChecker := health.NewChecker() // No checks for the moment, other then the http server availability
 	readinessChecker := health.NewChecker()
 
-	go githubapi.MainGhMetricsLoop(mainGhClientCache)
+	go githubapi.MainGhMetricsLoop(clientCache)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", handleWebhook(cfg))

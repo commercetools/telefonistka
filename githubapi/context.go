@@ -42,12 +42,11 @@ func NewGithubEndpoints(host string) GithubEndpoints {
 
 // EventConfig holds all externally-resolved configuration for event handling.
 type EventConfig struct {
-	MainClientCache     *lru.Cache[string, GhClient]
-	ApproverClientCache *lru.Cache[string, GhClient]
-	MainClient          ClientConfig
-	ApproverClient      ClientConfig
-	Endpoints           GithubEndpoints
-	TemplatesFS         fs.FS
+	ClientCache    *lru.Cache[string, GhClients]
+	MainClient     ClientConfig
+	ApproverClient ClientConfig
+	Endpoints      GithubEndpoints
+	TemplatesFS    fs.FS
 	CommitStatusURLTemplatePath string
 	HandleSelfComment   bool
 	WebhookSecret       []byte

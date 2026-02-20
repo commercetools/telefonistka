@@ -63,14 +63,14 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEvent, r *http.Request, payload []byte) {
 	repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-	mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+	clients, err := getOrCreateClients(ctx, cfg.ClientCache, cfg.MainClient, cfg.ApproverClient, cfg.Endpoints, repoOwner)
 	if err != nil {
-		slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
+		slog.Error("Failed to get GitHub clients", "owner", repoOwner, "err", err)
 		return
 	}
 
 	c := Context{
-		Repositories:                mainPair.v3Client.Repositories,
+		Repositories:                clients.Main.v3Client.Repositories,
 		TemplatesFS:                 cfg.TemplatesFS,
 		CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
 		Owner:                       repoOwner,
@@ -94,14 +94,9 @@ func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEve
 func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.PullRequestEvent) {
 	repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-	mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+	clients, err := getOrCreateClients(ctx, cfg.ClientCache, cfg.MainClient, cfg.ApproverClient, cfg.Endpoints, repoOwner)
 	if err != nil {
-		slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
-		return
-	}
-	approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
-	if err != nil {
-		slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
+		slog.Error("Failed to get GitHub clients", "owner", repoOwner, "err", err)
 		return
 	}
 
@@ -118,8 +113,7 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 		PrSHA:                       event.GetPullRequest().GetHead().GetSHA(),
 		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
 	}
-	mainPair.setServices(&c)
-	c.ApproverPRs = approverPair.v3Client.PullRequests
+	clients.setServices(&c)
 	c.PrLogger = slog.Default().With("context", c)
 
 	config, err := getInRepoConfig(ctx, c)
@@ -145,18 +139,13 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 
 func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github.IssueCommentEvent) {
 	repoOwner := event.GetRepo().GetOwner().GetLogin()
-	mainPair, err := GetOrCreateClient(ctx, cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner)
+	clients, err := getOrCreateClients(ctx, cfg.ClientCache, cfg.MainClient, cfg.ApproverClient, cfg.Endpoints, repoOwner)
 	if err != nil {
-		slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
-		return
-	}
-	approverPair, err := GetOrCreateClient(ctx, cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner)
-	if err != nil {
-		slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
+		slog.Error("Failed to get GitHub clients", "owner", repoOwner, "err", err)
 		return
 	}
 
-	botIdentity, _ := getBotIdentity(ctx, mainPair.v4Client)
+	botIdentity, _ := getBotIdentity(ctx, clients.Main.v4Client)
 
 	// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 	//
@@ -178,8 +167,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 		Labels:                      event.GetIssue().Labels,
 		DefaultBranch:               event.GetRepo().GetDefaultBranch(),
 	}
-	mainPair.setServices(&c)
-	c.ApproverPRs = approverPair.v3Client.PullRequests
+	clients.setServices(&c)
 	c.PrLogger = slog.Default().With("context", c)
 
 	config, err := getInRepoConfig(ctx, c)

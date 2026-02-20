@@ -14,18 +14,28 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// GhClient holds the REST and GraphQL clients for a single GitHub identity.
 type GhClient struct {
 	v3Client *github.Client
 	v4Client *githubv4.Client
 }
 
-// setServices populates the Context's GitHub service fields from this client.
-func (gc GhClient) setServices(c *Context) {
-	c.Repositories = gc.v3Client.Repositories
-	c.PullRequests = gc.v3Client.PullRequests
-	c.Issues = gc.v3Client.Issues
-	c.Git = gc.v3Client.Git
-	c.GraphQL = gc.v4Client
+// GhClients bundles the main and approver GitHub clients for one repo owner.
+// The approver is a separate identity so that auto-approvals don't come from
+// the same user that opened the PR.
+type GhClients struct {
+	Main     GhClient
+	Approver GhClient
+}
+
+// setServices populates all GitHub service fields on a Context.
+func (gc GhClients) setServices(c *Context) {
+	c.Repositories = gc.Main.v3Client.Repositories
+	c.PullRequests = gc.Main.v3Client.PullRequests
+	c.Issues = gc.Main.v3Client.Issues
+	c.Git = gc.Main.v3Client.Git
+	c.GraphQL = gc.Main.v4Client
+	c.ApproverPRs = gc.Approver.v3Client.PullRequests
 }
 
 func getAppInstallationId(ctx context.Context, keyPath string, appID int64, restURL string, owner string) (int64, error) {
@@ -62,9 +72,9 @@ func getAppInstallationId(ctx context.Context, keyPath string, appID int64, rest
 	return 0, fmt.Errorf("no installation found for owner %s", owner)
 }
 
-// newAppClientPair creates a REST+GraphQL client pair using GitHub App auth.
+// newAppClient creates a REST+GraphQL client using GitHub App auth.
 // A single ghinstallation transport is shared by both clients.
-func newAppClientPair(ctx context.Context, appID int64, keyPath string, endpoints GithubEndpoints, owner string) (GhClient, error) {
+func newAppClient(ctx context.Context, appID int64, keyPath string, endpoints GithubEndpoints, owner string) (GhClient, error) {
 	installID, err := getAppInstallationId(ctx, keyPath, appID, endpoints.RestURL, owner)
 	if err != nil {
 		return GhClient{}, fmt.Errorf("getting app installation ID for owner %s: %w", owner, err)
@@ -98,8 +108,8 @@ func newAppClientPair(ctx context.Context, appID int64, keyPath string, endpoint
 	return GhClient{v3Client: v3, v4Client: v4}, nil
 }
 
-// newTokenClientPair creates a REST+GraphQL client pair using an OAuth token.
-func newTokenClientPair(ctx context.Context, token string, endpoints GithubEndpoints) GhClient {
+// newTokenClient creates a REST+GraphQL client using an OAuth token.
+func newTokenClient(ctx context.Context, token string, endpoints GithubEndpoints) GhClient {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	httpClient := oauth2.NewClient(ctx, ts)
 
@@ -118,33 +128,41 @@ func newTokenClientPair(ctx context.Context, token string, endpoints GithubEndpo
 	return GhClient{v3Client: v3, v4Client: v4}
 }
 
-// GetOrCreateClient retrieves a cached client pair or creates one.
-// App-auth clients are cached per owner; token-auth clients are cached globally.
-func GetOrCreateClient(ctx context.Context, cache *lru.Cache[string, GhClient], creds ClientConfig, endpoints GithubEndpoints, owner string) (GhClient, error) {
-	key := owner
-	if creds.AppID == 0 {
-		key = "global"
-	}
-	if pair, ok := cache.Get(key); ok {
-		slog.Debug("Found cached client", "key", key)
-		return pair, nil
-	}
-
-	slog.Info("Creating new GitHub client", "key", key, "app_auth", creds.AppID != 0)
-
+// newClient creates a GhClient from credentials, dispatching to app or token auth.
+func newClient(ctx context.Context, creds ClientConfig, endpoints GithubEndpoints, owner string) (GhClient, error) {
 	if creds.AppID != 0 {
-		pair, err := newAppClientPair(ctx, creds.AppID, creds.AppKeyPath, endpoints, owner)
-		if err != nil {
-			return GhClient{}, err
-		}
-		cache.Add(key, pair)
-		return pair, nil
+		return newAppClient(ctx, creds.AppID, creds.AppKeyPath, endpoints, owner)
 	}
-
 	if creds.OAuthToken == "" {
 		return GhClient{}, fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
 	}
-	pair := newTokenClientPair(ctx, creds.OAuthToken, endpoints)
-	cache.Add(key, pair)
-	return pair, nil
+	return newTokenClient(ctx, creds.OAuthToken, endpoints), nil
+}
+
+// getOrCreateClients retrieves cached clients or creates both main and approver
+// for the given owner. The cache key is the owner for app-auth, "global" for token-auth.
+func getOrCreateClients(ctx context.Context, cache *lru.Cache[string, GhClients], mainCreds, approverCreds ClientConfig, endpoints GithubEndpoints, owner string) (GhClients, error) {
+	key := owner
+	if mainCreds.AppID == 0 {
+		key = "global"
+	}
+	if clients, ok := cache.Get(key); ok {
+		slog.Debug("Found cached clients", "key", key)
+		return clients, nil
+	}
+
+	slog.Info("Creating new GitHub clients", "key", key, "app_auth", mainCreds.AppID != 0)
+
+	main, err := newClient(ctx, mainCreds, endpoints, owner)
+	if err != nil {
+		return GhClients{}, fmt.Errorf("creating main client: %w", err)
+	}
+	approver, err := newClient(ctx, approverCreds, endpoints, owner)
+	if err != nil {
+		return GhClients{}, fmt.Errorf("creating approver client: %w", err)
+	}
+
+	clients := GhClients{Main: main, Approver: approver}
+	cache.Add(key, clients)
+	return clients, nil
 }
