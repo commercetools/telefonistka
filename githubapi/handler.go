@@ -11,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"maps"
+	"slices"
+
 	"github.com/commercetools/telefonistka/argocd"
 	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"golang.org/x/exp/maps"
 )
 
 // ReceiveWebhook validates the webhook payload and spawns a goroutine to handle the event.
@@ -487,5 +489,5 @@ func generateListOfChangedFiles(eventPayload *github.PushEvent) []string {
 		}
 	}
 
-	return maps.Keys(fileList)
+	return slices.Collect(maps.Keys(fileList))
 }

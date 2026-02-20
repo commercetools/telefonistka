@@ -11,9 +11,11 @@ import (
 	"strings"
 	"sync"
 
+	"maps"
+	"slices"
+
 	"github.com/commercetools/telefonistka/configuration"
 	prom "github.com/commercetools/telefonistka/prometheus"
-	"golang.org/x/exp/maps"
 )
 
 func generateListOfEndpoints(listOfChangedFiles []string, config *configuration.Config) []string {
@@ -31,7 +33,7 @@ func generateListOfEndpoints(listOfChangedFiles []string, config *configuration.
 		}
 	}
 
-	return maps.Keys(endpoints)
+	return slices.Collect(maps.Keys(endpoints))
 }
 
 func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *http.Request, body []byte, endpoint string) {

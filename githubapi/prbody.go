@@ -4,11 +4,10 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
-
-	"golang.org/x/exp/maps"
 )
 
 func generatePromotionPrBody(ctx context.Context, c Context, components string, promotion PromotionInstance, originalPrAuthor string) string {
@@ -31,7 +30,7 @@ func generatePromotionPrBody(ctx context.Context, c Context, components string, 
 	// newPrMetadata.PreviousPromotionMetadata[ghPrClientDetails.PrNumber].TargetPaths = targetPaths
 	// newPrMetadata.PreviousPromotionMetadata[ghPrClientDetails.PrNumber].SourcePath = sourcePath
 
-	newPrMetadata.PromotedPaths = maps.Keys(promotion.ComputedSyncPaths)
+	newPrMetadata.PromotedPaths = slices.Collect(maps.Keys(promotion.ComputedSyncPaths))
 
 	promotionSkipPaths := getPromotionSkipPaths(promotion)
 
@@ -82,7 +81,7 @@ func getPromotionSkipPaths(promotion PromotionInstance) map[string]bool {
 		skipCounts[component] = len(paths)
 	}
 
-	skipPaths := maps.Keys(skipCounts)
+	skipPaths := slices.Collect(maps.Keys(skipCounts))
 	slices.SortFunc(skipPaths, func(a, b string) int {
 		return cmp.Compare(skipCounts[a], skipCounts[b])
 	})
