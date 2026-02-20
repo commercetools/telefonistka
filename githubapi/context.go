@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"regexp"
 
+	"github.com/commercetools/telefonistka/argocd"
 	"github.com/commercetools/telefonistka/configuration"
 	"github.com/google/go-github/v62/github"
 	"github.com/shurcooL/githubv4"
@@ -42,6 +43,7 @@ func NewGithubEndpoints(host string) GithubEndpoints {
 // EventConfig holds all externally-resolved configuration for event handling.
 type EventConfig struct {
 	Clients                     *ClientProvider
+	ArgoCD                      *argocd.ArgoCDClients // nil when ArgoCD is not configured
 	TemplatesFS                 fs.FS
 	CommitStatusURLTemplatePath string
 	HandleSelfComment           bool

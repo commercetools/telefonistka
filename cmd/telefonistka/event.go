@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 
+	"github.com/commercetools/telefonistka/argocd"
 	"github.com/commercetools/telefonistka/githubapi"
 	"github.com/spf13/cobra"
 )
@@ -46,8 +48,26 @@ func event(eventType string, eventFilePath string) {
 		githubapi.NewGithubEndpoints(os.Getenv("GITHUB_HOST")),
 	)
 
+	var argoClients *argocd.ArgoCDClients
+	if addr := os.Getenv("ARGOCD_SERVER_ADDR"); addr != "" {
+		plaintext, _ := strconv.ParseBool(os.Getenv("ARGOCD_PLAINTEXT"))
+		insecure, _ := strconv.ParseBool(os.Getenv("ARGOCD_INSECURE"))
+		ac, err := argocd.NewArgoCDClients(argocd.ClientOptions{
+			ServerAddr: addr,
+			AuthToken:  os.Getenv("ARGOCD_TOKEN"),
+			Plaintext:  plaintext,
+			Insecure:   insecure,
+		})
+		if err != nil {
+			slog.Error("Failed to create ArgoCD clients", "err", err)
+			return
+		}
+		argoClients = &ac
+	}
+
 	cfg := githubapi.EventConfig{
 		Clients:                     clients,
+		ArgoCD:                      argoClients,
 		TemplatesFS:                 resolveTemplatesFS(),
 		CommitStatusURLTemplatePath: os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH"),
 		HandleSelfComment:           os.Getenv("HANDLE_SELF_COMMENT") == "true",

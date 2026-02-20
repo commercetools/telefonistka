@@ -42,8 +42,8 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func commentDiff(ctx context.Context, c Context) error {
-	if !c.Config.Argocd.CommentDiffonPR {
+func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClients) error {
+	if !c.Config.Argocd.CommentDiffonPR || argoClients == nil {
 		return nil
 	}
 	componentPathList, err := generateListOfChangedComponentPaths(ctx, c)
@@ -65,12 +65,8 @@ func commentDiff(ctx context.Context, c Context) error {
 			c.PrLogger.Debug("ArgoCD diff disabled for path", "path", componentPath)
 		}
 	}
-	argoClients, err := argocd.NewArgoCDClients(argocd.ClientOptions{})
-	if err != nil {
-		return fmt.Errorf("creating ArgoCD clients: %w", err)
-	}
 
-	hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.Config.Argocd.CreateTempAppObjectFroNewApps, argoClients)
+	hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.Config.Argocd.CreateTempAppObjectFroNewApps, *argoClients)
 	if err != nil {
 		return fmt.Errorf("getting diff information: %w", err)
 	}
