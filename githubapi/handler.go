@@ -3,48 +3,33 @@ package githubapi
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"maps"
 	"net/http"
-	"os"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/commercetools/telefonistka/argocd"
 	prom "github.com/commercetools/telefonistka/prometheus"
-	"github.com/commercetools/telefonistka/templates"
 	"github.com/google/go-github/v62/github"
-	lru "github.com/hashicorp/golang-lru/v2"
 )
 
-// resolveTemplatesFS returns an fs.FS for template lookups, using the
-// TEMPLATES_PATH environment variable as an override directory, or the
-// embedded templates as the default.
-func resolveTemplatesFS() fs.FS {
-	if p := os.Getenv("TEMPLATES_PATH"); p != "" {
-		return os.DirFS(p)
-	}
-	return templates.FS
-}
-
 // ReceiveWebhook validates the webhook payload and spawns a goroutine to handle the event.
-func ReceiveWebhook(r *http.Request, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], githubWebhookSecret []byte) error {
-	payload, err := github.ValidatePayload(r, githubWebhookSecret)
+func ReceiveWebhook(r *http.Request, cfg EventConfig) error {
+	payload, err := github.ValidatePayload(r, cfg.WebhookSecret)
 	if err != nil {
 		slog.Error("error reading request body", "err", err)
 		prom.InstrumentWebhookHit("validation_failed")
 		return err
 	}
 
-	go HandleEvent(context.Background(), mainGhClientCache, prApproverGhClientCache, r, payload)
+	go HandleEvent(context.Background(), cfg, r, payload)
 	return nil
 }
 
-func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhClientPair], prApproverGhClientCache *lru.Cache[string, GhClientPair], r *http.Request, payload []byte) {
+func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload []byte) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("Recovered", "err", r)
@@ -66,35 +51,21 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 	defer cancel()
 	var mainGithubClientPair GhClientPair
 	var approverGithubClientPair GhClientPair
-	tmplFS := resolveTemplatesFS()
-	commitStatusURLTmplPath := os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH")
-
-	endpoints := NewGithubEndpoints(os.Getenv("GITHUB_HOST"))
-	mainCreds := ClientConfig{
-		AppID:      parseOptionalInt64(os.Getenv("GITHUB_APP_ID")),
-		AppKeyPath: os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH"),
-		OAuthToken: os.Getenv("GITHUB_OAUTH_TOKEN"),
-	}
-	approverCreds := ClientConfig{
-		AppID:      parseOptionalInt64(os.Getenv("APPROVER_GITHUB_APP_ID")),
-		AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
-		OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
-	}
 
 	switch event := e.(type) {
 	case *github.PushEvent:
 		// this is a commit push, do something with it?
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, mainCreds, endpoints, repoOwner, ctx); err != nil {
+		if err := mainGithubClientPair.GetAndCache(cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
 
 		c := Context{
 			Repositories:                mainGithubClientPair.v3Client.Repositories,
-			TemplatesFS:                 tmplFS,
-			CommitStatusURLTemplatePath: commitStatusURLTmplPath,
+			TemplatesFS:                 cfg.TemplatesFS,
+			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
 			Owner:                       repoOwner,
 			Repo:                        event.GetRepo().GetName(),
 			RepoURL:                     event.GetRepo().GetHTMLURL(),
@@ -121,11 +92,11 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 	case *github.PullRequestEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, mainCreds, endpoints, repoOwner, ctx); err != nil {
+		if err := mainGithubClientPair.GetAndCache(cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
-		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, approverCreds, endpoints, repoOwner, ctx); err != nil {
+		if err := approverGithubClientPair.GetAndCache(cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
@@ -138,8 +109,8 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 			GraphQL:      mainGithubClientPair.v4Client,
 			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
 
-			TemplatesFS:                 tmplFS,
-			CommitStatusURLTemplatePath: commitStatusURLTmplPath,
+			TemplatesFS:                 cfg.TemplatesFS,
+			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
 			Labels:                      event.GetPullRequest().Labels,
 			Owner:                       repoOwner,
 			Repo:                        event.GetRepo().GetName(),
@@ -180,11 +151,11 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 
 	case *github.IssueCommentEvent:
 		repoOwner := event.GetRepo().GetOwner().GetLogin()
-		if err := mainGithubClientPair.GetAndCache(mainGhClientCache, mainCreds, endpoints, repoOwner, ctx); err != nil {
+		if err := mainGithubClientPair.GetAndCache(cfg.MainClientCache, cfg.MainClient, cfg.Endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
-		if err := approverGithubClientPair.GetAndCache(prApproverGhClientCache, approverCreds, endpoints, repoOwner, ctx); err != nil {
+		if err := approverGithubClientPair.GetAndCache(cfg.ApproverClientCache, cfg.ApproverClient, cfg.Endpoints, repoOwner, ctx); err != nil {
 			slog.Error("Failed to get approver GitHub client", "owner", repoOwner, "err", err)
 			return
 		}
@@ -196,8 +167,7 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 		// Allowing override makes it easier to test locally using a personal
 		// token. In those cases Telefonistka can be run with
 		// HANDLE_SELF_COMMENT=true to handle comments made manually.
-		handleSelf, _ := strconv.ParseBool(os.Getenv("HANDLE_SELF_COMMENT"))
-		if !handleSelf && event.GetSender().GetLogin() == botIdentity {
+		if !cfg.HandleSelfComment && event.GetSender().GetLogin() == botIdentity {
 			slog.Debug("Ignoring self comment")
 			return
 		}
@@ -209,8 +179,8 @@ func HandleEvent(ctx context.Context, mainGhClientCache *lru.Cache[string, GhCli
 			GraphQL:      mainGithubClientPair.v4Client,
 			ApproverPRs:  approverGithubClientPair.v3Client.PullRequests,
 
-			TemplatesFS:                 tmplFS,
-			CommitStatusURLTemplatePath: commitStatusURLTmplPath,
+			TemplatesFS:                 cfg.TemplatesFS,
+			CommitStatusURLTemplatePath: cfg.CommitStatusURLTemplatePath,
 			Owner:                       repoOwner,
 			Repo:                        event.GetRepo().GetName(),
 			RepoURL:                     event.GetRepo().GetHTMLURL(),
@@ -521,12 +491,4 @@ func generateListOfChangedFiles(eventPayload *github.PushEvent) []string {
 	}
 
 	return slices.Collect(maps.Keys(fileList))
-}
-
-// parseOptionalInt64 parses s as an int64, returning 0 for empty or
-// unparseable values. This is intentionally lenient: a zero AppID
-// signals "use OAuth token instead".
-func parseOptionalInt64(s string) int64 {
-	v, _ := strconv.ParseInt(s, 10, 64)
-	return v
 }

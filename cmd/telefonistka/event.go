@@ -35,6 +35,25 @@ func event(eventType string, eventFilePath string) {
 	mainGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 	prApproverGhClientCache, _ := lru.New[string, githubapi.GhClientPair](128)
 
+	cfg := githubapi.EventConfig{
+		MainClientCache:     mainGhClientCache,
+		ApproverClientCache: prApproverGhClientCache,
+		MainClient: githubapi.ClientConfig{
+			AppID:      parseOptionalInt64(os.Getenv("GITHUB_APP_ID")),
+			AppKeyPath: os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH"),
+			OAuthToken: os.Getenv("GITHUB_OAUTH_TOKEN"),
+		},
+		ApproverClient: githubapi.ClientConfig{
+			AppID:      parseOptionalInt64(os.Getenv("APPROVER_GITHUB_APP_ID")),
+			AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
+			OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
+		},
+		Endpoints:                   githubapi.NewGithubEndpoints(os.Getenv("GITHUB_HOST")),
+		TemplatesFS:                 resolveTemplatesFS(),
+		CommitStatusURLTemplatePath: os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH"),
+		HandleSelfComment:           os.Getenv("HANDLE_SELF_COMMENT") == "true",
+	}
+
 	slog.Info("Proccesing", "file", eventFilePath)
 	payload, err := os.ReadFile(eventFilePath)
 	if err != nil {
@@ -44,7 +63,7 @@ func event(eventType string, eventFilePath string) {
 	r.Body = io.NopCloser(bytes.NewReader(payload))
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("X-GitHub-Event", eventType)
-	githubapi.HandleEvent(context.Background(), mainGhClientCache, prApproverGhClientCache, r, payload)
+	githubapi.HandleEvent(context.Background(), cfg, r, payload)
 }
 
 func getEnv(key, fallback string) string {
