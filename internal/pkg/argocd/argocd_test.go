@@ -3,6 +3,7 @@ package argocd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/commercetools/telefonistka/internal/pkg/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -593,4 +595,191 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	assert.Equal(t, numComponents, len(diffResults))
 	// assert that the entire run takes less than numComponents * 1 second
 	assert.Less(t, elapsed, time.Duration(numComponents)*time.Second)
+}
+
+func TestGenerateAppSetGitGeneratorParams(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		path              string
+		wantPath          string
+		wantBasename      string
+		wantFilename      string
+		wantBaseNorm      string
+		wantFileNorm      string
+		wantSegmentsCount int
+	}{
+		"simple path": {
+			path:              "env/staging",
+			wantPath:          "env/staging",
+			wantBasename:      "staging",
+			wantFilename:      "staging",
+			wantBaseNorm:      "staging",
+			wantFileNorm:      "staging",
+			wantSegmentsCount: 2,
+		},
+		"nested path": {
+			path:              "env/prod/us-east/c1",
+			wantPath:          "env/prod/us-east/c1",
+			wantBasename:      "c1",
+			wantFilename:      "c1",
+			wantBaseNorm:      "c1",
+			wantFileNorm:      "c1",
+			wantSegmentsCount: 4,
+		},
+		"root path": {
+			path:              ".",
+			wantPath:          ".",
+			wantBasename:      ".",
+			wantFilename:      ".",
+			wantBaseNorm:      "",
+			wantFileNorm:      "",
+			wantSegmentsCount: 1,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			params := generateAppSetGitGeneratorParams(tc.path)
+			pathMap, ok := params["path"].(map[string]interface{})
+			if !ok {
+				t.Fatalf("params[\"path\"] is not map[string]interface{}, got %T", params["path"])
+			}
+			if got := pathMap["path"].(string); got != tc.wantPath {
+				t.Errorf("path = %q, want %q", got, tc.wantPath)
+			}
+			if got := pathMap["basename"].(string); got != tc.wantBasename {
+				t.Errorf("basename = %q, want %q", got, tc.wantBasename)
+			}
+			if got := pathMap["filename"].(string); got != tc.wantFilename {
+				t.Errorf("filename = %q, want %q", got, tc.wantFilename)
+			}
+			if got := pathMap["basenameNormalized"].(string); got != tc.wantBaseNorm {
+				t.Errorf("basenameNormalized = %q, want %q", got, tc.wantBaseNorm)
+			}
+			if got := pathMap["filenameNormalized"].(string); got != tc.wantFileNorm {
+				t.Errorf("filenameNormalized = %q, want %q", got, tc.wantFileNorm)
+			}
+			segments := pathMap["segments"].([]string)
+			if got := len(segments); got != tc.wantSegmentsCount {
+				t.Errorf("segments count = %d, want %d", got, tc.wantSegmentsCount)
+			}
+		})
+	}
+}
+
+func TestGetTempApplication(t *testing.T) {
+	t.Parallel()
+	tmpl := argoappv1.ApplicationSetTemplate{
+		ApplicationSetTemplateMeta: argoappv1.ApplicationSetTemplateMeta{
+			Name:      "my-app",
+			Namespace: "argocd",
+			Labels: map[string]string{
+				"env": "staging",
+			},
+			Annotations: map[string]string{
+				"note": "test",
+			},
+		},
+		Spec: argoappv1.ApplicationSpec{
+			Source: &argoappv1.ApplicationSource{
+				RepoURL: "https://github.com/example/repo",
+			},
+		},
+	}
+	tmpl.ApplicationSetTemplateMeta.Finalizers = []string{"resources-finalizer.argocd.argoproj.io"}
+
+	app := getTempApplication(tmpl)
+
+	if app.Name != "my-app" {
+		t.Errorf("Name = %q, want %q", app.Name, "my-app")
+	}
+	if app.Namespace != "argocd" {
+		t.Errorf("Namespace = %q, want %q", app.Namespace, "argocd")
+	}
+	if app.Labels["env"] != "staging" {
+		t.Errorf("Labels[env] = %q, want %q", app.Labels["env"], "staging")
+	}
+	if app.Annotations["note"] != "test" {
+		t.Errorf("Annotations[note] = %q, want %q", app.Annotations["note"], "test")
+	}
+	if len(app.Finalizers) != 1 || app.Finalizers[0] != "resources-finalizer.argocd.argoproj.io" {
+		t.Errorf("Finalizers = %v, want [resources-finalizer.argocd.argoproj.io]", app.Finalizers)
+	}
+	if app.Spec.Source.RepoURL != "https://github.com/example/repo" {
+		t.Errorf("Spec.Source.RepoURL = %q, want %q", app.Spec.Source.RepoURL, "https://github.com/example/repo")
+	}
+	if app.ResourceVersion != "" {
+		t.Errorf("ResourceVersion should be zero-valued, got %q", app.ResourceVersion)
+	}
+}
+
+func TestFindRelevantAppSetByPathPluginGenerator(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		pathPattern   string
+		componentPath string
+		wantName      string
+		wantErr       bool
+	}{
+		"match": {
+			pathPattern:   `"env/*"`,
+			componentPath: "env/staging",
+			wantName:      "plugin-appset",
+		},
+		"no match": {
+			pathPattern:   `"other/*"`,
+			componentPath: "env/staging",
+			wantErr:       true,
+		},
+		"bad JSON": {
+			pathPattern:   `not-valid-json`,
+			componentPath: "env/staging",
+			wantErr:       true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockAppSetClient := mocks.NewMockApplicationSetServiceClient(ctrl)
+			mockAppSetClient.EXPECT().
+				List(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(&argoappv1.ApplicationSetList{
+					Items: []argoappv1.ApplicationSet{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "plugin-appset"},
+							Spec: argoappv1.ApplicationSetSpec{
+								Generators: []argoappv1.ApplicationSetGenerator{
+									{
+										Plugin: &argoappv1.PluginGenerator{
+											Input: argoappv1.PluginInput{
+												Parameters: argoappv1.PluginParameters{
+													"path": apiextensionsv1.JSON{Raw: json.RawMessage(tc.pathPattern)},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}, nil)
+
+			appSet, err := findRelevantAppSetByPath(t.Context(), tc.componentPath, "repo", mockAppSetClient)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if appSet.Name != tc.wantName {
+				t.Errorf("appSet.Name = %q, want %q", appSet.Name, tc.wantName)
+			}
+		})
+	}
 }
