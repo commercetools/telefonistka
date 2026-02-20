@@ -7,7 +7,6 @@ import (
 
 	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
-	lru "github.com/hashicorp/golang-lru/v2"
 )
 
 const (
@@ -15,10 +14,10 @@ const (
 	metricRefreshTime = 60 * time.Second
 )
 
-func MainGhMetricsLoop(clientCache *lru.Cache[string, GhClients]) {
+func MainGhMetricsLoop(cp *ClientProvider) {
 	for t := range time.Tick(metricRefreshTime) {
 		slog.Debug("Updating pr metrics", "tick", t)
-		getPrMetrics(clientCache)
+		getPrMetrics(cp)
 	}
 }
 
@@ -84,12 +83,12 @@ func isPrStalePending(commitStatuses *github.CombinedStatus, timeToDefineStale t
 // getPrMetrics iterates through all clients , gets all repos and then all PRs and calculates metrics
 // getPrMetrics assumes Telefonistka uses a GitHub App style of authentication as it uses the Apps.ListRepos call
 // When using  personal access token authentication, Telefonistka is unaware of the "relevant" repos (at least it get a webhook from them).
-func getPrMetrics(clientCache *lru.Cache[string, GhClients]) {
+func getPrMetrics(cp *ClientProvider) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
-	for _, ghOwner := range clientCache.Keys() {
+	for _, ghOwner := range cp.CachedOwners() {
 		slog.Debug("Checking gh Owner", "owner", ghOwner)
-		clients, _ := clientCache.Get(ghOwner)
+		clients, _ := cp.CachedClients(ghOwner)
 		ghClient := clients.Main
 		repos, resp, err := ghClient.v3Client.Apps.ListRepos(ctx, nil)
 		_ = prom.InstrumentGhCall(resp)

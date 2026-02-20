@@ -63,7 +63,7 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEvent, r *http.Request, payload []byte) {
 	repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-	clients, err := getOrCreateClients(ctx, cfg.ClientCache, cfg.MainClient, cfg.ApproverClient, cfg.Endpoints, repoOwner)
+	clients, err := cfg.Clients.ForOwner(ctx, repoOwner)
 	if err != nil {
 		slog.Error("Failed to get GitHub clients", "owner", repoOwner, "err", err)
 		return
@@ -94,7 +94,7 @@ func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEve
 func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.PullRequestEvent) {
 	repoOwner := event.GetRepo().GetOwner().GetLogin()
 
-	clients, err := getOrCreateClients(ctx, cfg.ClientCache, cfg.MainClient, cfg.ApproverClient, cfg.Endpoints, repoOwner)
+	clients, err := cfg.Clients.ForOwner(ctx, repoOwner)
 	if err != nil {
 		slog.Error("Failed to get GitHub clients", "owner", repoOwner, "err", err)
 		return
@@ -139,7 +139,7 @@ func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.
 
 func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github.IssueCommentEvent) {
 	repoOwner := event.GetRepo().GetOwner().GetLogin()
-	clients, err := getOrCreateClients(ctx, cfg.ClientCache, cfg.MainClient, cfg.ApproverClient, cfg.Endpoints, repoOwner)
+	clients, err := cfg.Clients.ForOwner(ctx, repoOwner)
 	if err != nil {
 		slog.Error("Failed to get GitHub clients", "owner", repoOwner, "err", err)
 		return

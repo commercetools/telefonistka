@@ -10,7 +10,6 @@ import (
 
 	"github.com/commercetools/telefonistka/configuration"
 	"github.com/google/go-github/v62/github"
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -42,14 +41,11 @@ func NewGithubEndpoints(host string) GithubEndpoints {
 
 // EventConfig holds all externally-resolved configuration for event handling.
 type EventConfig struct {
-	ClientCache    *lru.Cache[string, GhClients]
-	MainClient     ClientConfig
-	ApproverClient ClientConfig
-	Endpoints      GithubEndpoints
-	TemplatesFS    fs.FS
+	Clients                     *ClientProvider
+	TemplatesFS                 fs.FS
 	CommitStatusURLTemplatePath string
-	HandleSelfComment   bool
-	WebhookSecret       []byte
+	HandleSelfComment           bool
+	WebhookSecret               []byte
 }
 
 type repoService interface {

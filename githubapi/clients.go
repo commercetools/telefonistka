@@ -38,6 +38,65 @@ func (gc GhClients) setServices(c *Context) {
 	c.ApproverPRs = gc.Approver.v3Client.PullRequests
 }
 
+// ClientProvider creates and caches GitHub clients for repo owners.
+// Credentials and endpoints are immutable; the cache is populated lazily.
+type ClientProvider struct {
+	cache         *lru.Cache[string, GhClients]
+	mainCreds     ClientConfig
+	approverCreds ClientConfig
+	endpoints     GithubEndpoints
+}
+
+// NewClientProvider creates a ClientProvider with an LRU cache of the given size.
+func NewClientProvider(size int, mainCreds, approverCreds ClientConfig, endpoints GithubEndpoints) *ClientProvider {
+	cache, _ := lru.New[string, GhClients](size)
+	return &ClientProvider{
+		cache:         cache,
+		mainCreds:     mainCreds,
+		approverCreds: approverCreds,
+		endpoints:     endpoints,
+	}
+}
+
+// ForOwner returns cached clients for the owner, creating them on a cache miss.
+// App-auth clients are cached per owner; token-auth clients are cached globally.
+func (cp *ClientProvider) ForOwner(ctx context.Context, owner string) (GhClients, error) {
+	key := owner
+	if cp.mainCreds.AppID == 0 {
+		key = "global"
+	}
+	if clients, ok := cp.cache.Get(key); ok {
+		slog.Debug("Found cached clients", "key", key)
+		return clients, nil
+	}
+
+	slog.Info("Creating new GitHub clients", "key", key, "app_auth", cp.mainCreds.AppID != 0)
+
+	main, err := newClient(ctx, cp.mainCreds, cp.endpoints, owner)
+	if err != nil {
+		return GhClients{}, fmt.Errorf("creating main client: %w", err)
+	}
+	approver, err := newClient(ctx, cp.approverCreds, cp.endpoints, owner)
+	if err != nil {
+		return GhClients{}, fmt.Errorf("creating approver client: %w", err)
+	}
+
+	clients := GhClients{Main: main, Approver: approver}
+	cp.cache.Add(key, clients)
+	return clients, nil
+}
+
+// CachedOwners returns the keys currently in the cache, for use by the
+// metrics loop.
+func (cp *ClientProvider) CachedOwners() []string {
+	return cp.cache.Keys()
+}
+
+// CachedClients returns the cached GhClients for the given key, if present.
+func (cp *ClientProvider) CachedClients(key string) (GhClients, bool) {
+	return cp.cache.Get(key)
+}
+
 func getAppInstallationId(ctx context.Context, keyPath string, appID int64, restURL string, owner string) (int64, error) {
 	atr, err := ghinstallation.NewAppsTransportKeyFromFile(http.DefaultTransport, appID, keyPath)
 	if err != nil {
@@ -137,32 +196,4 @@ func newClient(ctx context.Context, creds ClientConfig, endpoints GithubEndpoint
 		return GhClient{}, fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
 	}
 	return newTokenClient(ctx, creds.OAuthToken, endpoints), nil
-}
-
-// getOrCreateClients retrieves cached clients or creates both main and approver
-// for the given owner. The cache key is the owner for app-auth, "global" for token-auth.
-func getOrCreateClients(ctx context.Context, cache *lru.Cache[string, GhClients], mainCreds, approverCreds ClientConfig, endpoints GithubEndpoints, owner string) (GhClients, error) {
-	key := owner
-	if mainCreds.AppID == 0 {
-		key = "global"
-	}
-	if clients, ok := cache.Get(key); ok {
-		slog.Debug("Found cached clients", "key", key)
-		return clients, nil
-	}
-
-	slog.Info("Creating new GitHub clients", "key", key, "app_auth", mainCreds.AppID != 0)
-
-	main, err := newClient(ctx, mainCreds, endpoints, owner)
-	if err != nil {
-		return GhClients{}, fmt.Errorf("creating main client: %w", err)
-	}
-	approver, err := newClient(ctx, approverCreds, endpoints, owner)
-	if err != nil {
-		return GhClients{}, fmt.Errorf("creating approver client: %w", err)
-	}
-
-	clients := GhClients{Main: main, Approver: approver}
-	cache.Add(key, clients)
-	return clients, nil
 }

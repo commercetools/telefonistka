@@ -9,7 +9,6 @@ import (
 	"os"
 
 	"github.com/commercetools/telefonistka/githubapi"
-	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/spf13/cobra"
 )
 
@@ -32,21 +31,23 @@ func init() { //nolint:gochecknoinits
 }
 
 func event(eventType string, eventFilePath string) {
-	clientCache, _ := lru.New[string, githubapi.GhClients](128)
-
-	cfg := githubapi.EventConfig{
-		ClientCache: clientCache,
-		MainClient: githubapi.ClientConfig{
+	clients := githubapi.NewClientProvider(
+		128,
+		githubapi.ClientConfig{
 			AppID:      parseOptionalInt64(os.Getenv("GITHUB_APP_ID")),
 			AppKeyPath: os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("GITHUB_OAUTH_TOKEN"),
 		},
-		ApproverClient: githubapi.ClientConfig{
+		githubapi.ClientConfig{
 			AppID:      parseOptionalInt64(os.Getenv("APPROVER_GITHUB_APP_ID")),
 			AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
 		},
-		Endpoints:                   githubapi.NewGithubEndpoints(os.Getenv("GITHUB_HOST")),
+		githubapi.NewGithubEndpoints(os.Getenv("GITHUB_HOST")),
+	)
+
+	cfg := githubapi.EventConfig{
+		Clients:                     clients,
 		TemplatesFS:                 resolveTemplatesFS(),
 		CommitStatusURLTemplatePath: os.Getenv("CUSTOM_COMMIT_STATUS_URL_TEMPLATE_PATH"),
 		HandleSelfComment:           os.Getenv("HANDLE_SELF_COMMENT") == "true",
