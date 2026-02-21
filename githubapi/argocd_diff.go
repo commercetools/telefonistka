@@ -68,7 +68,7 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClien
 
 	hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, argocd.DiffConfig{
 		UseSHALabel:    c.Config.Argocd.UseSHALabelForAppDiscovery,
-		CreateTempApps: c.Config.Argocd.CreateTempAppObjectFroNewApps,
+		CreateTempApps: c.Config.Argocd.CreateTempAppObjectForNewApps,
 	}, *argoClients, c.PrLogger)
 	if err != nil {
 		return fmt.Errorf("getting diff information: %w", err)

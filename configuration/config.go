@@ -51,7 +51,7 @@ type ArgocdConfig struct {
 	AutoMergeNoDiffPRs            bool   `yaml:"autoMergeNoDiffPRs"`
 	AllowSyncfromBranchPathRegex  string `yaml:"allowSyncfromBranchPathRegex"`
 	UseSHALabelForAppDiscovery    bool   `yaml:"useSHALabelForAppDiscovery"`
-	CreateTempAppObjectFroNewApps bool   `yaml:"createTempAppObjectFromNewApps"`
+	CreateTempAppObjectForNewApps bool   `yaml:"createTempAppObjectFromNewApps"`
 }
 
 func ParseConfigFromYaml(y string) (*Config, error) {
