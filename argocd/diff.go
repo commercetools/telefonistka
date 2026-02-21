@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
@@ -21,6 +22,10 @@ import (
 	yaml3 "gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+// tempAppCleanupTimeout bounds how long we wait when deleting a
+// temporary ArgoCD application during cleanup.
+const tempAppCleanupTimeout = 30 * time.Second
 
 // DiffConfig holds options that control how ArgoCD diffs are generated.
 type DiffConfig struct {
@@ -247,11 +252,14 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 
 		// Capture values for the cleanup closure. Use a context
 		// detached from the parent so the delete succeeds even if
-		// the caller's context was cancelled.
-		cleanupCtx := context.WithoutCancel(ctx)
+		// the caller's context was cancelled, but bound it with a
+		// timeout so we don't block forever if ArgoCD is
+		// unresponsive.
 		name := app.Name
 		ns := app.Namespace
 		cleanup = func() {
+			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tempAppCleanupTimeout)
+			defer cancel()
 			if _, delErr := ac.App.Delete(cleanupCtx, &application.ApplicationDeleteRequest{
 				Name:         &name,
 				AppNamespace: &ns,
