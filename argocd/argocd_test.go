@@ -474,8 +474,7 @@ func TestTempAppDeletedOnDiffError(t *testing.T) {
 		repo,
 		ac,
 		&settings.Settings{URL: "https://argocd.test"},
-		true,  // useSHALabelForArgoDicovery
-		true,  // createTempAppObjectFromNewApps
+		DiffConfig{UseSHALabel: true, CreateTempApps: true},
 	)
 
 	assert.True(t, result.AppWasTemporarilyCreated, "expected temp app to be flagged as created")
@@ -585,8 +584,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 		makeComponents(numComponents),
 		"test-pr-branch",
 		"test-repo",
-		true,
-		false,
+		DiffConfig{UseSHALabel: true},
 		argoClients,
 	)
 

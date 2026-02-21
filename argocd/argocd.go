@@ -50,6 +50,12 @@ type ArgoCDClients struct {
 	AppSet  applicationsetpkg.ApplicationSetServiceClient
 }
 
+// DiffConfig holds options that control how ArgoCD diffs are generated.
+type DiffConfig struct {
+	UseSHALabel    bool // use SHA1 label instead of manifest-generate-paths annotation
+	CreateTempApps bool // create temporary ArgoCD app objects for new components
+}
+
 // DiffElement struct to store diff element details, this represents a single k8s object
 type DiffElement struct {
 	ObjectGroup     string
@@ -511,16 +517,16 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 	}
 }
 
-func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool, createTempAppObjectFromNewApps bool) (componentDiffResult DiffResult) {
+func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig) (componentDiffResult DiffResult) {
 	componentDiffResult.ComponentPath = componentPath
 
-	app, err := findArgocdApp(ctx, componentPath, repo, ac.App, useSHALabelForArgoDicovery)
+	app, err := findArgocdApp(ctx, componentPath, repo, ac.App, cfg.UseSHALabel)
 	if err != nil {
 		componentDiffResult.DiffError = err
 		return componentDiffResult
 	}
 	if app == nil {
-		if createTempAppObjectFromNewApps {
+		if cfg.CreateTempApps {
 			app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac)
 
 			if err != nil {
@@ -619,7 +625,7 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 }
 
 // GenerateDiffOfChangedComponents generates diff of changed components
-func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, useSHALabelForArgoDicovery bool, createTempAppObjectFromNewApps bool, argoClients ArgoCDClients) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients ArgoCDClients) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 
@@ -632,7 +638,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 	diffResult := make(chan DiffResult, len(componentsToDiff))
 	for componentPath, shouldIDiff := range componentsToDiff {
 		go func(componentPath string, shouldDiff bool) {
-			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, useSHALabelForArgoDicovery, createTempAppObjectFromNewApps)
+			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, cfg)
 		}(componentPath, shouldIDiff)
 	}
 
