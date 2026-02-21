@@ -517,60 +517,79 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 	}
 }
 
+// ensureApp locates (or creates) the ArgoCD application for a component.
+//
+// When the app already exists it is hard-refreshed so the live state is
+// current. When no app is found and cfg.CreateTempApps is set, a
+// temporary app object is created from the matching ApplicationSet
+// template.
+//
+// The returned cleanup function MUST be deferred by the caller — it
+// deletes the temporary app (or is a no-op for pre-existing apps).
+func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac ArgoCDClients, cfg DiffConfig) (app *argoappv1.Application, tempCreated bool, cleanup func(), err error) {
+	noop := func() {}
+
+	app, err = findArgocdApp(ctx, componentPath, repo, ac.App, cfg.UseSHALabel)
+	if err != nil {
+		return nil, false, noop, err
+	}
+
+	if app == nil {
+		if !cfg.CreateTempApps {
+			return nil, false, noop, fmt.Errorf("no ArgoCD application found for component path %s(repo %s)", componentPath, repo)
+		}
+
+		app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac)
+		if err != nil {
+			slog.Error("Error creating temporary app object", "err", err)
+			return nil, false, noop, err
+		}
+		slog.Debug("Created temporary app object", "app", app.Name)
+
+		// Capture values for the cleanup closure. Use a context
+		// detached from the parent so the delete succeeds even if
+		// the caller's context was cancelled.
+		cleanupCtx := context.WithoutCancel(ctx)
+		name := app.Name
+		ns := app.Namespace
+		cleanup = func() {
+			if _, delErr := ac.App.Delete(cleanupCtx, &application.ApplicationDeleteRequest{
+				Name:         &name,
+				AppNamespace: &ns,
+			}); delErr != nil {
+				slog.Error("Failed to delete temporary app", "app", name, "err", delErr)
+			} else {
+				slog.Debug("Deleted temporary app object", "app", name)
+			}
+		}
+		return app, true, cleanup, nil
+	}
+
+	// App exists — hard-refresh so the live state is current.
+	refreshType := string(argoappv1.RefreshTypeHard)
+	appNameQuery := application.ApplicationQuery{
+		Name:    &app.Name,
+		Refresh: &refreshType,
+	}
+	app, err = ac.App.Get(ctx, &appNameQuery)
+	if err != nil {
+		slog.Error("Error getting app(HardRefresh)", "app", appNameQuery.Name, "err", err)
+		return nil, false, noop, err
+	}
+	slog.Debug("Got ArgoCD app", "app", app.Name)
+	return app, false, noop, nil
+}
+
 func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig) (componentDiffResult DiffResult) {
 	componentDiffResult.ComponentPath = componentPath
 
-	app, err := findArgocdApp(ctx, componentPath, repo, ac.App, cfg.UseSHALabel)
+	app, tempCreated, cleanup, err := ensureApp(ctx, componentPath, repo, prBranch, ac, cfg)
 	if err != nil {
 		componentDiffResult.DiffError = err
 		return componentDiffResult
 	}
-	if app == nil {
-		if cfg.CreateTempApps {
-			app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac)
-
-			if err != nil {
-				slog.Error("Error creating temporary app object", "err", err)
-				componentDiffResult.DiffError = err
-				return componentDiffResult
-			}
-			slog.Debug("Created temporary app object", "app", app.Name)
-			componentDiffResult.AppWasTemporarilyCreated = true
-
-			// Guarantee cleanup regardless of how this function exits.
-			// Use a context detached from the parent so the delete
-			// succeeds even if the caller's context was cancelled.
-			cleanupCtx := context.WithoutCancel(ctx)
-			defer func() {
-				if _, delErr := ac.App.Delete(cleanupCtx, &application.ApplicationDeleteRequest{
-					Name:         &app.Name,
-					AppNamespace: &app.Namespace,
-				}); delErr != nil {
-					slog.Error("Failed to delete temporary app", "app", app.Name, "err", delErr)
-				} else {
-					slog.Debug("Deleted temporary app object", "app", app.Name)
-				}
-			}()
-		} else {
-			componentDiffResult.DiffError = fmt.Errorf("no ArgoCD application found for component path %s(repo %s)", componentPath, repo)
-			return
-		}
-	} else {
-		// Get the application and its resources, resources are the live state of the application objects.
-		// The 2nd "app fetch" is needed for the "refreshTypeHard", we don't want to do that to non-relevant apps"
-		refreshType := string(argoappv1.RefreshTypeHard)
-		appNameQuery := application.ApplicationQuery{
-			Name:    &app.Name, // we expect only one app with this label and repo selectors
-			Refresh: &refreshType,
-		}
-		app, err = ac.App.Get(ctx, &appNameQuery)
-		if err != nil {
-			componentDiffResult.DiffError = err
-			slog.Error("Error getting app(HardRefresh)", "app", appNameQuery.Name, "err", err)
-			return componentDiffResult
-		}
-		slog.Debug("Got ArgoCD app", "app", app.Name)
-	}
+	defer cleanup()
+	componentDiffResult.AppWasTemporarilyCreated = tempCreated
 	componentDiffResult.ArgoCdAppName = app.Name
 	componentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
 	componentDiffResult.ArgoCdAppHealthStatus = string(app.Status.Health.Status)
