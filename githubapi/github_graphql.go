@@ -27,6 +27,7 @@ func getBotIdentity(ctx context.Context, c graphQLClient) (string, error) {
 }
 
 func minimizeStalePRComments(ctx context.Context, c Context) error {
+	c.PrLogger.Debug("Minimizing stale PR comments")
 	botIdentity, err := getBotIdentity(ctx, c.GraphQL)
 	if err != nil {
 		c.PrLogger.Warn("fetching bot identity", "err", err)

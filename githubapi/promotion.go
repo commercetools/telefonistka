@@ -195,7 +195,7 @@ func applyPromotionPath(promotions map[string]promotionInstance, component relev
 }
 
 func detectDrift(ctx context.Context, c Context, templatesFS fs.FS) error {
-	c.PrLogger.Debug("Checking for Drift")
+	c.PrLogger.Debug("Checking for drift")
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -205,6 +205,7 @@ func detectDrift(ctx context.Context, c Context, templatesFS fs.FS) error {
 	if err != nil {
 		return err
 	}
+	c.PrLogger.Debug("Drift detection plan generated", "promotion_count", len(promotions))
 
 	for _, promotion := range promotions {
 		c.PrLogger.Debug("Checking drift for source", "source", promotion.Metadata.SourcePath)
@@ -261,6 +262,7 @@ func getComponentConfig(ctx context.Context, c Context, componentPath string, br
 
 // generateListOfRelevantComponents returns the set of components that were changed in the PR and are relevant for promotion.
 func generateListOfRelevantComponents(ctx context.Context, c Context) (relevantComponents map[relevantComponent]struct{}, err error) {
+	c.PrLogger.Debug("Generating list of relevant components")
 	relevantComponents = make(map[relevantComponent]struct{})
 
 	// Get the list of files in the PR, with pagination
@@ -296,6 +298,7 @@ func generateListOfRelevantComponents(ctx context.Context, c Context) (relevantC
 			break // a file can only be a single "source dir"
 		}
 	}
+	c.PrLogger.Debug("Found relevant components", "count", len(relevantComponents))
 	return relevantComponents, nil
 }
 
@@ -342,7 +345,7 @@ func generatePlanBasedOnChangedComponent(ctx context.Context, c Context, relevan
 }
 
 func generatePromotionPlan(ctx context.Context, c Context, configBranch string) (map[string]promotionInstance, error) {
-	c.PrLogger.Debug("Generating promotion plan")
+	c.PrLogger.Debug("Generating promotion plan", "config_branch", configBranch)
 	// TODO refactor tests to use the two functions below instead of this one
 	relevantComponents, err := generateListOfRelevantComponents(ctx, c)
 	if err != nil {

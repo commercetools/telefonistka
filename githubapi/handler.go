@@ -160,7 +160,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 	// token. In those cases Telefonistka can be run with
 	// HANDLE_SELF_COMMENT=true to handle comments made manually.
 	if !cfg.HandleSelfComment && event.GetSender().GetLogin() == botIdentity {
-		slog.Debug("Ignoring self comment")
+		slog.Debug("Ignoring self comment", "sender", event.GetSender().GetLogin(), "repo", event.GetRepo().GetFullName())
 		return
 	}
 	c := Context{
@@ -191,7 +191,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 	pr, resp, err := c.PullRequests.Get(ctx, c.Owner, c.Repo, event.GetIssue().GetNumber())
 	prom.InstrumentGhCall(resp)
 	if pr == nil || err != nil {
-		c.PrLogger.Debug("Issue is not a PR")
+		c.PrLogger.Debug("Issue is not a PR", "issue_number", event.GetIssue().GetNumber())
 		return
 	}
 
@@ -247,6 +247,7 @@ func handleShowPlanPREvent(ctx context.Context, c Context, templatesFS fs.FS) er
 }
 
 func handleChangedPREvent(ctx context.Context, c Context, templatesFS fs.FS, argoClients *argocd.ArgoCDClients) error {
+	c.PrLogger.Debug("Handling changed PR event")
 	if err := minimizeStalePRComments(ctx, c); err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
 	}
@@ -264,6 +265,7 @@ func handleChangedPREvent(ctx context.Context, c Context, templatesFS fs.FS, arg
 
 // handleMergedPrEvent processes a PR that has been merged, generating promotions and opening new PRs for each.
 func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argoClients *argocd.ArgoCDClients) error {
+	c.PrLogger.Debug("Handling merged PR event")
 	var err error
 
 	// configBranch = default branch as the PR is closed at this and its branch deleted.
@@ -290,7 +292,7 @@ func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argo
 			}
 
 			if len(treeEntries) < 1 {
-				c.PrLogger.Info("TreeEntries list is empty")
+				c.PrLogger.Info("TreeEntries list is empty", "source", promotion.Metadata.SourcePath, "targets", promotion.Metadata.TargetPaths)
 				continue
 			}
 
@@ -379,6 +381,7 @@ func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argo
 }
 
 func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommentEvent, botIdentity string, argoClients *argocd.ArgoCDClients) error {
+	c.PrLogger.Debug("Handling comment event", "action", ce.GetAction(), "comment_user", ce.GetComment().GetUser().GetLogin())
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonistka only creates PRs at this point)
 	if ce.GetAction() == "edited" && ce.GetComment().GetUser().GetLogin() == botIdentity && ce.GetIssue().GetState() == "open" {
 		const checkboxIdentifier = "telefonistka-argocd-branch-sync"

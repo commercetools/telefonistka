@@ -42,6 +42,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 }
 
 func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClients) error {
+	c.PrLogger.Debug("Commenting ArgoCD diff")
 	if !c.Config.Argocd.CommentDiffonPR || argoClients == nil {
 		return nil
 	}
@@ -74,7 +75,7 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClien
 	}
 	c.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", c.Ref)
 	if !hasComponentDiffErrors && !hasComponentDiff {
-		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state")
+		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state", "components_checked", len(componentsToDiff))
 		prLabels, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
 		prom.InstrumentGhCall(resp)
 		if err != nil {
@@ -113,7 +114,7 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClien
 			}
 		}
 	} else {
-		c.PrLogger.Debug("Did not find affected ArgoCD apps")
+		c.PrLogger.Debug("Did not find affected ArgoCD apps", "components_checked", len(componentPathList))
 	}
 	return nil
 }
