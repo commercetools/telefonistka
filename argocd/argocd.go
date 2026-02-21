@@ -330,7 +330,7 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 			}
 		}
 	}
-	return nil, fmt.Errorf("No ArgoCD ApplicationSet found for component path %s(repo %s)", componentPath, repo)
+	return nil, fmt.Errorf("%w: component %s (repo %s)", ErrAppSetNotFound, componentPath, repo)
 }
 
 // findArgocdAppBySHA1Label finds an ArgoCD application by the SHA1 label of the component path it's supposed to avoid performance issues with the "manifest-generate-paths" annotation method which requires pulling all ArgoCD applications(!) on every PR event.
@@ -420,7 +420,7 @@ func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath s
 		return fmt.Errorf("error finding ArgoCD application for component path %s: %w", componentPath, err)
 	}
 	if foundApp == nil {
-		return fmt.Errorf("no ArgoCD application was found for component path: %s", componentPath)
+		return fmt.Errorf("%w: component %s", ErrAppNotFound, componentPath)
 	}
 	if foundApp.Spec.Source.TargetRevision == revision {
 		slog.Info("App already has revision", "app", foundApp.Name, "revision", revision)
@@ -536,7 +536,7 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 
 	if app == nil {
 		if !cfg.CreateTempApps {
-			return nil, false, noop, fmt.Errorf("no ArgoCD application found for component path %s(repo %s)", componentPath, repo)
+			return nil, false, noop, fmt.Errorf("%w: component %s (repo %s)", ErrAppNotFound, componentPath, repo)
 		}
 
 		app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac)
