@@ -15,7 +15,6 @@ import (
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
-	"github.com/argoproj/argo-cd/v2/pkg/apiclient/project"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	reposerverApiClient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
@@ -494,13 +493,11 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	// mock the argoClients
 	mockAppServiceClient := mocks.NewMockApplicationServiceClient(mockCtrl)
 	mockSettingsServiceClient := mocks.NewMockSettingsServiceClient(mockCtrl)
-	mockProjectServiceClient := mocks.NewMockProjectServiceClient(mockCtrl)
 	// fake InitArgoClients
 
 	argoClients := ArgoCDClients{
 		App:     mockAppServiceClient,
 		Setting: mockSettingsServiceClient,
-		Project: mockProjectServiceClient,
 	}
 	// slowReply simulates a slow reply from the server
 	slowReply := func(ctx context.Context, in any, opts ...any) {
@@ -569,12 +566,6 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	mockAppServiceClient.EXPECT().
 		GetManifests(gomock.Any(), gomock.Any()).
 		Return(&reposerverApiClient.ManifestResponse{}, nil).
-		AnyTimes()
-
-	// mock the GetDetailedProject method
-	mockProjectServiceClient.EXPECT().
-		GetDetailedProject(gomock.Any(), gomock.Any()).
-		Return(&project.DetailedProjectsResponse{}, nil).
 		AnyTimes()
 
 	const numComponents = 5

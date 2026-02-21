@@ -9,14 +9,12 @@ import (
 	"log/slog"
 	"time"
 
-	cmdutil "github.com/argoproj/argo-cd/v2/cmd/util"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
-	projectpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/project"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	argodiff "github.com/argoproj/argo-cd/v2/util/argo/diff"
 	"github.com/argoproj/argo-cd/v2/util/argo/normalizers"
-	"github.com/argoproj/gitops-engine/pkg/sync/hook"
+	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 	"github.com/gonvenience/ytbx"
 	"github.com/homeport/dyff/pkg/dyff"
 	yaml3 "gopkg.in/yaml.v3"
@@ -57,95 +55,145 @@ type DiffResult struct {
 	ArgoCdAppAutoSyncEnabled bool
 }
 
-// Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
-// But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
-func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption, logger *slog.Logger) (foundDiffs bool, diffElements []DiffElement, err error) {
+// generateArgocdAppDiff pairs live cluster state (from ManagedResources)
+// with target manifests (from GetManifests at the PR branch) and runs
+// ArgoCD's StateDiff to produce per-object diffs.
+func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, manifests []string, logger *slog.Logger) (foundDiffs bool, diffElements []DiffElement, err error) {
 	logger.Debug("Generating ArgoCD app diff", "app", app.Name, "keep_diff_data", keepDiffData, "managed_resources", len(resources.Items))
-	liveObjs, err := cmdutil.LiveObjects(resources.Items)
-	if err != nil {
-		return false, nil, fmt.Errorf("Failed to get live objects: %w", err)
-	}
 
-	items := make([]objKeyLiveTarget, 0)
-	var unstructureds []*unstructured.Unstructured
-	for _, mfst := range diffOptions.res.Manifests {
-		obj, err := argoappv1.UnmarshalToUnstructured(mfst)
-		if err != nil {
-			return false, nil, fmt.Errorf("Failed to unmarshal manifest: %w", err)
-		}
-		unstructureds = append(unstructureds, obj)
-	}
-	groupedObjs, err := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace, logger)
-	if err != nil {
-		return false, nil, fmt.Errorf("Failed to group objects by key: %w", err)
-	}
-	items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace, logger)
-	if err != nil {
-		return false, nil, fmt.Errorf("Failed to group objects for diff: %w", err)
-	}
-
-	for _, item := range items {
-		var diffElement DiffElement
-		if item.target != nil && hook.IsHook(item.target) || item.live != nil && hook.IsHook(item.live) {
+	// 1. Index live state from ManagedResources using NormalizedLiveState.
+	liveByKey := make(map[kube.ResourceKey]*unstructured.Unstructured, len(resources.Items))
+	for _, res := range resources.Items {
+		key := kube.ResourceKey{Group: res.Group, Kind: res.Kind, Namespace: res.Namespace, Name: res.Name}
+		if key.Kind == kube.SecretKind && key.Group == "" {
 			continue
 		}
-		overrides := make(map[string]argoappv1.ResourceOverride)
-		for k := range argoSettings.ResourceOverrides {
-			val := argoSettings.ResourceOverrides[k]
-			overrides[k] = *val
+		if res.NormalizedLiveState == "" || res.NormalizedLiveState == "null" {
+			continue
 		}
+		live := &unstructured.Unstructured{}
+		if err := json.Unmarshal([]byte(res.NormalizedLiveState), live); err != nil {
+			return false, nil, fmt.Errorf("unmarshaling live state for %s/%s: %w", key.Kind, key.Name, err)
+		}
+		liveByKey[key] = live
+	}
 
-		ignoreAggregatedRoles := false
-		ignoreNormalizerOpts := normalizers.IgnoreNormalizerOpts{}
-		diffConfig, err := argodiff.NewDiffConfigBuilder().
-			WithDiffSettings(app.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles, ignoreNormalizerOpts).
-			WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
-			WithNoCache().
-			WithStructuredMergeDiff(true).
-			Build()
+	// 2. Dedup + index target manifests (last-write-wins).
+	targetByKey := make(map[kube.ResourceKey]*unstructured.Unstructured, len(manifests))
+	for _, mfst := range manifests {
+		obj, err := argoappv1.UnmarshalToUnstructured(mfst)
 		if err != nil {
-			return false, nil, fmt.Errorf("Failed to build diff config: %w", err)
+			return false, nil, fmt.Errorf("unmarshaling manifest: %w", err)
 		}
-		diffRes, err := argodiff.StateDiff(item.live, item.target, diffConfig)
+		if obj.GetNamespace() == "" {
+			obj.SetNamespace(app.Spec.Destination.Namespace)
+		}
+		key := kube.GetResourceKey(obj)
+		if key.Kind == kube.SecretKind && key.Group == "" {
+			continue
+		}
+		if isHookOrIgnored(obj) {
+			continue
+		}
+		targetByKey[key] = obj
+	}
+
+	// 3. Build DiffConfig once (reused for every item).
+	overrides := make(map[string]argoappv1.ResourceOverride, len(argoSettings.ResourceOverrides))
+	for k, v := range argoSettings.ResourceOverrides {
+		overrides[k] = *v
+	}
+	diffConfig, err := argodiff.NewDiffConfigBuilder().
+		WithDiffSettings(app.Spec.IgnoreDifferences, overrides, false, normalizers.IgnoreNormalizerOpts{}).
+		WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
+		WithNoCache().
+		WithStructuredMergeDiff(true).
+		Build()
+	if err != nil {
+		return false, nil, fmt.Errorf("building diff config: %w", err)
+	}
+
+	const redactedDiff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
+
+	// 4. Pair targets with live and diff.
+	for key, target := range targetByKey {
+		live := liveByKey[key]
+		delete(liveByKey, key)
+
+		if live != nil && isHookOrIgnored(live) {
+			continue
+		}
+
+		diffRes, err := argodiff.StateDiff(live, target, diffConfig)
 		if err != nil {
-			return false, nil, fmt.Errorf("Failed to diff objects: %w", err)
+			return false, nil, fmt.Errorf("diffing %s/%s: %w", key.Kind, key.Name, err)
 		}
 
-		if diffRes.Modified || item.target == nil || item.live == nil {
-			diffElement.ObjectGroup = item.key.Group
-			diffElement.ObjectKind = item.key.Kind
-			diffElement.ObjectNamespace = item.key.Namespace
-			diffElement.ObjectName = item.key.Name
+		if !diffRes.Modified && live != nil {
+			continue
+		}
+		foundDiffs = true
 
-			var live *unstructured.Unstructured
-			var target *unstructured.Unstructured
-			if item.target != nil && item.live != nil {
-				target = &unstructured.Unstructured{}
-				live = item.live
-				err = json.Unmarshal(diffRes.PredictedLive, target)
-				if err != nil {
-					return false, nil, fmt.Errorf("Failed to unmarshal predicted live object: %w", err)
+		de := DiffElement{
+			ObjectGroup:     key.Group,
+			ObjectKind:      key.Kind,
+			ObjectNamespace: key.Namespace,
+			ObjectName:      key.Name,
+		}
+		if keepDiffData {
+			if live != nil {
+				predicted := &unstructured.Unstructured{}
+				if err := json.Unmarshal(diffRes.PredictedLive, predicted); err != nil {
+					return false, nil, fmt.Errorf("unmarshaling predicted live for %s/%s: %w", key.Kind, key.Name, err)
 				}
+				de.Diff, err = diffLiveVsTargetObject(live, predicted)
 			} else {
-				live = item.live
-				target = item.target
-			}
-			if !foundDiffs {
-				foundDiffs = true
-			}
-
-			if keepDiffData {
-				diffElement.Diff, err = diffLiveVsTargetObject(live, target)
-			} else {
-				diffElement.Diff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
+				de.Diff, err = diffLiveVsTargetObject(nil, target)
 			}
 			if err != nil {
-				return false, nil, fmt.Errorf("Failed to diff live objects: %w", err)
+				return false, nil, fmt.Errorf("formatting diff for %s/%s: %w", key.Kind, key.Name, err)
 			}
+		} else {
+			de.Diff = redactedDiff
 		}
-		diffElements = append(diffElements, diffElement)
+		diffElements = append(diffElements, de)
 	}
+
+	// 5. Remaining live-only entries are resources deleted by the PR.
+	for key, live := range liveByKey {
+		if live == nil || isHookOrIgnored(live) {
+			continue
+		}
+		foundDiffs = true
+
+		de := DiffElement{
+			ObjectGroup:     key.Group,
+			ObjectKind:      key.Kind,
+			ObjectNamespace: key.Namespace,
+			ObjectName:      key.Name,
+		}
+		if keepDiffData {
+			de.Diff, err = diffLiveVsTargetObject(live, nil)
+			if err != nil {
+				return false, nil, fmt.Errorf("formatting diff for deleted %s/%s: %w", key.Kind, key.Name, err)
+			}
+		} else {
+			de.Diff = redactedDiff
+		}
+		diffElements = append(diffElements, de)
+	}
+
 	return foundDiffs, diffElements, nil
+}
+
+// isHookOrIgnored returns true if the object carries an ArgoCD sync
+// hook annotation or an explicit compare-options=ignore annotation.
+func isHookOrIgnored(obj *unstructured.Unstructured) bool {
+	annotations := obj.GetAnnotations()
+	if _, ok := annotations["argocd.argoproj.io/hook"]; ok {
+		return true
+	}
+	return annotations["argocd.argoproj.io/compare-options"] == "ignore"
 }
 
 // diffLiveVsTargetObject returns the diff of live and target in a format that
@@ -316,30 +364,17 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 		return componentDiffResult
 	}
 
-	// Get the application manifests, these are the target state of the application objects, taken from the git repo, specificly from the PR branch.
-	diffOption := &DifferenceOption{}
-
-	manifestQuery := application.ApplicationManifestQuery{
+	manifests, err := ac.App.GetManifests(ctx, &application.ApplicationManifestQuery{
 		Name:         &app.Name,
 		Revision:     &prBranch,
 		AppNamespace: &app.Namespace,
-	}
-	manifests, err := ac.App.GetManifests(ctx, &manifestQuery)
+	})
 	if err != nil {
 		componentDiffResult.DiffError = fmt.Errorf("fetching manifests for %s at %s: %w", app.Name, prBranch, err)
 		return componentDiffResult
 	}
-	diffOption.res = manifests
-	diffOption.revision = prBranch
 
-	// Now we diff the live state(resources) and target state of the application objects(diffOption.res)
-	detailedProject, err := ac.Project.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
-	if err != nil {
-		componentDiffResult.DiffError = fmt.Errorf("fetching project %s: %w", app.Spec.Project, err)
-		return componentDiffResult
-	}
-
-	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption, logger)
+	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(commentDiff, app, resources, argoSettings, manifests.Manifests, logger)
 
 	return componentDiffResult
 }

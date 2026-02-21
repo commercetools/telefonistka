@@ -8,7 +8,6 @@ import (
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
 	applicationsetpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/applicationset"
-	projectpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/project"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
@@ -118,18 +117,6 @@ func (s *fakeAppServer) GetManifests(_ context.Context, q *application.Applicati
 
 // --- Project service fake ---
 
-type fakeProjectServer struct {
-	projectpkg.UnimplementedProjectServiceServer
-}
-
-func (s *fakeProjectServer) GetDetailedProject(_ context.Context, req *projectpkg.ProjectQuery) (*projectpkg.DetailedProjectsResponse, error) {
-	return &projectpkg.DetailedProjectsResponse{
-		Project: &argoappv1.AppProject{
-			ObjectMeta: metav1.ObjectMeta{Name: req.Name},
-		},
-	}, nil
-}
-
 // --- Settings service fake ---
 
 type fakeSettingsServer struct {
@@ -161,7 +148,6 @@ func (s *fakeAppSetServer) List(context.Context, *applicationsetpkg.ApplicationS
 
 type FakeArgoCD struct {
 	App     *fakeAppServer
-	Project *fakeProjectServer
 	Setting *fakeSettingsServer
 	AppSet  *fakeAppSetServer
 }
@@ -179,7 +165,6 @@ func startFakeArgoCD(t *testing.T) (*FakeArgoCD, *argocd.ArgoCDClients) {
 			managedResources: make(map[string]*application.ManagedResourcesResponse),
 			manifests:        make(map[string]*repoapiclient.ManifestResponse),
 		},
-		Project: &fakeProjectServer{},
 		Setting: &fakeSettingsServer{},
 		AppSet:  &fakeAppSetServer{},
 	}
@@ -187,7 +172,6 @@ func startFakeArgoCD(t *testing.T) (*FakeArgoCD, *argocd.ArgoCDClients) {
 	lis := bufconn.Listen(1024 * 1024)
 	srv := grpc.NewServer()
 	application.RegisterApplicationServiceServer(srv, fake.App)
-	projectpkg.RegisterProjectServiceServer(srv, fake.Project)
 	settings.RegisterSettingsServiceServer(srv, fake.Setting)
 	applicationsetpkg.RegisterApplicationSetServiceServer(srv, fake.AppSet)
 
@@ -210,7 +194,6 @@ func startFakeArgoCD(t *testing.T) (*FakeArgoCD, *argocd.ArgoCDClients) {
 
 	clients := &argocd.ArgoCDClients{
 		App:     application.NewApplicationServiceClient(conn),
-		Project: projectpkg.NewProjectServiceClient(conn),
 		Setting: settings.NewSettingsServiceClient(conn),
 		AppSet:  applicationsetpkg.NewApplicationSetServiceClient(conn),
 	}

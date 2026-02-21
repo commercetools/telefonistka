@@ -7,7 +7,6 @@ import (
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
 	applicationsetpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/applicationset"
-	projectpkg "github.com/argoproj/argo-cd/v2/pkg/apiclient/project"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/settings"
 )
 
@@ -21,16 +20,15 @@ type ClientOptions struct {
 	Insecure   bool
 }
 
-// ArgoCDClients bundles the four gRPC service stubs needed to interact
+// ArgoCDClients bundles the gRPC service stubs needed to interact
 // with an ArgoCD server.
 type ArgoCDClients struct {
 	App     application.ApplicationServiceClient
-	Project projectpkg.ProjectServiceClient
 	Setting settings.SettingsServiceClient
 	AppSet  applicationsetpkg.ApplicationSetServiceClient
 }
 
-// NewArgoCDClients creates the four gRPC service stubs from the given
+// NewArgoCDClients creates the gRPC service stubs from the given
 // connection options. Call this once at application startup and reuse
 // the result.
 func NewArgoCDClients(opts ClientOptions) (ArgoCDClients, error) {
@@ -52,11 +50,6 @@ func NewArgoCDClients(opts ClientOptions) (ArgoCDClients, error) {
 	_, ac.App, err = client.NewApplicationClient()
 	if err != nil {
 		return ac, fmt.Errorf("creating ArgoCD app client: %w", err)
-	}
-
-	_, ac.Project, err = client.NewProjectClient()
-	if err != nil {
-		return ac, fmt.Errorf("creating ArgoCD project client: %w", err)
 	}
 
 	_, ac.Setting, err = client.NewSettingsClient()
