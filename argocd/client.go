@@ -2,6 +2,7 @@ package argocd
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
@@ -34,6 +35,7 @@ type ArgoCDClients struct {
 // the result.
 func NewArgoCDClients(opts ClientOptions) (ArgoCDClients, error) {
 	var ac ArgoCDClients
+	slog.Debug("Creating ArgoCD clients", "server", opts.ServerAddr, "plaintext", opts.Plaintext, "insecure", opts.Insecure)
 
 	clientOpts := &apiclient.ClientOptions{
 		ServerAddr: opts.ServerAddr,
@@ -67,5 +69,6 @@ func NewArgoCDClients(opts ClientOptions) (ArgoCDClients, error) {
 		return ac, fmt.Errorf("creating ArgoCD appSet client: %w", err)
 	}
 
+	slog.Debug("ArgoCD clients created")
 	return ac, nil
 }

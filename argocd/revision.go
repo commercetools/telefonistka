@@ -10,6 +10,7 @@ import (
 )
 
 func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool) error {
+	slog.Debug("Setting ArgoCD app revision", "component_path", componentPath, "revision", revision, "repo", repo)
 	foundApp, err := findArgocdApp(ctx, componentPath, repo, ac.App, useSHALabelForArgoDicovery)
 	if err != nil {
 		return fmt.Errorf("error finding ArgoCD application for component path %s: %w", componentPath, err)

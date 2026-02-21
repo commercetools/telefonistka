@@ -55,6 +55,7 @@ type DiffResult struct {
 // Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
 // But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
 func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (foundDiffs bool, diffElements []DiffElement, err error) {
+	slog.Debug("Generating ArgoCD app diff", "app", app.Name, "keep_diff_data", keepDiffData, "managed_resources", len(resources.Items))
 	liveObjs, err := cmdutil.LiveObjects(resources.Items)
 	if err != nil {
 		return false, nil, fmt.Errorf("Failed to get live objects: %w", err)
@@ -278,6 +279,7 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 }
 
 func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig) (componentDiffResult DiffResult) {
+	slog.Debug("Generating diff for component", "component_path", componentPath, "pr_branch", prBranch, "comment_diff", commentDiff)
 	componentDiffResult.ComponentPath = componentPath
 
 	app, tempCreated, cleanup, err := ensureApp(ctx, componentPath, repo, prBranch, ac, cfg)
@@ -329,7 +331,6 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 		return componentDiffResult
 	}
 
-	slog.Debug("Generating diff for component", "component_path", componentPath)
 	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption)
 
 	return componentDiffResult
@@ -337,6 +338,7 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 
 // GenerateDiffOfChangedComponents generates diff of changed components
 func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients ArgoCDClients) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+	slog.Debug("Generating diffs for changed components", "component_count", len(componentsToDiff), "pr_branch", prBranch)
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 

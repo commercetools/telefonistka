@@ -3,6 +3,7 @@ package argocd
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/argoproj/argo-cd/v2/controller"
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
@@ -61,6 +62,7 @@ func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructu
 			objByKey[kube.GetResourceKey(obj)] = obj
 		}
 	}
+	slog.Debug("Grouped objects by key", "local_objects", len(localObs), "live_objects", len(liveObjs), "grouped", len(objByKey))
 	return objByKey, nil
 }
 
@@ -101,5 +103,6 @@ func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[
 		}
 		items = append(items, objKeyLiveTarget{key, nil, local})
 	}
+	slog.Debug("Grouped objects for diff", "managed_resources", len(resources.Items), "diff_items", len(items))
 	return items, nil
 }

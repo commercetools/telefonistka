@@ -19,6 +19,7 @@ import (
 
 // This function will search for an ApplicationSet by the componentPath and repo name by comparing the componentPath with the ApplicationSet's spec.generators.[]git.directories
 func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo string, appSetClient applicationsetpkg.ApplicationSetServiceClient) (appSet *argoappv1.ApplicationSet, err error) {
+	slog.Debug("Searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
 	appSetQuery := applicationsetpkg.ApplicationSetListQuery{}
 
 	foundAppSets, err := appSetClient.List(ctx, &appSetQuery)
@@ -27,15 +28,12 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 	}
 	for _, appSet := range foundAppSets.Items {
 		for _, generator := range appSet.Spec.Generators {
-			slog.Debug("Checking ApplicationSet for component path", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
 			if generator.Git != nil && generator.Git.RepoURL == repo {
 				for _, dir := range generator.Git.Directories {
 					match, _ := path.Match(dir.Path, componentPath)
 					if match {
-						slog.Debug("Found ArgoCD ApplicationSet for component path", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
+						slog.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
 						return &appSet, nil
-					} else {
-						slog.Debug("No match for component path in directory", "component_path", componentPath, "dir", dir.Path)
 					}
 				}
 			}
@@ -52,16 +50,15 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 
 						match, _ := path.Match(parsedPath, componentPath)
 						if match {
-							slog.Debug("Found ArgoCD ApplicationSet for component path", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
+							slog.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
 							return &appSet, nil
-						} else {
-							slog.Debug("No match for component path directory", "component_path", componentPath, "dir", parsedPath)
 						}
 					}
 				}
 			}
 		}
 	}
+	slog.Debug("No matching ApplicationSet found", "component_path", componentPath, "repo", repo, "appsets_checked", len(foundAppSets.Items))
 	return nil, fmt.Errorf("%w: component %s (repo %s)", ErrAppSetNotFound, componentPath, repo)
 }
 
@@ -84,7 +81,7 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 		return nil, fmt.Errorf("Error listing ArgoCD applications: %w", err)
 	}
 	if len(foundApps.Items) == 0 {
-		slog.Info("No ArgoCD application found for component path sha1 for selector", "sha", componentPathSha1, "repo", repo, "selector", labelSelector)
+		slog.Info("No ArgoCD application found for component path sha1 for selector", "component_path", componentPath, "sha", componentPathSha1, "repo", repo, "selector", labelSelector)
 		return nil, nil
 	}
 
@@ -139,6 +136,7 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 }
 
 func findArgocdApp(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient, useSHALabelForArgoDicovery bool) (app *argoappv1.Application, err error) {
+	slog.Debug("Finding ArgoCD app", "component_path", componentPath, "repo", repo, "use_sha_label", useSHALabelForArgoDicovery)
 	f := findArgocdAppByManifestPathAnnotation
 	if useSHALabelForArgoDicovery {
 		f = findArgocdAppBySHA1Label
