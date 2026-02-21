@@ -25,9 +25,12 @@ import (
 
 type fakeAppServer struct {
 	application.UnimplementedApplicationServiceServer
-	mu      sync.Mutex
-	apps    map[string]*argoappv1.Application
-	patches []*application.ApplicationPatchRequest
+	mu               sync.Mutex
+	apps             map[string]*argoappv1.Application
+	patches          []*application.ApplicationPatchRequest
+	deletes          []*application.ApplicationDeleteRequest
+	managedResources map[string]*application.ManagedResourcesResponse // per app name
+	manifests        map[string]*repoapiclient.ManifestResponse       // per app name
 }
 
 func (s *fakeAppServer) addApp(app *argoappv1.Application) {
@@ -70,9 +73,16 @@ func (s *fakeAppServer) Create(_ context.Context, req *application.ApplicationCr
 	return app, nil
 }
 
+func (s *fakeAppServer) Deletes() []*application.ApplicationDeleteRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]*application.ApplicationDeleteRequest(nil), s.deletes...)
+}
+
 func (s *fakeAppServer) Delete(_ context.Context, req *application.ApplicationDeleteRequest) (*application.ApplicationResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.deletes = append(s.deletes, req)
 	delete(s.apps, req.GetName())
 	return &application.ApplicationResponse{}, nil
 }
@@ -88,11 +98,21 @@ func (s *fakeAppServer) Patch(_ context.Context, req *application.ApplicationPat
 	return app, nil
 }
 
-func (s *fakeAppServer) ManagedResources(context.Context, *application.ResourcesQuery) (*application.ManagedResourcesResponse, error) {
+func (s *fakeAppServer) ManagedResources(_ context.Context, q *application.ResourcesQuery) (*application.ManagedResourcesResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if resp, ok := s.managedResources[q.GetApplicationName()]; ok {
+		return resp, nil
+	}
 	return &application.ManagedResourcesResponse{}, nil
 }
 
-func (s *fakeAppServer) GetManifests(context.Context, *application.ApplicationManifestQuery) (*repoapiclient.ManifestResponse, error) {
+func (s *fakeAppServer) GetManifests(_ context.Context, q *application.ApplicationManifestQuery) (*repoapiclient.ManifestResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if resp, ok := s.manifests[q.GetName()]; ok {
+		return resp, nil
+	}
 	return &repoapiclient.ManifestResponse{}, nil
 }
 
@@ -127,10 +147,14 @@ func (s *fakeSettingsServer) Get(context.Context, *settings.SettingsQuery) (*set
 
 type fakeAppSetServer struct {
 	applicationsetpkg.UnimplementedApplicationSetServiceServer
+	mu      sync.Mutex
+	appSets []argoappv1.ApplicationSet
 }
 
 func (s *fakeAppSetServer) List(context.Context, *applicationsetpkg.ApplicationSetListQuery) (*argoappv1.ApplicationSetList, error) {
-	return &argoappv1.ApplicationSetList{}, nil
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return &argoappv1.ApplicationSetList{Items: s.appSets}, nil
 }
 
 // --- Aggregate + helper ---
@@ -150,7 +174,11 @@ func startFakeArgoCD(t *testing.T) (*FakeArgoCD, *argocd.ArgoCDClients) {
 	t.Helper()
 
 	fake := &FakeArgoCD{
-		App:     &fakeAppServer{apps: make(map[string]*argoappv1.Application)},
+		App: &fakeAppServer{
+			apps:             make(map[string]*argoappv1.Application),
+			managedResources: make(map[string]*application.ManagedResourcesResponse),
+			manifests:        make(map[string]*repoapiclient.ManifestResponse),
+		},
 		Project: &fakeProjectServer{},
 		Setting: &fakeSettingsServer{},
 		AppSet:  &fakeAppSetServer{},
