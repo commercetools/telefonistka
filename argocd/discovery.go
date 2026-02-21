@@ -30,7 +30,11 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 		for _, generator := range appSet.Spec.Generators {
 			if generator.Git != nil && generator.Git.RepoURL == repo {
 				for _, dir := range generator.Git.Directories {
-					match, _ := path.Match(dir.Path, componentPath)
+					match, matchErr := path.Match(dir.Path, componentPath)
+					if matchErr != nil {
+						logger.Warn("Malformed glob in ApplicationSet directory pattern", "appset", appSet.Name, "pattern", dir.Path, "err", matchErr)
+						continue
+					}
 					if match {
 						logger.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
 						return &appSet, nil
@@ -48,7 +52,11 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 							return nil, fmt.Errorf("unable to unmarshal plugin generator path: %w", err)
 						}
 
-						match, _ := path.Match(parsedPath, componentPath)
+						match, matchErr := path.Match(parsedPath, componentPath)
+						if matchErr != nil {
+							logger.Warn("Malformed glob in ApplicationSet plugin path", "appset", appSet.Name, "pattern", parsedPath, "err", matchErr)
+							continue
+						}
 						if match {
 							logger.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
 							return &appSet, nil
