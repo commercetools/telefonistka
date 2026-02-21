@@ -738,11 +738,16 @@ func removeTime(groups []string, a slog.Attr) slog.Attr {
 	return a
 }
 
-// newTestLogger returns a logger that writes to t.Output and filters out
-// timestamps.
+// newTestLogger returns a logger that writes to t.Output, filters out
+// timestamps, and suppresses DEBUG noise. Set TELEFONISTKA_TEST_DEBUG=1
+// for verbose output when investigating failures.
 func newTestLogger(t *testing.T) *slog.Logger {
 	t.Helper()
-	return slog.New(slog.NewTextHandler(t.Output(), &slog.HandlerOptions{Level: slog.LevelDebug, ReplaceAttr: removeTime}))
+	level := slog.LevelInfo
+	if os.Getenv("TELEFONISTKA_TEST_DEBUG") != "" {
+		level = slog.LevelDebug
+	}
+	return slog.New(slog.NewTextHandler(t.Output(), &slog.HandlerOptions{Level: level, ReplaceAttr: removeTime}))
 }
 
 //nolint:thelper // want to get the line where the error occurs here
