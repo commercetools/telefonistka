@@ -3,6 +3,7 @@ package argocd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"crypto/sha1" //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	"encoding/hex"
 	"encoding/json"
@@ -635,17 +636,18 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 		}(componentPath, shouldIDiff)
 	}
 
+	var errs []error
 	for range componentsToDiff {
 		currentDiffResult := <-diffResult
 		if currentDiffResult.DiffError != nil {
 			slog.Error("Error generating diff for component", "component_path", currentDiffResult.ComponentPath, "err", currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
-			err = currentDiffResult.DiffError
+			errs = append(errs, currentDiffResult.DiffError)
 		}
 		if currentDiffResult.HasDiff {
 			hasComponentDiff = true
 		}
 		diffResults = append(diffResults, currentDiffResult)
 	}
-	return hasComponentDiff, hasComponentDiffErrors, diffResults, err
+	return hasComponentDiff, hasComponentDiffErrors, diffResults, errors.Join(errs...)
 }
