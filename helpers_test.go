@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -726,6 +727,22 @@ func checkErr(t *testing.T, err error) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %s", err)
 	}
+}
+
+// removeTime filters out the time key and is meant to be used as a
+// slog.HandlerOptions.ReplaceAttr function.
+func removeTime(groups []string, a slog.Attr) slog.Attr {
+	if a.Key == slog.TimeKey && len(groups) == 0 {
+		return slog.Attr{}
+	}
+	return a
+}
+
+// newTestLogger returns a logger that writes to t.Output and filters out
+// timestamps.
+func newTestLogger(t *testing.T) *slog.Logger {
+	t.Helper()
+	return slog.New(slog.NewTextHandler(t.Output(), &slog.HandlerOptions{Level: slog.LevelDebug, ReplaceAttr: removeTime}))
 }
 
 //nolint:thelper // want to get the line where the error occurs here
