@@ -40,9 +40,9 @@ func generateAppSetGitGeneratorParams(p string) map[string]interface{} {
 	return params
 }
 
-func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, repo string, prBranch string, ac ArgoCDClients) (app *argoappv1.Application, err error) {
-	slog.Debug("ArgoCD app not found, searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
-	appSetOfcomponent, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.AppSet)
+func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, repo string, prBranch string, ac ArgoCDClients, logger *slog.Logger) (app *argoappv1.Application, err error) {
+	logger.Debug("ArgoCD app not found, searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
+	appSetOfcomponent, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.AppSet, logger)
 	if appSetOfcomponent != nil {
 		useGoTemplate := true
 		var goTemplateOptions []string
@@ -70,7 +70,7 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 		if err != nil {
 			return nil, err
 		}
-		slog.Debug("Temporary app created from ApplicationSet", "app", tempAppName, "appset", appSetOfcomponent.Name)
+		logger.Debug("Temporary app created from ApplicationSet", "app", tempAppName, "appset", appSetOfcomponent.Name)
 		return app, nil
 	} else {
 		return nil, err

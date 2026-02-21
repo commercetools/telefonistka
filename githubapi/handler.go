@@ -369,7 +369,7 @@ func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argo
 		for _, componentPath := range componentPathList {
 			if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
 				c.PrLogger.Info("Ensuring ArgoCD app is set to HEAD", "path", componentPath)
-				err := argocd.SetArgoCDAppRevision(ctx, *argoClients, componentPath, "HEAD", c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery)
+				err := argocd.SetArgoCDAppRevision(ctx, *argoClients, componentPath, "HEAD", c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.PrLogger)
 				if err != nil {
 					c.PrLogger.Error("Failed to set ArgoCD app to HEAD", "path", componentPath, "err", err)
 				}
@@ -396,7 +396,7 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 
 				for _, componentPath := range componentPathList {
 					if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-						err := argocd.SetArgoCDAppRevision(ctx, *argoClients, componentPath, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery)
+						err := argocd.SetArgoCDAppRevision(ctx, *argoClients, componentPath, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.PrLogger)
 						if err != nil {
 							c.PrLogger.Error("Failed to sync ArgoCD app from branch", "err", err)
 						}

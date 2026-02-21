@@ -18,8 +18,8 @@ import (
 )
 
 // This function will search for an ApplicationSet by the componentPath and repo name by comparing the componentPath with the ApplicationSet's spec.generators.[]git.directories
-func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo string, appSetClient applicationsetpkg.ApplicationSetServiceClient) (appSet *argoappv1.ApplicationSet, err error) {
-	slog.Debug("Searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
+func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo string, appSetClient applicationsetpkg.ApplicationSetServiceClient, logger *slog.Logger) (appSet *argoappv1.ApplicationSet, err error) {
+	logger.Debug("Searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
 	appSetQuery := applicationsetpkg.ApplicationSetListQuery{}
 
 	foundAppSets, err := appSetClient.List(ctx, &appSetQuery)
@@ -32,7 +32,7 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 				for _, dir := range generator.Git.Directories {
 					match, _ := path.Match(dir.Path, componentPath)
 					if match {
-						slog.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
+						logger.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
 						return &appSet, nil
 					}
 				}
@@ -50,7 +50,7 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 
 						match, _ := path.Match(parsedPath, componentPath)
 						if match {
-							slog.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
+							logger.Debug("Found matching ApplicationSet", "appset", appSet.Name, "component_path", componentPath, "repo", repo)
 							return &appSet, nil
 						}
 					}
@@ -58,20 +58,20 @@ func findRelevantAppSetByPath(ctx context.Context, componentPath string, repo st
 			}
 		}
 	}
-	slog.Debug("No matching ApplicationSet found", "component_path", componentPath, "repo", repo, "appsets_checked", len(foundAppSets.Items))
+	logger.Debug("No matching ApplicationSet found", "component_path", componentPath, "repo", repo, "appsets_checked", len(foundAppSets.Items))
 	return nil, fmt.Errorf("%w: component %s (repo %s)", ErrAppSetNotFound, componentPath, repo)
 }
 
 // findArgocdAppBySHA1Label finds an ArgoCD application by the SHA1 label of the component path it's supposed to avoid performance issues with the "manifest-generate-paths" annotation method which requires pulling all ArgoCD applications(!) on every PR event.
 // The SHA1 label is assumed to be populated by the ApplicationSet controller(or apps of apps  or similar).
-func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
+func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient, logger *slog.Logger) (app *argoappv1.Application, err error) {
 	// Calculate sha1 of component path to use in a label selector
 	cPathBa := []byte(componentPath)
 	hasher := sha1.New() //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	hasher.Write(cPathBa)
 	componentPathSha1 := hex.EncodeToString(hasher.Sum(nil))
 	labelSelector := fmt.Sprintf("telefonistka.io/component-path-sha1=%s", componentPathSha1)
-	slog.Debug("Using label selector", "selector", labelSelector)
+	logger.Debug("Using label selector", "selector", labelSelector)
 	appLabelQuery := application.ApplicationQuery{
 		Selector: &labelSelector,
 		Repo:     &repo,
@@ -81,7 +81,7 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 		return nil, fmt.Errorf("Error listing ArgoCD applications: %w", err)
 	}
 	if len(foundApps.Items) == 0 {
-		slog.Info("No ArgoCD application found for component path sha1 for selector", "component_path", componentPath, "sha", componentPathSha1, "repo", repo, "selector", labelSelector)
+		logger.Info("No ArgoCD application found for component path sha1 for selector", "component_path", componentPath, "sha", componentPathSha1, "repo", repo, "selector", labelSelector)
 		return nil, nil
 	}
 
@@ -92,7 +92,7 @@ func findArgocdAppBySHA1Label(ctx context.Context, componentPath string, repo st
 // findArgocdAppByManifestPathAnnotation is the default method to find an ArgoCD application by the manifest-generate-paths annotation.
 // It assumes the ArgoCD (optional) manifest-generate-paths annotation is set on all relevant apps.
 // Notice that this method includes a full list of all ArgoCD applications in the repo, this could be a performance issue if there are many apps in the repo.
-func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient) (app *argoappv1.Application, err error) {
+func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient, logger *slog.Logger) (app *argoappv1.Application, err error) {
 	// argocd.argoproj.io/manifest-generate-paths
 	appQuery := application.ApplicationQuery{
 		Repo: &repo,
@@ -102,7 +102,7 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 	getAppsStart := time.Now()
 	allRepoApps, err := appClient.List(ctx, &appQuery)
 	getAppsDuration := time.Since(getAppsStart).Milliseconds()
-	slog.Debug("Got ArgoCD applications for repo", "count", len(allRepoApps.Items), "repo", repo, "ms", getAppsDuration)
+	logger.Debug("Got ArgoCD applications for repo", "count", len(allRepoApps.Items), "repo", repo, "ms", getAppsDuration)
 	if err != nil {
 		return nil, err
 	}
@@ -124,22 +124,22 @@ func findArgocdAppByManifestPathAnnotation(ctx context.Context, componentPath st
 			// Using filepath.Rel solves all kinds of path issues, like double slashes, etc.
 			rel, err := filepath.Rel(manifetsPathElement, componentPath)
 			if !strings.HasPrefix(rel, "..") && err == nil {
-				slog.Debug("Found app with manifest-generate-paths annotation that matches component path",
+				logger.Debug("Found app with manifest-generate-paths annotation that matches component path",
 					"app", app.Name, "paths_annotation", appManifestPathsAnnotation, "component_path", componentPath)
 				return &app, nil
 			}
 		}
 	}
-	slog.Info("No ArgoCD application found with manifest-generate-paths annotation that matches path",
+	logger.Info("No ArgoCD application found with manifest-generate-paths annotation that matches path",
 		"component_path", componentPath, "repo", repo, "checked_count", len(allRepoApps.Items))
 	return nil, nil
 }
 
-func findArgocdApp(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient, useSHALabelForArgoDicovery bool) (app *argoappv1.Application, err error) {
-	slog.Debug("Finding ArgoCD app", "component_path", componentPath, "repo", repo, "use_sha_label", useSHALabelForArgoDicovery)
+func findArgocdApp(ctx context.Context, componentPath string, repo string, appClient application.ApplicationServiceClient, useSHALabelForArgoDicovery bool, logger *slog.Logger) (app *argoappv1.Application, err error) {
+	logger.Debug("Finding ArgoCD app", "component_path", componentPath, "repo", repo, "use_sha_label", useSHALabelForArgoDicovery)
 	f := findArgocdAppByManifestPathAnnotation
 	if useSHALabelForArgoDicovery {
 		f = findArgocdAppBySHA1Label
 	}
-	return f(ctx, componentPath, repo, appClient)
+	return f(ctx, componentPath, repo, appClient, logger)
 }

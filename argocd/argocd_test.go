@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"testing"
@@ -58,6 +59,7 @@ func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
 		componentPath,
 		repo,
 		ac,
+		slog.Default(),
 	); err != nil {
 		t.Errorf("got unexpected error")
 	}
@@ -178,7 +180,7 @@ func TestFindArgocdAppBySHA1Label(t *testing.T) {
 
 	mockApplicationClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(expectedResponse, nil)
 
-	app, err := findArgocdAppBySHA1Label(ctx, "random/path", "some-repo", mockApplicationClient)
+	app, err := findArgocdAppBySHA1Label(ctx, "random/path", "some-repo", mockApplicationClient, slog.Default())
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -216,7 +218,7 @@ func TestFindArgocdAppByPathAnnotation(t *testing.T) {
 
 	mockApplicationClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(expectedResponse, nil)
 
-	apps, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient)
+	apps, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient, slog.Default())
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -253,7 +255,7 @@ func TestFindArgocdAppByPathAnnotationSemiColon(t *testing.T) {
 
 	mockApplicationClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(expectedResponse, nil)
 
-	app, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient)
+	app, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient, slog.Default())
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -289,7 +291,7 @@ func TestFindArgocdAppByPathAnnotationRelative(t *testing.T) {
 	}
 
 	mockApplicationClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(expectedResponse, nil)
-	app, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient)
+	app, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient, slog.Default())
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	} else if app.Name != "right-app" {
@@ -324,7 +326,7 @@ func TestFindArgocdAppByPathAnnotationRelative2(t *testing.T) {
 	}
 
 	mockApplicationClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(expectedResponse, nil)
-	app, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient)
+	app, err := findArgocdAppByManifestPathAnnotation(ctx, "right/path", "some-repo", mockApplicationClient, slog.Default())
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	} else if app.Name != "right-app" {
@@ -358,7 +360,7 @@ func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 	}
 
 	mockApplicationClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(expectedResponse, nil)
-	app, err := findArgocdAppByManifestPathAnnotation(ctx, "non-existing/path", "some-repo", mockApplicationClient)
+	app, err := findArgocdAppByManifestPathAnnotation(ctx, "non-existing/path", "some-repo", mockApplicationClient, slog.Default())
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
@@ -475,6 +477,7 @@ func TestTempAppDeletedOnDiffError(t *testing.T) {
 		ac,
 		&settings.Settings{URL: "https://argocd.test"},
 		DiffConfig{UseSHALabel: true, CreateTempApps: true},
+		slog.Default(),
 	)
 
 	assert.True(t, result.AppWasTemporarilyCreated, "expected temp app to be flagged as created")
@@ -586,6 +589,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 		"test-repo",
 		DiffConfig{UseSHALabel: true},
 		argoClients,
+		slog.Default(),
 	)
 
 	// stop timer
@@ -765,7 +769,7 @@ func TestFindRelevantAppSetByPathPluginGenerator(t *testing.T) {
 					},
 				}, nil)
 
-			appSet, err := findRelevantAppSetByPath(t.Context(), tc.componentPath, "repo", mockAppSetClient)
+			appSet, err := findRelevantAppSetByPath(t.Context(), tc.componentPath, "repo", mockAppSetClient, slog.Default())
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")

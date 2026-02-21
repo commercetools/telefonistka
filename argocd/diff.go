@@ -54,8 +54,8 @@ type DiffResult struct {
 
 // Mostly copied from  https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1255C6-L1338
 // But instead of printing the diff to stdout, we return it as a string in a struct so we can format it in a nice PR comment.
-func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption) (foundDiffs bool, diffElements []DiffElement, err error) {
-	slog.Debug("Generating ArgoCD app diff", "app", app.Name, "keep_diff_data", keepDiffData, "managed_resources", len(resources.Items))
+func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv1.Application, proj *argoappv1.AppProject, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, diffOptions *DifferenceOption, logger *slog.Logger) (foundDiffs bool, diffElements []DiffElement, err error) {
+	logger.Debug("Generating ArgoCD app diff", "app", app.Name, "keep_diff_data", keepDiffData, "managed_resources", len(resources.Items))
 	liveObjs, err := cmdutil.LiveObjects(resources.Items)
 	if err != nil {
 		return false, nil, fmt.Errorf("Failed to get live objects: %w", err)
@@ -70,11 +70,11 @@ func generateArgocdAppDiff(ctx context.Context, keepDiffData bool, app *argoappv
 		}
 		unstructureds = append(unstructureds, obj)
 	}
-	groupedObjs, err := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace)
+	groupedObjs, err := groupObjsByKey(unstructureds, liveObjs, app.Spec.Destination.Namespace, logger)
 	if err != nil {
 		return false, nil, fmt.Errorf("Failed to group objects by key: %w", err)
 	}
-	items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace)
+	items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.InstanceName(argoSettings.ControllerNamespace), app.Spec.Destination.Namespace, logger)
 	if err != nil {
 		return false, nil, fmt.Errorf("Failed to group objects for diff: %w", err)
 	}
@@ -226,10 +226,10 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, er
 //
 // The returned cleanup function MUST be deferred by the caller — it
 // deletes the temporary app (or is a no-op for pre-existing apps).
-func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac ArgoCDClients, cfg DiffConfig) (app *argoappv1.Application, tempCreated bool, cleanup func(), err error) {
+func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac ArgoCDClients, cfg DiffConfig, logger *slog.Logger) (app *argoappv1.Application, tempCreated bool, cleanup func(), err error) {
 	noop := func() {}
 
-	app, err = findArgocdApp(ctx, componentPath, repo, ac.App, cfg.UseSHALabel)
+	app, err = findArgocdApp(ctx, componentPath, repo, ac.App, cfg.UseSHALabel, logger)
 	if err != nil {
 		return nil, false, noop, err
 	}
@@ -239,11 +239,11 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 			return nil, false, noop, fmt.Errorf("%w: component %s (repo %s)", ErrAppNotFound, componentPath, repo)
 		}
 
-		app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac)
+		app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac, logger)
 		if err != nil {
 			return nil, false, noop, err
 		}
-		slog.Debug("Created temporary app object", "app", app.Name)
+		logger.Debug("Created temporary app object", "app", app.Name)
 
 		// Capture values for the cleanup closure. Use a context
 		// detached from the parent so the delete succeeds even if
@@ -256,9 +256,9 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 				Name:         &name,
 				AppNamespace: &ns,
 			}); delErr != nil {
-				slog.Error("deleting temporary app", "app", name, "err", delErr)
+				logger.Error("deleting temporary app", "app", name, "err", delErr)
 			} else {
-				slog.Debug("Deleted temporary app object", "app", name)
+				logger.Debug("Deleted temporary app object", "app", name)
 			}
 		}
 		return app, true, cleanup, nil
@@ -274,15 +274,15 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 	if err != nil {
 		return nil, false, noop, fmt.Errorf("refreshing application %s: %w", *appNameQuery.Name, err)
 	}
-	slog.Debug("Got ArgoCD app", "app", app.Name)
+	logger.Debug("Got ArgoCD app", "app", app.Name)
 	return app, false, noop, nil
 }
 
-func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig) (componentDiffResult DiffResult) {
-	slog.Debug("Generating diff for component", "component_path", componentPath, "pr_branch", prBranch, "comment_diff", commentDiff)
+func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig, logger *slog.Logger) (componentDiffResult DiffResult) {
+	logger.Debug("Generating diff for component", "component_path", componentPath, "pr_branch", prBranch, "comment_diff", commentDiff)
 	componentDiffResult.ComponentPath = componentPath
 
-	app, tempCreated, cleanup, err := ensureApp(ctx, componentPath, repo, prBranch, ac, cfg)
+	app, tempCreated, cleanup, err := ensureApp(ctx, componentPath, repo, prBranch, ac, cfg, logger)
 	if err != nil {
 		componentDiffResult.DiffError = err
 		return componentDiffResult
@@ -331,14 +331,14 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 		return componentDiffResult
 	}
 
-	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption)
+	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(ctx, commentDiff, app, detailedProject.Project, resources, argoSettings, diffOption, logger)
 
 	return componentDiffResult
 }
 
 // GenerateDiffOfChangedComponents generates diff of changed components
-func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients ArgoCDClients) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
-	slog.Debug("Generating diffs for changed components", "component_count", len(componentsToDiff), "pr_branch", prBranch)
+func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients ArgoCDClients, logger *slog.Logger) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+	logger.Debug("Generating diffs for changed components", "component_count", len(componentsToDiff), "pr_branch", prBranch)
 	hasComponentDiff = false
 	hasComponentDiffErrors = false
 
@@ -350,7 +350,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 	diffResult := make(chan DiffResult, len(componentsToDiff))
 	for componentPath, shouldIDiff := range componentsToDiff {
 		go func(componentPath string, shouldDiff bool) {
-			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, cfg)
+			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, cfg, logger)
 		}(componentPath, shouldIDiff)
 	}
 
@@ -358,7 +358,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 	for range componentsToDiff {
 		currentDiffResult := <-diffResult
 		if currentDiffResult.DiffError != nil {
-			slog.Error("generating diff", "component_path", currentDiffResult.ComponentPath, "err", currentDiffResult.DiffError)
+			logger.Error("generating diff", "component_path", currentDiffResult.ComponentPath, "err", currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
 			errs = append(errs, currentDiffResult.DiffError)
 		}

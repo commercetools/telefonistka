@@ -9,9 +9,9 @@ import (
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
 )
 
-func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool) error {
-	slog.Debug("Setting ArgoCD app revision", "component_path", componentPath, "revision", revision, "repo", repo)
-	foundApp, err := findArgocdApp(ctx, componentPath, repo, ac.App, useSHALabelForArgoDicovery)
+func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool, logger *slog.Logger) error {
+	logger.Debug("Setting ArgoCD app revision", "component_path", componentPath, "revision", revision, "repo", repo)
+	foundApp, err := findArgocdApp(ctx, componentPath, repo, ac.App, useSHALabelForArgoDicovery, logger)
 	if err != nil {
 		return fmt.Errorf("error finding ArgoCD application for component path %s: %w", componentPath, err)
 	}
@@ -19,7 +19,7 @@ func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath s
 		return fmt.Errorf("%w: component %s", ErrAppNotFound, componentPath)
 	}
 	if foundApp.Spec.Source.TargetRevision == revision {
-		slog.Info("App already has revision", "app", foundApp.Name, "revision", revision)
+		logger.Info("App already has revision", "app", foundApp.Name, "revision", revision)
 		return nil
 	}
 
@@ -33,7 +33,7 @@ func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath s
 	patchObject.Spec.Source.TargetRevision = revision
 	patchJson, _ := json.Marshal(patchObject)
 	patch := string(patchJson)
-	slog.Debug("Patching app", "namespace", foundApp.Namespace, "app", foundApp.Name, "patch", patch)
+	logger.Debug("Patching app", "namespace", foundApp.Namespace, "app", foundApp.Name, "patch", patch)
 
 	patchType := "merge"
 	_, err = ac.App.Patch(ctx, &application.ApplicationPatchRequest{
@@ -45,7 +45,7 @@ func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath s
 	if err != nil {
 		return fmt.Errorf("revision patching failed: %w", err)
 	} else {
-		slog.Info("ArgoCD App revision set", "app", foundApp.Name, "revision", revision)
+		logger.Info("ArgoCD App revision set", "app", foundApp.Name, "revision", revision)
 	}
 
 	return err

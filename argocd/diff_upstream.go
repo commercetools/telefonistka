@@ -43,7 +43,7 @@ func (p *resourceInfoProvider) IsNamespaced(gk schema.GroupKind) (bool, error) {
 // This function creates a map of objects by key(object name/kind/ns) from the rendered manifests.
 // That map is used to compare the objects in the application with the objects in the cluster.
 // copied from https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1091-L1109
-func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructured.Unstructured, appNamespace string) (map[kube.ResourceKey]*unstructured.Unstructured, error) {
+func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructured.Unstructured, appNamespace string, logger *slog.Logger) (map[kube.ResourceKey]*unstructured.Unstructured, error) {
 	namespacedByGk := make(map[schema.GroupKind]bool)
 	for i := range liveObjs {
 		if liveObjs[i] != nil {
@@ -62,13 +62,13 @@ func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructu
 			objByKey[kube.GetResourceKey(obj)] = obj
 		}
 	}
-	slog.Debug("Grouped objects by key", "local_objects", len(localObs), "live_objects", len(liveObjs), "grouped", len(objByKey))
+	logger.Debug("Grouped objects by key", "local_objects", len(localObs), "live_objects", len(liveObjs), "grouped", len(objByKey))
 	return objByKey, nil
 }
 
 // This function create a slice of objects to be "diff'ed", each element contains the key, live(in-cluster API state) and target(rended manifest from git) object.
 // Copied from https://github.com/argoproj/argo-cd/blob/4f6a8dce80f0accef7ed3b5510e178a6b398b331/cmd/argocd/commands/app.go#L1341-L1372
-func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[kube.ResourceKey]*unstructured.Unstructured, items []objKeyLiveTarget, argoSettings *settings.Settings, appName, namespace string) ([]objKeyLiveTarget, error) {
+func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[kube.ResourceKey]*unstructured.Unstructured, items []objKeyLiveTarget, argoSettings *settings.Settings, appName, namespace string, logger *slog.Logger) ([]objKeyLiveTarget, error) {
 	resourceTracking := argo.NewResourceTracking()
 	for _, res := range resources.Items {
 		live := &unstructured.Unstructured{}
@@ -103,6 +103,6 @@ func groupObjsForDiff(resources *application.ManagedResourcesResponse, objs map[
 		}
 		items = append(items, objKeyLiveTarget{key, nil, local})
 	}
-	slog.Debug("Grouped objects for diff", "managed_resources", len(resources.Items), "diff_items", len(items))
+	logger.Debug("Grouped objects for diff", "managed_resources", len(resources.Items), "diff_items", len(items))
 	return items, nil
 }
