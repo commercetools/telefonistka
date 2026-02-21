@@ -493,7 +493,7 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 		r := &utils.Render{}
 		newAppObject, err := r.RenderTemplateParams(getTempApplication(appSetOfcomponent.Spec.Template), nil, params, useGoTemplate, goTemplateOptions)
 		if err != nil {
-			slog.Error("Error rendering ApplicationSet template", "err", err, "params", params)
+			return nil, fmt.Errorf("rendering ApplicationSet template: %w", err)
 		}
 
 		// Mutating some of the app object fields to fit this specific use case
