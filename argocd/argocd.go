@@ -541,7 +541,6 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 
 		app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac)
 		if err != nil {
-			slog.Error("Error creating temporary app object", "err", err)
 			return nil, false, noop, err
 		}
 		slog.Debug("Created temporary app object", "app", app.Name)
@@ -557,7 +556,7 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 				Name:         &name,
 				AppNamespace: &ns,
 			}); delErr != nil {
-				slog.Error("Failed to delete temporary app", "app", name, "err", delErr)
+				slog.Error("deleting temporary app", "app", name, "err", delErr)
 			} else {
 				slog.Debug("Deleted temporary app object", "app", name)
 			}
@@ -573,8 +572,7 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 	}
 	app, err = ac.App.Get(ctx, &appNameQuery)
 	if err != nil {
-		slog.Error("Error getting app(HardRefresh)", "app", appNameQuery.Name, "err", err)
-		return nil, false, noop, err
+		return nil, false, noop, fmt.Errorf("refreshing application %s: %w", *appNameQuery.Name, err)
 	}
 	slog.Debug("Got ArgoCD app", "app", app.Name)
 	return app, false, noop, nil
@@ -605,11 +603,9 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 
 	resources, err := ac.App.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
 	if err != nil {
-		componentDiffResult.DiffError = err
-		slog.Error("Error getting (live)resources for app", "app", app.Name, "err", err)
+		componentDiffResult.DiffError = fmt.Errorf("fetching managed resources for %s: %w", app.Name, err)
 		return componentDiffResult
 	}
-	slog.Debug("Got (live)resources for app", "app", app.Name)
 
 	// Get the application manifests, these are the target state of the application objects, taken from the git repo, specificly from the PR branch.
 	diffOption := &DifferenceOption{}
@@ -621,19 +617,16 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 	}
 	manifests, err := ac.App.GetManifests(ctx, &manifestQuery)
 	if err != nil {
-		componentDiffResult.DiffError = err
-		slog.Error("Error getting manifests for app revision", "app", app.Name, "branch", prBranch, "err", err)
+		componentDiffResult.DiffError = fmt.Errorf("fetching manifests for %s at %s: %w", app.Name, prBranch, err)
 		return componentDiffResult
 	}
-	slog.Debug("Got manifests for app %s, revision %s", "app", app.Name, "branch", prBranch)
 	diffOption.res = manifests
 	diffOption.revision = prBranch
 
 	// Now we diff the live state(resources) and target state of the application objects(diffOption.res)
 	detailedProject, err := ac.Project.GetDetailedProject(ctx, &projectpkg.ProjectQuery{Name: app.Spec.Project})
 	if err != nil {
-		componentDiffResult.DiffError = err
-		slog.Error("Error getting project", "project", app.Spec.Project, "err", err)
+		componentDiffResult.DiffError = fmt.Errorf("fetching project %s: %w", app.Spec.Project, err)
 		return componentDiffResult
 	}
 
@@ -650,8 +643,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 
 	argoSettings, err := argoClients.Setting.Get(ctx, &settings.SettingsQuery{})
 	if err != nil {
-		slog.Error("error getting ArgoCD settings", "err", err)
-		return false, true, nil, err
+		return false, true, nil, fmt.Errorf("fetching ArgoCD settings: %w", err)
 	}
 
 	diffResult := make(chan DiffResult, len(componentsToDiff))
@@ -665,7 +657,7 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 	for range componentsToDiff {
 		currentDiffResult := <-diffResult
 		if currentDiffResult.DiffError != nil {
-			slog.Error("Error generating diff for component", "component_path", currentDiffResult.ComponentPath, "err", currentDiffResult.DiffError)
+			slog.Error("generating diff", "component_path", currentDiffResult.ComponentPath, "err", currentDiffResult.DiffError)
 			hasComponentDiffErrors = true
 			errs = append(errs, currentDiffResult.DiffError)
 		}
