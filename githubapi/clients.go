@@ -128,7 +128,7 @@ func getAppInstallationId(ctx context.Context, keyPath string, appID int64, rest
 		}
 	}
 
-	return 0, fmt.Errorf("no installation found for owner %s", owner)
+	return 0, fmt.Errorf("%w: %s", ErrNoInstallation, owner)
 }
 
 // newAppClient creates a REST+GraphQL client using GitHub App auth.
@@ -193,7 +193,7 @@ func newClient(ctx context.Context, creds ClientConfig, endpoints GithubEndpoint
 		return newAppClient(ctx, creds.AppID, creds.AppKeyPath, endpoints, owner)
 	}
 	if creds.OAuthToken == "" {
-		return GhClient{}, fmt.Errorf("neither AppID nor OAuthToken set in ClientConfig")
+		return GhClient{}, fmt.Errorf("%w", ErrNoCredentials)
 	}
 	return newTokenClient(ctx, creds.OAuthToken, endpoints), nil
 }
