@@ -13,6 +13,7 @@ import (
 	"github.com/commercetools/telefonistka/argocd"
 	"github.com/commercetools/telefonistka/githubapi"
 	"github.com/commercetools/telefonistka/templates"
+	"github.com/commercetools/telefonistka/webhook"
 	"github.com/spf13/cobra"
 )
 
@@ -97,13 +98,15 @@ func serve() {
 		TemplatesFS:         resolveTemplatesFS(),
 		CommitStatusURLTmpl: commitStatusURLTmpl,
 		HandleSelfComment:   os.Getenv("HANDLE_SELF_COMMENT") == "true",
-		WebhookSecret:       []byte(getCrucialEnv("GITHUB_WEBHOOK_SECRET")),
 	}
 
 	go githubapi.MainGhMetricsLoop(clients)
 
 	srv := &http.Server{
-		Handler:      githubapi.NewHandler(cfg),
+		Handler: webhook.NewHandler(webhook.Config{
+			Event:         cfg,
+			WebhookSecret: []byte(getCrucialEnv("GITHUB_WEBHOOK_SECRET")),
+		}),
 		Addr:         ":8080",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,

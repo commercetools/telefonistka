@@ -1,16 +1,27 @@
-package githubapi
+package webhook
 
 import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/commercetools/telefonistka/githubapi"
 	"github.com/google/go-github/v62/github"
 )
+
+func mustMarshal(t *testing.T, v any) []byte {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
 
 // signPayload computes the X-Hub-Signature-256 header value for a
 // webhook payload signed with the given secret.
@@ -38,11 +49,17 @@ func postWebhook(t *testing.T, url string, eventType string, secret, payload []b
 	return resp
 }
 
+func newTestEventConfig() githubapi.EventConfig {
+	return githubapi.EventConfig{
+		Clients: githubapi.NewClientProvider(1, githubapi.ClientConfig{}, githubapi.ClientConfig{}, githubapi.GithubEndpoints{}),
+	}
+}
+
 func TestWebhookEndpoint(t *testing.T) {
 	t.Parallel()
 	secret := []byte("test-secret")
-	cfg := EventConfig{
-		Clients:       NewClientProvider(1, ClientConfig{}, ClientConfig{}, GithubEndpoints{}),
+	cfg := Config{
+		Event:         newTestEventConfig(),
 		WebhookSecret: secret,
 		Sync:          true,
 	}
@@ -126,9 +143,7 @@ func TestWebhookEndpoint(t *testing.T) {
 
 func TestHealthEndpoints(t *testing.T) {
 	t.Parallel()
-	cfg := EventConfig{
-		Clients: NewClientProvider(1, ClientConfig{}, ClientConfig{}, GithubEndpoints{}),
-	}
+	cfg := Config{Event: newTestEventConfig()}
 	srv := httptest.NewServer(NewHandler(cfg))
 	t.Cleanup(srv.Close)
 
@@ -149,9 +164,7 @@ func TestHealthEndpoints(t *testing.T) {
 
 func TestMetricsEndpoint(t *testing.T) {
 	t.Parallel()
-	cfg := EventConfig{
-		Clients: NewClientProvider(1, ClientConfig{}, ClientConfig{}, GithubEndpoints{}),
-	}
+	cfg := Config{Event: newTestEventConfig()}
 	srv := httptest.NewServer(NewHandler(cfg))
 	defer srv.Close()
 
@@ -165,11 +178,11 @@ func TestMetricsEndpoint(t *testing.T) {
 	}
 }
 
-func TestNewHandlerWebhookSync(t *testing.T) {
+func TestWebhookSync(t *testing.T) {
 	t.Parallel()
 	secret := []byte("sync-test")
-	cfg := EventConfig{
-		Clients:       NewClientProvider(1, ClientConfig{}, ClientConfig{}, GithubEndpoints{}),
+	cfg := Config{
+		Event:         newTestEventConfig(),
 		WebhookSecret: secret,
 		Sync:          true,
 	}
@@ -201,11 +214,9 @@ func TestNewHandlerWebhookSync(t *testing.T) {
 	}
 }
 
-func TestNewHandlerUnknownRoute(t *testing.T) {
+func TestUnknownRoute(t *testing.T) {
 	t.Parallel()
-	cfg := EventConfig{
-		Clients: NewClientProvider(1, ClientConfig{}, ClientConfig{}, GithubEndpoints{}),
-	}
+	cfg := Config{Event: newTestEventConfig()}
 	handler := NewHandler(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/nonexistent", nil)

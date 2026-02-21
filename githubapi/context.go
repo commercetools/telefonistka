@@ -48,8 +48,6 @@ type EventConfig struct {
 	TemplatesFS         fs.FS
 	CommitStatusURLTmpl *template.Template // nil → use default URL
 	HandleSelfComment   bool
-	WebhookSecret       []byte
-	Sync                bool // run HandleEvent synchronously (for testing)
 }
 
 type repoService interface {
