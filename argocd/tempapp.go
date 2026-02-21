@@ -40,39 +40,43 @@ func generateAppSetGitGeneratorParams(p string) map[string]interface{} {
 	return params
 }
 
-func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, repo string, prBranch string, ac ArgoCDClients, logger *slog.Logger) (app *argoappv1.Application, err error) {
+func createTempAppObjectForNewApp(ctx context.Context, componentPath string, repo string, prBranch string, ac ArgoCDClients, logger *slog.Logger) (app *argoappv1.Application, err error) {
 	logger.Debug("ArgoCD app not found, searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
-	appSetOfcomponent, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.AppSet, logger)
-	if appSetOfcomponent != nil {
-		useGoTemplate := true
-		var goTemplateOptions []string
-		params := generateAppSetGitGeneratorParams(componentPath)
-		r := &utils.Render{}
-		newAppObject, err := r.RenderTemplateParams(getTempApplication(appSetOfcomponent.Spec.Template), nil, params, useGoTemplate, goTemplateOptions)
-		if err != nil {
-			return nil, fmt.Errorf("rendering ApplicationSet template: %w", err)
-		}
-
-		// Mutating some of the app object fields to fit this specific use case
-		tempAppName := fmt.Sprintf("temp-%s", newAppObject.Name)
-		newAppObject.Name = tempAppName
-		// We need to remove the automated sync policy, we just want to create a temporary app object, run a diff and remove it.
-		newAppObject.Spec.SyncPolicy.Automated = nil
-		newAppObject.Spec.Source.TargetRevision = prBranch
-
-		validateTempApp := false
-		appCreateRequest := application.ApplicationCreateRequest{
-			Application: newAppObject,
-			Validate:    &validateTempApp, // It makes more sense to handle template failures in the diff generation section
-		}
-		// Create the temporary app object
-		app, err = ac.App.Create(ctx, &appCreateRequest)
-		if err != nil {
-			return nil, err
-		}
-		logger.Debug("Temporary app created from ApplicationSet", "app", tempAppName, "appset", appSetOfcomponent.Name)
-		return app, nil
-	} else {
+	appSet, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.AppSet, logger)
+	if err != nil {
 		return nil, err
 	}
+
+	useGoTemplate := true
+	var goTemplateOptions []string
+	params := generateAppSetGitGeneratorParams(componentPath)
+	r := &utils.Render{}
+	newAppObject, err := r.RenderTemplateParams(getTempApplication(appSet.Spec.Template), nil, params, useGoTemplate, goTemplateOptions)
+	if err != nil {
+		return nil, fmt.Errorf("rendering ApplicationSet template: %w", err)
+	}
+
+	// Mutating some of the app object fields to fit this specific use case
+	tempAppName := fmt.Sprintf("temp-%s", newAppObject.Name)
+	newAppObject.Name = tempAppName
+	// We need to remove the automated sync policy, we just want to create
+	// a temporary app object, run a diff and remove it.
+	if newAppObject.Spec.SyncPolicy != nil {
+		newAppObject.Spec.SyncPolicy.Automated = nil
+	}
+	if newAppObject.Spec.Source != nil {
+		newAppObject.Spec.Source.TargetRevision = prBranch
+	}
+
+	validateTempApp := false
+	appCreateRequest := application.ApplicationCreateRequest{
+		Application: newAppObject,
+		Validate:    &validateTempApp, // It makes more sense to handle template failures in the diff generation section
+	}
+	app, err = ac.App.Create(ctx, &appCreateRequest)
+	if err != nil {
+		return nil, err
+	}
+	logger.Debug("Temporary app created from ApplicationSet", "app", tempAppName, "appset", appSet.Name)
+	return app, nil
 }

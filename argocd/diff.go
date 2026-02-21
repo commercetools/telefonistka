@@ -239,7 +239,7 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 			return nil, false, noop, fmt.Errorf("%w: component %s (repo %s)", ErrAppNotFound, componentPath, repo)
 		}
 
-		app, err = createTempAppObjectFroNewApp(ctx, componentPath, repo, prBranch, ac, logger)
+		app, err = createTempAppObjectForNewApp(ctx, componentPath, repo, prBranch, ac, logger)
 		if err != nil {
 			return nil, false, noop, err
 		}
