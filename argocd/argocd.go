@@ -513,23 +513,10 @@ func createTempAppObjectFroNewApp(ctx context.Context, componentPath string, rep
 func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, useSHALabelForArgoDicovery bool, createTempAppObjectFromNewApps bool) (componentDiffResult DiffResult) {
 	componentDiffResult.ComponentPath = componentPath
 
-	// Find ArgoCD application by the path SHA1 label selector and repo name
-	// At the moment we assume one to one mapping between Telefonistka components and ArgoCD application
-
-	var app *argoappv1.Application
-	var err error
-	if useSHALabelForArgoDicovery {
-		app, err = findArgocdAppBySHA1Label(ctx, componentPath, repo, ac.App)
-		if err != nil {
-			componentDiffResult.DiffError = err
-			return componentDiffResult
-		}
-	} else {
-		app, err = findArgocdAppByManifestPathAnnotation(ctx, componentPath, repo, ac.App)
-		if err != nil {
-			componentDiffResult.DiffError = err
-			return componentDiffResult
-		}
+	app, err := findArgocdApp(ctx, componentPath, repo, ac.App, useSHALabelForArgoDicovery)
+	if err != nil {
+		componentDiffResult.DiffError = err
+		return componentDiffResult
 	}
 	if app == nil {
 		if createTempAppObjectFromNewApps {
