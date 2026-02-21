@@ -1,11 +1,8 @@
 package telefonistka
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -82,16 +79,12 @@ func event(eventType string, eventFilePath string) {
 		HandleSelfComment:   os.Getenv("HANDLE_SELF_COMMENT") == "true",
 	}
 
-	slog.Info("Proccesing", "file", eventFilePath)
+	slog.Info("Processing", "file", eventFilePath)
 	payload, err := os.ReadFile(eventFilePath)
 	if err != nil {
 		panic(err)
 	}
-	r, _ := http.NewRequest("POST", "", nil) //nolint:noctx
-	r.Body = io.NopCloser(bytes.NewReader(payload))
-	r.Header.Set("Content-Type", "application/json")
-	r.Header.Set("X-GitHub-Event", eventType)
-	githubapi.HandleEvent(context.Background(), cfg, r, payload)
+	githubapi.HandleEvent(context.Background(), cfg, eventType, nil, payload)
 }
 
 func getEnv(key, fallback string) string {

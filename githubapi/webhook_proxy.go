@@ -40,7 +40,7 @@ func generateListOfEndpoints(listOfChangedFiles []string, config *configuration.
 	return slices.Collect(maps.Keys(endpoints))
 }
 
-func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *http.Request, body []byte, endpoint string) {
+func proxyRequest(ctx context.Context, skipTLSVerify bool, headers http.Header, body []byte, endpoint string) {
 	tr := &http.Transport{}
 	if skipTLSVerify {
 		tr = &http.Transport{
@@ -48,12 +48,12 @@ func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *
 		}
 	}
 	client := &http.Client{Transport: tr}
-	req, err := http.NewRequestWithContext(ctx, originalHttpRequest.Method, endpoint, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBuffer(body))
 	if err != nil {
 		slog.Error("Error creating request to endpoint", "endpoint", endpoint, "err", err)
 		return
 	}
-	req.Header = originalHttpRequest.Header.Clone()
+	req.Header = headers.Clone()
 	// Because payload and headers are passed as-is, I'm hoping webhook signature validation will "just work"
 
 	resp, err := client.Do(req)
@@ -72,7 +72,7 @@ func proxyRequest(ctx context.Context, skipTLSVerify bool, originalHttpRequest *
 	}
 }
 
-func handleProxyForward(ctx context.Context, config *configuration.Config, listOfChangedFiles []string, httpRequest *http.Request, payload []byte) {
+func handleProxyForward(ctx context.Context, config *configuration.Config, listOfChangedFiles []string, headers http.Header, payload []byte) {
 	slog.Debug("Changed files in push event", "files", listOfChangedFiles)
 
 	// TODO this need to be cached with TTL + invalidate if configfile in listOfChangedFiles?
@@ -85,7 +85,7 @@ func handleProxyForward(ctx context.Context, config *configuration.Config, listO
 		wg.Add(1)
 		go func(endpoint string) {
 			defer wg.Done()
-			proxyRequest(ctx, config.WhProxtSkipTLSVerifyUpstream, httpRequest, payload, endpoint)
+			proxyRequest(ctx, config.WhProxtSkipTLSVerifyUpstream, headers, payload, endpoint)
 		}(endpoint)
 	}
 	wg.Wait()

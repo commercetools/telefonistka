@@ -27,18 +27,21 @@ func ReceiveWebhook(r *http.Request, cfg EventConfig) error {
 		return err
 	}
 
-	go HandleEvent(context.Background(), cfg, r, payload)
+	eventType := github.WebHookType(r)
+	go HandleEvent(context.Background(), cfg, eventType, r.Header, payload)
 	return nil
 }
 
-func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload []byte) {
+// HandleEvent parses a GitHub webhook payload and routes it to the
+// appropriate handler. headers carries the original HTTP headers for
+// push-event proxy forwarding (may be nil when not applicable).
+func HandleEvent(ctx context.Context, cfg EventConfig, eventType string, headers http.Header, payload []byte) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("panic in event handler", "err", r)
 		}
 	}()
 
-	eventType := github.WebHookType(r)
 	e, err := github.ParseWebHook(eventType, payload)
 	if err != nil {
 		slog.Error("could not parse webhook", "err", err)
@@ -54,7 +57,7 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 
 	switch event := e.(type) {
 	case *github.PushEvent:
-		handlePushEvent(ctx, cfg, event, r, payload)
+		handlePushEvent(ctx, cfg, event, headers, payload)
 	case *github.PullRequestEvent:
 		handlePullRequestEvent(ctx, cfg, event)
 	case *github.IssueCommentEvent:
@@ -62,7 +65,7 @@ func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload 
 	}
 }
 
-func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEvent, r *http.Request, payload []byte) {
+func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEvent, headers http.Header, payload []byte) {
 	repoOwner := event.GetRepo().GetOwner().GetLogin()
 
 	clients, err := cfg.Clients.ForOwner(ctx, repoOwner)
@@ -90,7 +93,7 @@ func handlePushEvent(ctx context.Context, cfg EventConfig, event *github.PushEve
 	c.Config = config
 
 	c.PrLogger.Info("Handling event", "type", fmt.Sprintf("%T", event))
-	handleProxyForward(ctx, config, generateListOfChangedFiles(event), r, payload)
+	handleProxyForward(ctx, config, generateListOfChangedFiles(event), headers, payload)
 }
 
 func handlePullRequestEvent(ctx context.Context, cfg EventConfig, event *github.PullRequestEvent) {
