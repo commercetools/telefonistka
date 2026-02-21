@@ -1,0 +1,9 @@
+promotionPaths:
+  - sourcePath: "workspace/"
+    conditions:
+      prHasLabels:
+        - "approved-for-prod"
+    promotionPrs:
+      - targetDescription: "Production"
+        targetPaths:
+          - "live/"

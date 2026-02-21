@@ -1,0 +1,8 @@
+promotionPaths:
+  - sourcePath: "workspace/"
+    promotionPrs:
+      - targetDescription: "Production"
+        targetPaths:
+          - "live/"
+argocd:
+  allowSyncfromBranchPathRegex: ".*"

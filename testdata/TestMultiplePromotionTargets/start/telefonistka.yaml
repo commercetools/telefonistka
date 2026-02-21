@@ -1,0 +1,7 @@
+promotionPaths:
+  - sourcePath: "workspace/"
+    promotionPrs:
+      - targetDescription: "Staging and Production"
+        targetPaths:
+          - "staging/"
+          - "live/"

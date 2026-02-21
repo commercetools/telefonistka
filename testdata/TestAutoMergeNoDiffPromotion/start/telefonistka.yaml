@@ -1,0 +1,9 @@
+promotionPaths:
+  - sourcePath: "workspace/"
+    promotionPrs:
+      - targetDescription: "Production"
+        targetPaths:
+          - "live/"
+argocd:
+  commentDiffonPR: true
+  autoMergeNoDiffPRs: true
