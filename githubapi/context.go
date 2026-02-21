@@ -123,6 +123,18 @@ type Context struct {
 	Config     *configuration.Config    `json:"-"`
 }
 
+// LogValue implements slog.LogValuer so that Context is logged as a
+// structured group instead of an opaque fmt.Sprintf dump.
+func (c Context) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("owner", c.Owner),
+		slog.String("repo", c.Repo),
+		slog.Int("pr", c.PrNumber),
+		slog.String("ref", c.Ref),
+		slog.String("sha", c.PrSHA),
+	)
+}
+
 func (c *Context) getPrMetadata(ctx context.Context, prBody string) {
 	serializedPrMetadata := prMetadataRegex.FindStringSubmatch(prBody)
 	if len(serializedPrMetadata) == 2 {
