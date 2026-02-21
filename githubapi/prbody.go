@@ -37,7 +37,7 @@ func generatePromotionPrBody(ctx context.Context, c Context, components string, 
 
 	newPrBody = prBody(keys, newPrMetadata, newPrBody, promotionSkipPaths)
 
-	prMetadataString, _ := newPrMetadata.serialize()
+	prMetadataString, _ := newPrMetadata.serialize() // json.Marshal on a known struct; safe to ignore
 
 	newPrBody = newPrBody + "\n<!--|Telefonistka data, do not delete|" + prMetadataString + "|-->"
 

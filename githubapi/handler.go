@@ -34,7 +34,7 @@ func ReceiveWebhook(r *http.Request, cfg EventConfig) error {
 func HandleEvent(ctx context.Context, cfg EventConfig, r *http.Request, payload []byte) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("Recovered", "err", r)
+			slog.Error("panic in event handler", "err", r)
 		}
 	}()
 
@@ -149,7 +149,10 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 		return
 	}
 
-	botIdentity, _ := getBotIdentity(ctx, clients.Main.v4Client)
+	botIdentity, err := getBotIdentity(ctx, clients.Main.v4Client)
+	if err != nil {
+		slog.Warn("fetching bot identity", "err", err)
+	}
 
 	// Ignore comment events sent by the bot (this is about who trigger the event not who wrote the comment)
 	//

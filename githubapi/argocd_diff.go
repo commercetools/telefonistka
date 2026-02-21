@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
 	"github.com/commercetools/telefonistka/argocd"
 	prom "github.com/commercetools/telefonistka/prometheus"
@@ -187,39 +186,35 @@ func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, par
 func generateArgoCdDiffComments(diffCommentData diffCommentData, githubCommentMaxSize int) (comments []string, err error) {
 	commentBody, err := buildArgoCdDiffComment(diffCommentData, false, 0, 0)
 	if err != nil {
-		slog.Error("Failed to build ArgoCD diff comment", "err", err)
-		return comments, err
+		return comments, fmt.Errorf("building full diff comment: %w", err)
 	}
 
-	// Happy path, the diff comment is small enough to be posted in one comment
+	// Happy path — the diff comment fits in one comment.
 	if len(commentBody) < githubCommentMaxSize {
 		comments = append(comments, commentBody)
 		return comments, nil
 	}
 
-	// If the diff comment is too large, we'll split it into multiple comments, one per component
+	// Comment is too large; split into one comment per component.
 	totalComponents := len(diffCommentData.DiffOfChangedComponents)
 	for i, singleComponentDiff := range diffCommentData.DiffOfChangedComponents {
 		componentTemplateData := diffCommentData
 		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
 		commentBody, err := buildArgoCdDiffComment(componentTemplateData, false, i+1, totalComponents)
 		if err != nil {
-			slog.Error("Failed to build ArgoCD diff comment", "err", err)
-			return comments, err
+			return comments, fmt.Errorf("building diff comment for component %d/%d: %w", i+1, totalComponents, err)
 		}
 
-		// Even per component comments can be too large, in that case we'll just use the concise template
-		// Somewhat Happy path, the per-component diff comment is small enough to be posted in one comment
+		// Per-component comment fits — use it.
 		if len(commentBody) < githubCommentMaxSize {
 			comments = append(comments, commentBody)
 			continue
 		}
 
-		// now we don't have much choice, this is the saddest path, we'll use the concise template
+		// Last resort: concise template.
 		commentBody, err = buildArgoCdDiffComment(componentTemplateData, true, i+1, totalComponents)
 		if err != nil {
-			slog.Error("Failed to build ArgoCD diff comment", "err", err)
-			return comments, err
+			return comments, fmt.Errorf("building concise diff comment for component %d/%d: %w", i+1, totalComponents, err)
 		}
 		comments = append(comments, commentBody)
 	}

@@ -27,7 +27,10 @@ func getBotIdentity(ctx context.Context, c graphQLClient) (string, error) {
 }
 
 func minimizeStalePRComments(ctx context.Context, c Context) error {
-	botIdentity, _ := getBotIdentity(ctx, c.GraphQL)
+	botIdentity, err := getBotIdentity(ctx, c.GraphQL)
+	if err != nil {
+		c.PrLogger.Warn("fetching bot identity", "err", err)
+	}
 	comments, err := getUnminimizedComments(ctx, c)
 	if err != nil {
 		c.PrLogger.Error("Failed to get unminimized comments", "err", err)

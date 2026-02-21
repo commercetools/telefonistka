@@ -49,7 +49,7 @@ type ClientProvider struct {
 
 // NewClientProvider creates a ClientProvider with an LRU cache of the given size.
 func NewClientProvider(size int, mainCreds, approverCreds ClientConfig, endpoints GithubEndpoints) *ClientProvider {
-	cache, _ := lru.New[string, GhClients](size)
+	cache, _ := lru.New[string, GhClients](size) // size is always a positive literal
 	return &ClientProvider{
 		cache:         cache,
 		mainCreds:     mainCreds,
@@ -168,13 +168,17 @@ func newAppClient(ctx context.Context, appID int64, keyPath string, endpoints Gi
 }
 
 // newTokenClient creates a REST+GraphQL client using an OAuth token.
-func newTokenClient(ctx context.Context, token string, endpoints GithubEndpoints) GhClient {
+func newTokenClient(ctx context.Context, token string, endpoints GithubEndpoints) (GhClient, error) {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	httpClient := oauth2.NewClient(ctx, ts)
 
 	v3 := github.NewClient(httpClient)
 	if endpoints.RestURL != "" {
-		v3, _ = v3.WithEnterpriseURLs(endpoints.RestURL, endpoints.RestURL)
+		var err error
+		v3, err = v3.WithEnterpriseURLs(endpoints.RestURL, endpoints.RestURL)
+		if err != nil {
+			return GhClient{}, fmt.Errorf("configuring enterprise URL: %w", err)
+		}
 	}
 
 	var v4 *githubv4.Client
@@ -184,7 +188,7 @@ func newTokenClient(ctx context.Context, token string, endpoints GithubEndpoints
 		v4 = githubv4.NewClient(httpClient)
 	}
 
-	return GhClient{v3Client: v3, v4Client: v4}
+	return GhClient{v3Client: v3, v4Client: v4}, nil
 }
 
 // newClient creates a GhClient from credentials, dispatching to app or token auth.
@@ -195,5 +199,5 @@ func newClient(ctx context.Context, creds ClientConfig, endpoints GithubEndpoint
 	if creds.OAuthToken == "" {
 		return GhClient{}, fmt.Errorf("%w", ErrNoCredentials)
 	}
-	return newTokenClient(ctx, creds.OAuthToken, endpoints), nil
+	return newTokenClient(ctx, creds.OAuthToken, endpoints)
 }

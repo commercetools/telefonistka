@@ -247,7 +247,10 @@ func getComponentConfig(ctx context.Context, c Context, componentPath string, br
 		c.PrLogger.Error("could not get file list from GH API", "err", err, "resp", resp)
 		return nil, err
 	}
-	componentConfigFileContentString, _ := componentConfigFileContent.GetContent()
+	componentConfigFileContentString, err := componentConfigFileContent.GetContent()
+	if err != nil {
+		return nil, fmt.Errorf("decoding component config: %w", err)
+	}
 	err = yaml.Unmarshal([]byte(componentConfigFileContentString), componentConfig)
 	if err != nil {
 		c.PrLogger.Error("Failed to parse configuration", "err", err) // TODO comment this error to PR
