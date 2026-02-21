@@ -43,12 +43,13 @@ func NewGithubEndpoints(host string) GithubEndpoints {
 
 // EventConfig holds all externally-resolved configuration for event handling.
 type EventConfig struct {
-	Clients                *ClientProvider
-	ArgoCD                 *argocd.ArgoCDClients    // nil when ArgoCD is not configured
-	TemplatesFS            fs.FS
-	CommitStatusURLTmpl    *template.Template       // nil → use default URL
-	HandleSelfComment      bool
-	WebhookSecret          []byte
+	Clients             *ClientProvider
+	ArgoCD              *argocd.ArgoCDClients // nil when ArgoCD is not configured
+	TemplatesFS         fs.FS
+	CommitStatusURLTmpl *template.Template // nil → use default URL
+	HandleSelfComment   bool
+	WebhookSecret       []byte
+	Sync                bool // run HandleEvent synchronously (for testing)
 }
 
 type repoService interface {

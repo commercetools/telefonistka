@@ -13,23 +13,43 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/alexliesenfeld/health"
 	"github.com/commercetools/telefonistka/argocd"
 	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// ReceiveWebhook validates the webhook payload and spawns a goroutine to handle the event.
-func ReceiveWebhook(r *http.Request, cfg EventConfig) error {
-	payload, err := github.ValidatePayload(r, cfg.WebhookSecret)
-	if err != nil {
-		slog.Error("error reading request body", "err", err)
-		prom.InstrumentWebhookHit("validation_failed")
-		return err
-	}
+// NewHandler returns an http.Handler that serves the webhook, health,
+// and metrics endpoints. The caller is responsible for starting the
+// server and any background goroutines (e.g. MainGhMetricsLoop).
+func NewHandler(cfg EventConfig) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/webhook", webhookHandler(cfg))
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/live", health.NewHandler(health.NewChecker()))
+	mux.Handle("/ready", health.NewHandler(health.NewChecker()))
+	return mux
+}
 
-	eventType := github.WebHookType(r)
-	go HandleEvent(context.Background(), cfg, eventType, r.Header, payload)
-	return nil
+func webhookHandler(cfg EventConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		payload, err := github.ValidatePayload(r, cfg.WebhookSecret)
+		if err != nil {
+			slog.Error("error reading request body", "err", err)
+			prom.InstrumentWebhookHit("validation_failed")
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+
+		eventType := github.WebHookType(r)
+		if cfg.Sync {
+			HandleEvent(r.Context(), cfg, eventType, r.Header, payload)
+		} else {
+			go HandleEvent(context.Background(), cfg, eventType, r.Header, payload)
+		}
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 // HandleEvent parses a GitHub webhook payload and routes it to the

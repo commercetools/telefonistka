@@ -11,11 +11,8 @@ import (
 	"time"
 
 	"github.com/commercetools/telefonistka/argocd"
-
-	"github.com/alexliesenfeld/health"
 	"github.com/commercetools/telefonistka/githubapi"
 	"github.com/commercetools/telefonistka/templates"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 )
 
@@ -52,18 +49,6 @@ var serveCmd = &cobra.Command{
 // This is still(https://github.com/spf13/cobra/issues/1862) the documented way to use cobra
 func init() { //nolint:gochecknoinits
 	rootCmd.AddCommand(serveCmd)
-}
-
-func handleWebhook(cfg githubapi.EventConfig) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		err := githubapi.ReceiveWebhook(r, cfg)
-		if err != nil {
-			slog.Error("error handling webhook", "err", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}
 }
 
 func serve() {
@@ -115,19 +100,10 @@ func serve() {
 		WebhookSecret:       []byte(getCrucialEnv("GITHUB_WEBHOOK_SECRET")),
 	}
 
-	livenessChecker := health.NewChecker() // No checks for the moment, other then the http server availability
-	readinessChecker := health.NewChecker()
-
 	go githubapi.MainGhMetricsLoop(clients)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/webhook", handleWebhook(cfg))
-	mux.Handle("/metrics", promhttp.Handler())
-	mux.Handle("/live", health.NewHandler(livenessChecker))
-	mux.Handle("/ready", health.NewHandler(readinessChecker))
-
 	srv := &http.Server{
-		Handler:      mux,
+		Handler:      githubapi.NewHandler(cfg),
 		Addr:         ":8080",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
