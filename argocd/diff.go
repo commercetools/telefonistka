@@ -19,7 +19,6 @@ import (
 	"github.com/argoproj/gitops-engine/pkg/sync/hook"
 	"github.com/gonvenience/ytbx"
 	"github.com/homeport/dyff/pkg/dyff"
-	"golang.org/x/sync/semaphore"
 	yaml3 "gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -27,10 +26,6 @@ import (
 // tempAppCleanupTimeout bounds how long we wait when deleting a
 // temporary ArgoCD application during cleanup.
 const tempAppCleanupTimeout = 30 * time.Second
-
-// maxConcurrentDiffs limits how many component diffs run in parallel
-// against the ArgoCD API to avoid overwhelming it on large PRs.
-const maxConcurrentDiffs = 10
 
 // DiffConfig holds options that control how ArgoCD diffs are generated.
 type DiffConfig struct {
@@ -361,14 +356,8 @@ func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[s
 	}
 
 	diffResult := make(chan DiffResult, len(componentsToDiff))
-	sem := semaphore.NewWeighted(maxConcurrentDiffs)
 	for componentPath, shouldIDiff := range componentsToDiff {
 		go func(componentPath string, shouldDiff bool) {
-			if err := sem.Acquire(ctx, 1); err != nil {
-				diffResult <- DiffResult{ComponentPath: componentPath, DiffError: err}
-				return
-			}
-			defer sem.Release(1)
 			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, cfg, logger)
 		}(componentPath, shouldIDiff)
 	}
