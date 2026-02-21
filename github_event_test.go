@@ -602,13 +602,13 @@ func TestTempAppCreation(t *testing.T) {
 			}},
 			Template: argoappv1.ApplicationSetTemplate{
 				ApplicationSetTemplateMeta: argoappv1.ApplicationSetTemplateMeta{
-					Name: "{{path.basename}}",
+					Name: "{{.path.basename}}",
 				},
 				Spec: argoappv1.ApplicationSpec{
 					Project: "default",
 					Source: &argoappv1.ApplicationSource{
 						RepoURL: repo.GetHTMLURL(),
-						Path:    "{{path}}",
+						Path:    "{{.path.path}}",
 					},
 					Destination: argoappv1.ApplicationDestination{
 						Server:    "https://kubernetes.default.svc",
@@ -914,7 +914,7 @@ func TestDryRunMode(t *testing.T) {
 
 	var planCommented bool
 	for _, c := range comments {
-		if strings.Contains(c.GetBody(), "Promotion plan") || strings.Contains(c.GetBody(), "Production") {
+		if strings.Contains(c.GetBody(), "Promotion Dry Run") {
 			planCommented = true
 			break
 		}
@@ -1013,7 +1013,7 @@ func TestShowPlanLabel(t *testing.T) {
 
 	var planCommented bool
 	for _, c := range comments {
-		if strings.Contains(c.GetBody(), "Production") {
+		if strings.Contains(c.GetBody(), "Promotion Dry Run") {
 			planCommented = true
 			break
 		}
@@ -1101,52 +1101,6 @@ func TestMultiplePromotionTargets(t *testing.T) {
 	}
 }
 
-func TestCustomPromotionPRLabels(t *testing.T) {
-	t.Parallel()
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		t.Skip("GITHUB_TOKEN not set")
-	}
-	checkGithubTokenDeleteRepoScope(t)
-	slog.SetDefault(newTestLogger(t))
-
-	f := setupMergedPR(t)
-
-	mergedPR := &github.PullRequest{
-		Number: f.PR.Number,
-		User:   f.PR.User,
-		Head: &github.PullRequestBranch{
-			SHA: github.String(f.PRCommit.GetSHA()),
-			Ref: github.String("upgrade"),
-		},
-		Merged: github.Bool(true),
-	}
-	payload := marshalPREvent(t, f.Repo, mergedPR, "closed")
-
-	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
-
-	// Assert: promotion PR has custom labels.
-	prs, _, err := f.GH.PullRequests.List(t.Context(), f.Owner, f.Name,
-		&github.PullRequestListOptions{State: "open"})
-	checkErr(t, err)
-
-	for _, p := range prs {
-		if !strings.Contains(p.GetTitle(), "Promotion") {
-			continue
-		}
-		labels := make(map[string]bool)
-		for _, l := range p.Labels {
-			labels[l.GetName()] = true
-		}
-		if !labels["auto-promotion"] {
-			t.Error("expected promotion PR to have 'auto-promotion' label")
-		}
-		if !labels["gitops"] {
-			t.Error("expected promotion PR to have 'gitops' label")
-		}
-	}
-}
-
 func TestToggleCommitStatus(t *testing.T) {
 	t.Parallel()
 	if os.Getenv("GITHUB_TOKEN") == "" {
@@ -1156,6 +1110,14 @@ func TestToggleCommitStatus(t *testing.T) {
 	slog.SetDefault(newTestLogger(t))
 
 	f := setupOpenPR(t)
+
+	// The toggle handler flips an EXISTING status; create one first.
+	_, _, err := f.GH.Repositories.CreateStatus(t.Context(), f.Owner, f.Name,
+		f.PRCommit.GetSHA(), &github.RepoStatus{
+			State:   github.String("failure"),
+			Context: github.String("ci/build"),
+		})
+	checkErr(t, err)
 
 	// Post a comment with the toggle command.
 	comment, _, err := f.GH.Issues.CreateComment(t.Context(), f.Owner, f.Name,

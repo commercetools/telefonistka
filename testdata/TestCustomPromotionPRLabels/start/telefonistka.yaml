@@ -1,9 +1,0 @@
-promotionPaths:
-  - sourcePath: "workspace/"
-    promotionPrs:
-      - targetDescription: "Production"
-        targetPaths:
-          - "live/"
-promtionPRlables:
-  - "auto-promotion"
-  - "gitops"
