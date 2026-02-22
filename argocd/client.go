@@ -20,19 +20,19 @@ type ClientOptions struct {
 	Insecure   bool
 }
 
-// ArgoCDClients bundles the gRPC service stubs needed to interact
+// Clients bundles the gRPC service stubs needed to interact
 // with an ArgoCD server.
-type ArgoCDClients struct {
+type Clients struct {
 	App     application.ApplicationServiceClient
 	Setting settings.SettingsServiceClient
 	AppSet  applicationsetpkg.ApplicationSetServiceClient
 }
 
-// NewArgoCDClients creates the gRPC service stubs from the given
+// NewClients creates the gRPC service stubs from the given
 // connection options. Call this once at application startup and reuse
 // the result.
-func NewArgoCDClients(opts ClientOptions) (ArgoCDClients, error) {
-	var ac ArgoCDClients
+func NewClients(opts ClientOptions) (Clients, error) {
+	var ac Clients
 	slog.Debug("Creating ArgoCD clients", "server", opts.ServerAddr, "plaintext", opts.Plaintext, "insecure", opts.Insecure)
 
 	clientOpts := &apiclient.ClientOptions{

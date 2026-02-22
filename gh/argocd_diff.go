@@ -41,7 +41,7 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 	return false
 }
 
-func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClients) error {
+func commentDiff(ctx context.Context, c Context, argoClients *argocd.Clients) error {
 	c.PrLogger.Debug("Commenting ArgoCD diff")
 	if !c.Config.Argocd.CommentDiffonPR || argoClients == nil {
 		return nil

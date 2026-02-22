@@ -471,7 +471,7 @@ func startTelefonistka(t *testing.T, ghToken, argoServerAddr, argoToken, webhook
 		gh.Endpoints{},
 	)
 
-	ac, err := argocd.NewArgoCDClients(argocd.ClientOptions{
+	ac, err := argocd.NewClients(argocd.ClientOptions{
 		ServerAddr: argoServerAddr,
 		AuthToken:  argoToken,
 		Insecure:   true,

@@ -156,7 +156,7 @@ type FakeArgoCD struct {
 // services, dials it, and returns the fakes (for assertions) and the
 // client stubs (for EventConfig.ArgoCD). Server and connection are
 // cleaned up via t.Cleanup.
-func startFakeArgoCD(t *testing.T) (*FakeArgoCD, *argocd.ArgoCDClients) {
+func startFakeArgoCD(t *testing.T) (*FakeArgoCD, *argocd.Clients) {
 	t.Helper()
 
 	fake := &FakeArgoCD{
@@ -192,7 +192,7 @@ func startFakeArgoCD(t *testing.T) (*FakeArgoCD, *argocd.ArgoCDClients) {
 		srv.Stop()
 	})
 
-	clients := &argocd.ArgoCDClients{
+	clients := &argocd.Clients{
 		App:     application.NewApplicationServiceClient(conn),
 		Setting: settings.NewSettingsServiceClient(conn),
 		AppSet:  applicationsetpkg.NewApplicationSetServiceClient(conn),

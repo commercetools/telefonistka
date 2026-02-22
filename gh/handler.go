@@ -199,7 +199,7 @@ func handleIssueCommentEvent(ctx context.Context, cfg EventConfig, event *github
 	}
 }
 
-func handlePREvent(ctx context.Context, stat string, c Context, templatesFS fs.FS, commitStatusURLTmpl *template.Template, argoClients *argocd.ArgoCDClients) {
+func handlePREvent(ctx context.Context, stat string, c Context, templatesFS fs.FS, commitStatusURLTmpl *template.Template, argoClients *argocd.Clients) {
 	setCommitStatus(ctx, c, "pending", commitStatusURLTmpl)
 
 	var err error
@@ -235,7 +235,7 @@ func handleShowPlanPREvent(ctx context.Context, c Context, templatesFS fs.FS) er
 	return nil
 }
 
-func handleChangedPREvent(ctx context.Context, c Context, templatesFS fs.FS, argoClients *argocd.ArgoCDClients) error {
+func handleChangedPREvent(ctx context.Context, c Context, templatesFS fs.FS, argoClients *argocd.Clients) error {
 	c.PrLogger.Debug("Handling changed PR event")
 	if err := minimizeStalePRComments(ctx, c); err != nil {
 		return fmt.Errorf("minimizing stale PR comments: %w", err)
@@ -253,7 +253,7 @@ func handleChangedPREvent(ctx context.Context, c Context, templatesFS fs.FS, arg
 }
 
 // handleMergedPrEvent processes a PR that has been merged, generating promotions and opening new PRs for each.
-func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argoClients *argocd.ArgoCDClients) error {
+func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argoClients *argocd.Clients) error {
 	c.PrLogger.Debug("Handling merged PR event")
 	var err error
 
@@ -358,7 +358,7 @@ func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argo
 		for _, componentPath := range componentPathList {
 			if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
 				c.PrLogger.Info("Ensuring ArgoCD app is set to HEAD", "path", componentPath)
-				err := argocd.SetArgoCDAppRevision(ctx, *argoClients, componentPath, "HEAD", c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.PrLogger)
+				err := argocd.SetAppRevision(ctx, *argoClients, componentPath, "HEAD", c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.PrLogger)
 				if err != nil {
 					c.PrLogger.Error("Failed to set ArgoCD app to HEAD", "path", componentPath, "err", err)
 				}
@@ -369,7 +369,7 @@ func handleMergedPrEvent(ctx context.Context, c Context, templatesFS fs.FS, argo
 	return err
 }
 
-func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommentEvent, botIdentity string, argoClients *argocd.ArgoCDClients) error {
+func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommentEvent, botIdentity string, argoClients *argocd.Clients) error {
 	c.PrLogger.Debug("Handling comment event", "action", ce.GetAction(), "comment_user", ce.GetComment().GetUser().GetLogin())
 	// This part should only happen on edits of bot comments on open PRs (I'm not testing Issue vs PR as Telefonistka only creates PRs at this point)
 	if ce.GetAction() == "edited" && ce.GetComment().GetUser().GetLogin() == botIdentity && ce.GetIssue().GetState() == "open" {
@@ -385,7 +385,7 @@ func handleCommentPrEvent(ctx context.Context, c Context, ce *github.IssueCommen
 
 				for _, componentPath := range componentPathList {
 					if isSyncFromBranchAllowedForThisPath(c.Config.Argocd.AllowSyncfromBranchPathRegex, componentPath) {
-						err := argocd.SetArgoCDAppRevision(ctx, *argoClients, componentPath, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.PrLogger)
+						err := argocd.SetAppRevision(ctx, *argoClients, componentPath, c.Ref, c.RepoURL, c.Config.Argocd.UseSHALabelForAppDiscovery, c.PrLogger)
 						if err != nil {
 							c.PrLogger.Error("Failed to sync ArgoCD app from branch", "err", err)
 						}

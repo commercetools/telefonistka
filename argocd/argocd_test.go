@@ -375,7 +375,7 @@ func TestTempAppDeletedOnDiffError(t *testing.T) {
 	mockAppClient := mocks.NewMockApplicationServiceClient(ctrl)
 	mockAppSetClient := mocks.NewMockApplicationSetServiceClient(ctrl)
 
-	ac := ArgoCDClients{
+	ac := Clients{
 		App:    mockAppClient,
 		AppSet: mockAppSetClient,
 	}
@@ -495,7 +495,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	mockSettingsServiceClient := mocks.NewMockSettingsServiceClient(mockCtrl)
 	// fake InitArgoClients
 
-	argoClients := ArgoCDClients{
+	argoClients := Clients{
 		App:     mockAppServiceClient,
 		Setting: mockSettingsServiceClient,
 	}

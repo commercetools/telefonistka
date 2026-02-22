@@ -41,7 +41,7 @@ func generateAppSetGitGeneratorParams(p string) map[string]any {
 	}
 }
 
-func createTempAppObjectForNewApp(ctx context.Context, componentPath, repo, prBranch string, ac ArgoCDClients, logger *slog.Logger) (*argoappv1.Application, error) {
+func createTempAppObjectForNewApp(ctx context.Context, componentPath, repo, prBranch string, ac Clients, logger *slog.Logger) (*argoappv1.Application, error) {
 	logger.Debug("ArgoCD app not found, searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
 	appSet, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.AppSet, logger)
 	if err != nil {

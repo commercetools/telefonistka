@@ -273,7 +273,7 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, er
 //
 // The returned cleanup function MUST be deferred by the caller — it
 // deletes the temporary app (or is a no-op for pre-existing apps).
-func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac ArgoCDClients, cfg DiffConfig, logger *slog.Logger) (app *argoappv1.Application, tempCreated bool, cleanup func(), err error) {
+func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Clients, cfg DiffConfig, logger *slog.Logger) (app *argoappv1.Application, tempCreated bool, cleanup func(), err error) {
 	noop := func() {}
 
 	app, err = findArgocdApp(ctx, componentPath, repo, ac.App, cfg.UseSHALabel, logger)
@@ -328,7 +328,7 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 	return app, false, noop, nil
 }
 
-func generateDiffOfAComponent(ctx context.Context, includeDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig, logger *slog.Logger) DiffResult {
+func generateDiffOfAComponent(ctx context.Context, includeDiff bool, componentPath string, prBranch string, repo string, ac Clients, argoSettings *settings.Settings, cfg DiffConfig, logger *slog.Logger) DiffResult {
 	logger.Debug("Generating diff for component", "component_path", componentPath, "pr_branch", prBranch, "include_diff", includeDiff)
 	r := DiffResult{ComponentPath: componentPath}
 
@@ -376,7 +376,7 @@ func generateDiffOfAComponent(ctx context.Context, includeDiff bool, componentPa
 // component concurrently. Per-component errors are stored in
 // DiffResult.DiffError; the returned error is reserved for failures
 // that prevent any diff from being attempted (e.g. settings fetch).
-func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients ArgoCDClients, logger *slog.Logger) ([]DiffResult, error) {
+func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients Clients, logger *slog.Logger) ([]DiffResult, error) {
 	logger.Debug("Generating diffs for changed components", "component_count", len(componentsToDiff), "pr_branch", prBranch)
 
 	argoSettings, err := argoClients.Setting.Get(ctx, &settings.SettingsQuery{})

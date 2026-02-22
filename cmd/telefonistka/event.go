@@ -47,11 +47,11 @@ func event(eventType string, eventFilePath string) {
 		gh.NewEndpoints(os.Getenv("GITHUB_HOST")),
 	)
 
-	var argoClients *argocd.ArgoCDClients
+	var argoClients *argocd.Clients
 	if addr := os.Getenv("ARGOCD_SERVER_ADDR"); addr != "" {
 		plaintext, _ := strconv.ParseBool(os.Getenv("ARGOCD_PLAINTEXT"))
 		insecure, _ := strconv.ParseBool(os.Getenv("ARGOCD_INSECURE"))
-		ac, err := argocd.NewArgoCDClients(argocd.ClientOptions{
+		ac, err := argocd.NewClients(argocd.ClientOptions{
 			ServerAddr: addr,
 			AuthToken:  os.Getenv("ARGOCD_TOKEN"),
 			Plaintext:  plaintext,

@@ -9,7 +9,7 @@ import (
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
 )
 
-func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath, revision, repo string, useSHALabelForArgoDiscovery bool, logger *slog.Logger) error {
+func SetAppRevision(ctx context.Context, ac Clients, componentPath, revision, repo string, useSHALabelForArgoDiscovery bool, logger *slog.Logger) error {
 	logger.Debug("Setting ArgoCD app revision", "component_path", componentPath, "revision", revision, "repo", repo)
 	app, err := findArgocdApp(ctx, componentPath, repo, ac.App, useSHALabelForArgoDiscovery, logger)
 	if err != nil {

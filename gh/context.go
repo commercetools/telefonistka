@@ -44,7 +44,7 @@ func NewEndpoints(host string) Endpoints {
 // EventConfig holds all externally-resolved configuration for event handling.
 type EventConfig struct {
 	Clients             *ClientProvider
-	ArgoCD              *argocd.ArgoCDClients // nil when ArgoCD is not configured
+	ArgoCD              *argocd.Clients // nil when ArgoCD is not configured
 	TemplatesFS         fs.FS
 	CommitStatusURLTmpl *template.Template // nil → use default URL
 	HandleSelfComment   bool
