@@ -64,6 +64,16 @@ import (
 	"sigs.k8s.io/kind/pkg/cluster/nodeutils"
 )
 
+// testLogWriter adapts testing.TB to io.Writer so that slog output is
+// routed through t.Log (indented, captured by -v). Each Write call
+// emits one log line with trailing newlines stripped.
+type testLogWriter struct{ t testing.TB }
+
+func (w testLogWriter) Write(p []byte) (int, error) {
+	w.t.Log(strings.TrimRight(string(p), "\n"))
+	return len(p), nil
+}
+
 // contextWithGracePeriod returns a new context that with a deadline that is d
 // time before the deadline of ctx.
 func contextWithGracePeriod(ctx context.Context, d time.Duration) (_ context.Context, cancel func()) {
@@ -430,6 +440,20 @@ func getTestdata(t *testing.T, filepath string) *bytes.Buffer {
 
 func startTelefonistka(t *testing.T, ghToken, argoServerAddr, argoToken, webhookSecret string) string {
 	t.Helper()
+
+	// Route slog output through t.Log so it is indented under the test
+	// name, captured by -v, and has no timestamp (the test framework
+	// adds its own).
+	slog.SetDefault(slog.New(slog.NewTextHandler(testLogWriter{t}, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelDebug,
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey {
+				return slog.Attr{}
+			}
+			return a
+		},
+	})))
 
 	clients := githubapi.NewClientProvider(1,
 		githubapi.ClientConfig{OAuthToken: ghToken},
