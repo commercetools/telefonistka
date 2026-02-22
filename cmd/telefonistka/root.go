@@ -51,13 +51,19 @@ func replaceAttr(groups []string, a slog.Attr) slog.Attr {
 
 func Execute() {
 	level := logLevels[getEnv("LOG_LEVEL", "info")]
-	handlerOpts := slog.HandlerOptions{}
-	handlerOpts.AddSource = true
-	handlerOpts.Level = level
-	handlerOpts.ReplaceAttr = replaceAttr
-	logHandler := slog.NewJSONHandler(os.Stderr, &handlerOpts)
-	logger := slog.New(logHandler)
-	slog.SetDefault(logger)
+	handlerOpts := slog.HandlerOptions{
+		AddSource:  true,
+		Level:      level,
+		ReplaceAttr: replaceAttr,
+	}
+
+	var logHandler slog.Handler
+	if getEnv("LOG_FORMAT", "json") == "text" {
+		logHandler = slog.NewTextHandler(os.Stderr, &handlerOpts)
+	} else {
+		logHandler = slog.NewJSONHandler(os.Stderr, &handlerOpts)
+	}
+	slog.SetDefault(slog.New(logHandler))
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Whoops. There was an error while executing your CLI '%s'", err)
