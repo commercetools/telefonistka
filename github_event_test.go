@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
-	argoappv1 "github.com/argoproj/argo-cd/v2/pkg/apis/application/v1alpha1"
-	repoapiclient "github.com/argoproj/argo-cd/v2/reposerver/apiclient"
+	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
+	argoappv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
 	"github.com/commercetools/telefonistka/githubapi"
 	"github.com/commercetools/telefonistka/templates"
 	"github.com/google/go-github/v62/github"

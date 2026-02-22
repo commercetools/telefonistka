@@ -22,7 +22,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/argoproj/argo-cd/v2/pkg/apiclient/session"
+	"github.com/argoproj/argo-cd/v3/pkg/apiclient/session"
 	"github.com/commercetools/telefonistka/argocd"
 	"github.com/commercetools/telefonistka/githubapi"
 	"github.com/commercetools/telefonistka/templates"

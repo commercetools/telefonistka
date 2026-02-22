@@ -1,6 +1,6 @@
 global:
   image:
-    tag: "v2.11.13"
+    tag: "v3.0.3"
   logging:
     format: "json"
     level: "debug"

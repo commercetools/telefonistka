@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/argoproj/argo-cd/v2/pkg/apiclient/application"
+	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
 )
 
 func SetArgoCDAppRevision(ctx context.Context, ac ArgoCDClients, componentPath string, revision string, repo string, useSHALabelForArgoDicovery bool, logger *slog.Logger) error {
