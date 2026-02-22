@@ -313,11 +313,19 @@ func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, i
 	l, err := c.ImageList(t.Context(), dockertypes.ImageListOptions{Filters: args})
 	checkErr(t, err)
 
-	var ids []string
+	var names []string
 	for l := range slices.Values(l) {
-		ids = append(ids, l.ID)
+		// Use RepoTags so the tarball includes a manifest that tags
+		// the image on the receiving end.  An anonymous (ID-only)
+		// save loads the image but it cannot be referenced by tag.
+		if len(l.RepoTags) > 0 {
+			names = append(names, l.RepoTags...)
+		} else {
+			names = append(names, l.ID)
+		}
 	}
-	archive, err := c.ImageSave(t.Context(), ids)
+	t.Logf("Saving images %s", strings.Join(names, ","))
+	archive, err := c.ImageSave(t.Context(), names)
 	checkErr(t, err)
 	defer func() { checkErr(t, archive.Close()) }()
 
@@ -328,7 +336,7 @@ func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, i
 		nodes, err := p.ListInternalNodes(c)
 		checkErr(t, err)
 		for n := range slices.Values(nodes) {
-			t.Logf("Loading %s into %s", images, n)
+			t.Logf("Loading images %s into %s", strings.Join(images, ","), n)
 			checkErr(t, nodeutils.LoadImageArchive(n, archive))
 		}
 	}
