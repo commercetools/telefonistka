@@ -372,11 +372,11 @@ func generateDiffOfAComponent(ctx context.Context, includeDiff bool, componentPa
 	return r
 }
 
-// GenerateDiffOfChangedComponents generates diffs for each changed
+// DiffComponents generates diffs for each changed
 // component concurrently. Per-component errors are stored in
 // DiffResult.DiffError; the returned error is reserved for failures
 // that prevent any diff from being attempted (e.g. settings fetch).
-func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients Clients, logger *slog.Logger) ([]DiffResult, error) {
+func DiffComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients Clients, logger *slog.Logger) ([]DiffResult, error) {
 	logger.Debug("Generating diffs for changed components", "component_count", len(componentsToDiff), "pr_branch", prBranch)
 
 	argoSettings, err := argoClients.Setting.Get(ctx, &settings.SettingsQuery{})

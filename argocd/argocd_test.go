@@ -572,7 +572,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	// start timer
 	start := time.Now()
 
-	diffResults, err := GenerateDiffOfChangedComponents(
+	diffResults, err := DiffComponents(
 		context.TODO(),
 		makeComponents(numComponents),
 		"test-pr-branch",
