@@ -1,4 +1,4 @@
-package main
+package telefonistka_test
 
 import (
 	"crypto/rand"

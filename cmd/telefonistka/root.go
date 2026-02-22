@@ -1,4 +1,4 @@
-package telefonistka
+package main
 
 import (
 	"fmt"
@@ -49,7 +49,7 @@ func replaceAttr(groups []string, a slog.Attr) slog.Attr {
 	}
 }
 
-func Execute() {
+func execute() {
 	level := logLevels[getEnv("LOG_LEVEL", "info")]
 	handlerOpts := slog.HandlerOptions{
 		AddSource:  true,

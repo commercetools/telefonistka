@@ -1,4 +1,4 @@
-package telefonistka
+package main
 
 import (
 	"context"

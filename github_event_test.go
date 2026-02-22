@@ -1,4 +1,4 @@
-package main
+package telefonistka_test
 
 import (
 	"crypto/sha1" //nolint:gosec // test-only, matching production SHA1 label
