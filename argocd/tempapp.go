@@ -12,71 +12,65 @@ import (
 	argoappv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 )
 
-// copied form https://github.com/argoproj/argo-cd/blob/v2.11.4/applicationset/controllers/applicationset_controller.go#L493C1-L503C2
-func getTempApplication(applicationSetTemplate argoappv1.ApplicationSetTemplate) *argoappv1.Application {
-	var tmplApplication argoappv1.Application
-	tmplApplication.Annotations = applicationSetTemplate.Annotations
-	tmplApplication.Labels = applicationSetTemplate.Labels
-	tmplApplication.Namespace = applicationSetTemplate.Namespace
-	tmplApplication.Name = applicationSetTemplate.Name
-	tmplApplication.Spec = applicationSetTemplate.Spec
-	tmplApplication.Finalizers = applicationSetTemplate.Finalizers
-
-	return &tmplApplication
+// copied from https://github.com/argoproj/argo-cd/blob/v2.11.4/applicationset/controllers/applicationset_controller.go#L493C1-L503C2
+func getTempApplication(tmpl argoappv1.ApplicationSetTemplate) *argoappv1.Application {
+	var app argoappv1.Application
+	app.Name = tmpl.Name
+	app.Namespace = tmpl.Namespace
+	app.Annotations = tmpl.Annotations
+	app.Labels = tmpl.Labels
+	app.Finalizers = tmpl.Finalizers
+	app.Spec = tmpl.Spec
+	return &app
 }
 
-// This function generate the params map for the ApplicationSet template, mimicking the behavior of the ApplicationSet controller Git Generator
-func generateAppSetGitGeneratorParams(p string) map[string]interface{} {
-	params := make(map[string]interface{})
-	paramPath := map[string]interface{}{}
-
-	paramPath["path"] = p
-	paramPath["basename"] = path.Base(paramPath["path"].(string))
-	paramPath["filename"] = path.Base(p)
-	paramPath["basenameNormalized"] = utils.SanitizeName(path.Base(paramPath["path"].(string)))
-	paramPath["filenameNormalized"] = utils.SanitizeName(path.Base(paramPath["filename"].(string)))
-	paramPath["segments"] = strings.Split(paramPath["path"].(string), "/")
-	params["path"] = paramPath
-	return params
+// generateAppSetGitGeneratorParams builds the params map for the
+// ApplicationSet template, mimicking the Git generator in the
+// ApplicationSet controller.
+func generateAppSetGitGeneratorParams(p string) map[string]any {
+	base := path.Base(p)
+	return map[string]any{
+		"path": map[string]any{
+			"path":               p,
+			"basename":           base,
+			"filename":           base,
+			"basenameNormalized": utils.SanitizeName(base),
+			"filenameNormalized": utils.SanitizeName(base),
+			"segments":           strings.Split(p, "/"),
+		},
+	}
 }
 
-func createTempAppObjectForNewApp(ctx context.Context, componentPath string, repo string, prBranch string, ac ArgoCDClients, logger *slog.Logger) (app *argoappv1.Application, err error) {
+func createTempAppObjectForNewApp(ctx context.Context, componentPath, repo, prBranch string, ac ArgoCDClients, logger *slog.Logger) (*argoappv1.Application, error) {
 	logger.Debug("ArgoCD app not found, searching for matching ApplicationSet", "component_path", componentPath, "repo", repo)
 	appSet, err := findRelevantAppSetByPath(ctx, componentPath, repo, ac.AppSet, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	useGoTemplate := true
-	var goTemplateOptions []string
 	params := generateAppSetGitGeneratorParams(componentPath)
-	r := &utils.Render{}
-	newAppObject, err := r.RenderTemplateParams(getTempApplication(appSet.Spec.Template), nil, params, useGoTemplate, goTemplateOptions)
+	rendered, err := (&utils.Render{}).RenderTemplateParams(getTempApplication(appSet.Spec.Template), nil, params, true, nil)
 	if err != nil {
 		return nil, fmt.Errorf("rendering ApplicationSet template: %w", err)
 	}
 
-	// Mutating some of the app object fields to fit this specific use case
-	tempAppName := fmt.Sprintf("temp-%s", newAppObject.Name)
-	newAppObject.Name = tempAppName
-	// We need to remove the automated sync policy, we just want to create
-	// a temporary app object, run a diff and remove it.
-	if newAppObject.Spec.SyncPolicy != nil {
-		newAppObject.Spec.SyncPolicy.Automated = nil
+	rendered.Name = fmt.Sprintf("temp-%s", rendered.Name)
+	// Remove auto-sync: the temp app only exists for diffing.
+	if rendered.Spec.SyncPolicy != nil {
+		rendered.Spec.SyncPolicy.Automated = nil
 	}
-	if newAppObject.Spec.Source != nil {
-		newAppObject.Spec.Source.TargetRevision = prBranch
+	if rendered.Spec.Source != nil {
+		rendered.Spec.Source.TargetRevision = prBranch
 	}
 
-	validateTempApp := false
-	appCreateRequest := application.ApplicationCreateRequest{
-		Application: newAppObject,
-		Validate:    &validateTempApp, // It makes more sense to handle template failures in the diff generation section
-	}
-	app, err = ac.App.Create(ctx, &appCreateRequest)
+	noValidate := false
+	app, err := ac.App.Create(ctx, &application.ApplicationCreateRequest{
+		Application: rendered,
+		Validate:    &noValidate,
+	})
 	if err != nil {
 		return nil, err
 	}
-	logger.Debug("Temporary app created from ApplicationSet", "app", tempAppName, "appset", appSet.Name)
+	logger.Debug("Temporary app created from ApplicationSet", "app", rendered.Name, "appset", appSet.Name)
 	return app, nil
 }
