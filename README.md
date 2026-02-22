@@ -169,31 +169,28 @@ See [here](docs/observability.md)
 
 ## Development
 
-### Local Testing
+### Integration Tests
 
-Telefonistka have 3 major methods to interact with the world:
+The root package contains integration tests that spin up a complete
+environment from scratch:
 
-* Receive event webhooks from GitHub
-* Send API calls to GitHub REST and GraphQL APIs(requires network access and credentials)
-* Send API calls to ArgoCD API(requires network access and credentials)
+* A [kind](https://kind.sigs.k8s.io/) cluster running in Docker
+* Argo CD installed via Helm
+* A temporary GitHub repository with webhook delivery
+* A freshly built Telefonistka server wired to both
 
-Supporting all those requirements in a local environment might require lots of setup.
-Assuming you have a working lab environment, the easiest way to locally test Telefonistka might be with tools like [mirrord](https://mirrord.dev/) or [telepresence](https://www.telepresence.io/)
-
-A [mirrord.json](mirrord.json) is supplied as reference.
-
-This is how I compile and trigger mirrord execution
+Because these tests create real infrastructure they are gated behind an
+environment variable and skipped by default during `go test ./...`.
 
 ```sh
-go build . && mirrord exec -f mirrord.json ./telefonistka server
+INTEGRATE=1 GITHUB_TOKEN=$(gh auth token) go test -run TestTelefonistka -v -timeout=30m
 ```
 
-Alternatively, you can use `ngrok` or similar services to route webhook to a local instance, but you still need to provide credentials to all outbound API calls.
+The test is interactive — it runs until you press Ctrl-C, giving you
+time to inspect the cluster and Argo CD UI.  Credentials and a saved
+kubeconfig path are printed to the test log on startup.
 
-* use Ngrok ( `ngrok http 8080` ) to expose the local instance
-* See the URLs in ngrok command output.
-* Add a webhook to repo setting (don't forget the `/webhook` path in the URL).
-* Content type needs to be `application/json`, **currently** only PR events are needed
+See `telefonistka_test.go` and `helpers_test.go` for the full setup.
 
 ### Building Container Image From Forks
 
