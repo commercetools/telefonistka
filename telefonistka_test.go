@@ -67,12 +67,8 @@ func TestTelefonistka(t *testing.T) {
 		argoInitialPasswordSecretKey  = "password"
 	)
 
-	var (
-		// TODO make sure this aligns with what is configured when starting the
-		// server. For now it is hardcoded.
-		forwardTarget = "http://localhost:8080/webhook"
-		webhookSecret = rand.Text()
-	)
+	webhookSecret := rand.Text()
+	ghToken := os.Getenv("GITHUB_TOKEN")
 
 	cluster := newCluster(t)
 	clientset := newClientset(t, cluster.Config)
@@ -109,17 +105,12 @@ func TestTelefonistka(t *testing.T) {
 	token := newArgoToken(t, conn, argoUsername, adminPassword.String())
 	t.Logf("You can log into Argo CD on %q using %q and %q as the password", "https://"+argoServerAddr, argoUsername, adminPassword)
 
-	startTelefonistka(t, token, argoServerAddr, webhookSecret)
-
-	// There is no good way to wait for execution and start of server; TODO: as
-	// mentioned above, refactor entrypoint such that it will be just as easy
-	// to spin up an isolated instance in code
-	time.Sleep(5 * time.Second)
+	serverURL := startTelefonistka(t, ghToken, argoServerAddr, token, webhookSecret)
 
 	wsURL := createRepoHook(t, gh, repository, webhookSecret)
 
 	// dst, src
-	forwardData(t, ctx, forwardTarget, wsURL)
+	forwardData(t, ctx, serverURL+"/webhook", wsURL)
 
 	//  Setup initial state of repository based on testdata.
 	first := createCommit(t, gh, repository, "heads/main", "Initial", os.DirFS(path.Join("testdata", t.Name(), "start")))
@@ -166,12 +157,8 @@ func TestHelm(t *testing.T) {
 		argoInitialPasswordSecretKey  = "password"
 	)
 
-	var (
-		// TODO make sure this aligns with what is configured when starting the
-		// server. For now it is hardcoded.
-		forwardTarget = "http://localhost:8080/webhook"
-		webhookSecret = rand.Text()
-	)
+	webhookSecret := rand.Text()
+	ghToken := os.Getenv("GITHUB_TOKEN")
 
 	cluster := newCluster(t)
 	clientset := newClientset(t, cluster.Config)
@@ -188,7 +175,7 @@ func TestHelm(t *testing.T) {
 
 	loadLocalImage(t, newDockerClient(t), cluster, "gcr.io/ct-services/argo-cd-helmfile:v0.5.0") // sha256:ed34582d67cab4fbba9057134858043b64852ba8ace0cc7b45ac995f8d47337c
 
-	valsData := struct{ GithubUsername, GithubToken string }{repository.GetOwner().GetLogin(), os.Getenv("GITHUB_TOKEN")}
+	valsData := struct{ GithubUsername, GithubToken string }{repository.GetOwner().GetLogin(), ghToken}
 	vals := readValuesFileTemplate(t, "argo.values.yaml", valsData)
 	releaseExternalChart(t, cluster.TemporaryConfigFile, argoNamespace, "https://argoproj.github.io/argo-helm", "argo-cd", vals)
 
@@ -222,17 +209,12 @@ func TestHelm(t *testing.T) {
 	token := newArgoToken(t, conn, argoUsername, adminPassword.String())
 	t.Logf("You can log into Argo CD on %q using %q and %q as the password", "https://"+argoServerAddr, argoUsername, adminPassword)
 
-	startTelefonistka(t, token, argoServerAddr, webhookSecret)
-
-	// There is no good way to wait for execution and start of server; TODO: as
-	// mentioned above, refactor entrypoint such that it will be just as easy
-	// to spin up an isolated instance in code
-	time.Sleep(5 * time.Second)
+	serverURL := startTelefonistka(t, ghToken, argoServerAddr, token, webhookSecret)
 
 	wsURL := createRepoHook(t, gh, repository, webhookSecret)
 
 	// dst, src
-	forwardData(t, ctx, forwardTarget, wsURL)
+	forwardData(t, ctx, serverURL+"/webhook", wsURL)
 
 	//  Setup initial state of repository based on testdata.
 	first := createCommit(t, gh, repository, "heads/main", "Initial", os.DirFS(path.Join("testdata", t.Name(), "start")))

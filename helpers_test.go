@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -11,8 +10,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path"
 	"slices"
@@ -24,6 +23,10 @@ import (
 	"time"
 
 	"github.com/argoproj/argo-cd/v2/pkg/apiclient/session"
+	"github.com/commercetools/telefonistka/argocd"
+	"github.com/commercetools/telefonistka/githubapi"
+	"github.com/commercetools/telefonistka/templates"
+	"github.com/commercetools/telefonistka/webhook"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	dockerclient "github.com/docker/docker/client"
@@ -425,46 +428,36 @@ func getTestdata(t *testing.T, filepath string) *bytes.Buffer {
 	return readFile(t, path.Join("testdata", t.Name(), filepath))
 }
 
-//nolint:thelper // want to get the line where the error occurs here
-func startTelefonistka(t *testing.T, token, argoServerAddr, webhookSecret string) {
-	// TODO: refactor so that it is easy to instead instantiate the server in
-	// code.
-	// cmd := exec.CommandContext(t.Context(), "go", "run", ".", "server")
-	// NOTE: testing air to get live reloading
-	cmd := exec.CommandContext(t.Context(), "go", "run", "github.com/air-verse/air@latest", "--build.cmd", "go build ./cmd/telefonistka", "--build.bin", "./telefonistka", "--build.args_bin", "server")
-	cmd.Env = append(os.Environ(),
-		"GITHUB_WEBHOOK_SECRET="+webhookSecret,
+func startTelefonistka(t *testing.T, ghToken, argoServerAddr, argoToken, webhookSecret string) string {
+	t.Helper()
 
-		// TODO: read in top-level test
-		"GITHUB_OAUTH_TOKEN="+os.Getenv("GITHUB_TOKEN"),
-		"APPROVER_GITHUB_OAUTH_TOKEN="+os.Getenv("GITHUB_TOKEN"),
-
-		"LOG_LEVEL=debug",
-		"LOG_FORMAT=text",
-		"ARGOCD_SERVER_ADDR="+argoServerAddr,
-		"ARGOCD_TOKEN="+token,
-		"ARGOCD_INSECURE=true",
-
-		"HANDLE_SELF_COMMENT=true",
+	clients := githubapi.NewClientProvider(1,
+		githubapi.ClientConfig{OAuthToken: ghToken},
+		githubapi.ClientConfig{OAuthToken: ghToken},
+		githubapi.GithubEndpoints{},
 	)
 
-	stderr, err := cmd.StderrPipe()
+	ac, err := argocd.NewArgoCDClients(argocd.ClientOptions{
+		ServerAddr: argoServerAddr,
+		AuthToken:  argoToken,
+		Insecure:   true,
+	})
 	checkErr(t, err)
 
-	checkErr(t, cmd.Start())
-
-	// Forward subprocess log output through t.Log so it is
-	// indented under the test name and captured by -v.
-	go func() {
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			t.Log(scanner.Text())
-		}
-	}()
-
-	t.Cleanup(func() {
-		_ = cmd.Wait()
+	handler := webhook.NewHandler(webhook.Config{
+		Event: githubapi.EventConfig{
+			Clients:           clients,
+			ArgoCD:            &ac,
+			TemplatesFS:       templates.FS,
+			HandleSelfComment: true,
+		},
+		WebhookSecret: []byte(webhookSecret),
 	})
+
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+	t.Logf("Telefonistka listening on %s", srv.URL)
+	return srv.URL
 }
 
 //nolint:thelper // want to get the line where the error occurs here
