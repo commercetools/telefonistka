@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -304,7 +305,7 @@ func newDockerClient(t *testing.T) *dockerclient.Client {
 // loadLocalImage loads an image from the host into the cluster.
 //
 
-func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, images ...string) {
+func loadLocalImage(t *testing.T, c *dockerclient.Client, cl *Cluster, images ...string) {
 	t.Helper()
 	args := filters.NewArgs()
 	for img := range slices.Values(images) {
@@ -329,16 +330,15 @@ func loadLocalImage(t *testing.T, c *dockerclient.Client, p *cluster.Provider, i
 	checkErr(t, err)
 	defer func() { checkErr(t, archive.Close()) }()
 
-	cl, err := p.List()
+	// Load into the specific cluster — not p.List() which returns
+	// ALL kind clusters on the machine.  The archive is a one-shot
+	// stream; a stale cluster consuming it first would leave the
+	// target cluster with an empty reader.
+	nodes, err := cl.ListInternalNodes(cl.Name)
 	checkErr(t, err)
-
-	for c := range slices.Values(cl) {
-		nodes, err := p.ListInternalNodes(c)
-		checkErr(t, err)
-		for n := range slices.Values(nodes) {
-			t.Logf("Loading images %s into %s", strings.Join(images, ","), n)
-			checkErr(t, nodeutils.LoadImageArchive(n, archive))
-		}
+	for n := range slices.Values(nodes) {
+		t.Logf("Loading images %s into %s", strings.Join(images, ","), n)
+		checkErr(t, nodeutils.LoadImageArchive(n, archive))
 	}
 }
 
@@ -440,6 +440,7 @@ func startTelefonistka(t *testing.T, token, argoServerAddr, webhookSecret string
 		"APPROVER_GITHUB_OAUTH_TOKEN="+os.Getenv("GITHUB_TOKEN"),
 
 		"LOG_LEVEL=debug",
+		"LOG_FORMAT=text",
 		"ARGOCD_SERVER_ADDR="+argoServerAddr,
 		"ARGOCD_TOKEN="+token,
 		"ARGOCD_INSECURE=true",
@@ -447,25 +448,22 @@ func startTelefonistka(t *testing.T, token, argoServerAddr, webhookSecret string
 		"HANDLE_SELF_COMMENT=true",
 	)
 
-	// Make sure we get output from the executed command above.
-	//
-	// TODO: properly wrap and forward to t.Log
-	var wg sync.WaitGroup
-	wg.Add(1)
+	stderr, err := cmd.StderrPipe()
+	checkErr(t, err)
+
+	checkErr(t, cmd.Start())
+
+	// Forward subprocess log output through t.Log so it is
+	// indented under the test name and captured by -v.
 	go func() {
-		defer wg.Done()
-		stderr, err := cmd.StderrPipe()
-		checkErr(t, err)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			io.Copy(os.Stderr, stderr) //nolint:errcheck
-		}()
-		checkErr(t, cmd.Start())
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			t.Log(scanner.Text())
+		}
 	}()
 
 	t.Cleanup(func() {
-		wg.Wait()
+		_ = cmd.Wait()
 	})
 }
 

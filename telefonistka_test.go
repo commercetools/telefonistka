@@ -186,7 +186,7 @@ func TestHelm(t *testing.T) {
 	// installYamlFile := getFile(t, "https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml")
 	// applyResource(t, cl.Config, argoNamespace, installYamlFile)
 
-	loadLocalImage(t, newDockerClient(t), cluster.Provider, "gcr.io/ct-services/argo-cd-helmfile:v0.5.0") // sha256:ed34582d67cab4fbba9057134858043b64852ba8ace0cc7b45ac995f8d47337c
+	loadLocalImage(t, newDockerClient(t), cluster, "gcr.io/ct-services/argo-cd-helmfile:v0.5.0") // sha256:ed34582d67cab4fbba9057134858043b64852ba8ace0cc7b45ac995f8d47337c
 
 	valsData := struct{ GithubUsername, GithubToken string }{repository.GetOwner().GetLogin(), os.Getenv("GITHUB_TOKEN")}
 	vals := readValuesFileTemplate(t, "argo.values.yaml", valsData)
