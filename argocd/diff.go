@@ -30,9 +30,8 @@ type DiffConfig struct {
 	CreateTempApps bool // create temporary ArgoCD app objects for new components
 }
 
-// DiffElement struct to store diff element details, this represents a single k8s object
+// DiffElement represents a single diffed Kubernetes object.
 type DiffElement struct {
-	ObjectGroup     string
 	ObjectName      string
 	ObjectKind      string
 	ObjectNamespace string
@@ -133,7 +132,6 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		}
 
 		de := DiffElement{
-			ObjectGroup:     key.Group,
 			ObjectKind:      key.Kind,
 			ObjectNamespace: key.Namespace,
 			ObjectName:      key.Name,
@@ -164,7 +162,6 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		}
 
 		de := DiffElement{
-			ObjectGroup:     key.Group,
 			ObjectKind:      key.Kind,
 			ObjectNamespace: key.Namespace,
 			ObjectName:      key.Name,
