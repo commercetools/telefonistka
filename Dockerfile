@@ -1,19 +1,11 @@
-
 FROM golang:1.26 AS test
 ARG GOPROXY
-ENV GOPATH=/go
-ENV PATH="$PATH:$GOPATH/bin"
 WORKDIR /go/src/github.com/commercetools/telefonistka
 COPY . ./
-RUN make test
+RUN go generate $(go list ./mocks/...) && go test -v -timeout 30s ./...
 
 FROM test AS build
-ARG GOPROXY
-ENV GOPATH=/go
-ENV PATH="$PATH:$GOPATH/bin"
-WORKDIR /go/src/github.com/commercetools/telefonistka
-COPY . ./
-RUN make build
+RUN CGO_ENABLED=0 go build -ldflags '-extldflags "-static"' -o telefonistka ./cmd/telefonistka
 
 
 FROM alpine:latest AS alpine-release
