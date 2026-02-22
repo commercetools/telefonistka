@@ -65,7 +65,7 @@ func serve() {
 			AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
 		},
-		githubapi.NewGithubEndpoints(os.Getenv("GITHUB_HOST")),
+		githubapi.NewEndpoints(os.Getenv("GITHUB_HOST")),
 	)
 
 	var argoClients *argocd.ArgoCDClients
@@ -100,7 +100,7 @@ func serve() {
 		HandleSelfComment:   os.Getenv("HANDLE_SELF_COMMENT") == "true",
 	}
 
-	go githubapi.MainGhMetricsLoop(clients)
+	go githubapi.MetricsLoop(clients)
 
 	srv := &http.Server{
 		Handler: webhook.NewHandler(webhook.Config{

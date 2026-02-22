@@ -51,7 +51,7 @@ func postWebhook(t *testing.T, url string, eventType string, secret, payload []b
 
 func newTestEventConfig() githubapi.EventConfig {
 	return githubapi.EventConfig{
-		Clients: githubapi.NewClientProvider(1, githubapi.ClientConfig{}, githubapi.ClientConfig{}, githubapi.GithubEndpoints{}),
+		Clients: githubapi.NewClientProvider(1, githubapi.ClientConfig{}, githubapi.ClientConfig{}, githubapi.Endpoints{}),
 	}
 }
 

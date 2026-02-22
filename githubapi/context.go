@@ -22,20 +22,20 @@ type ClientConfig struct {
 	OAuthToken string
 }
 
-// GithubEndpoints holds resolved GitHub API base URLs.
+// Endpoints holds resolved GitHub API base URLs.
 // Zero value means public github.com.
-type GithubEndpoints struct {
+type Endpoints struct {
 	RestURL    string // e.g. "https://ghes.example.com/api/v3"
 	GraphqlURL string // e.g. "https://ghes.example.com/api/graphql"
 }
 
-// NewGithubEndpoints computes REST and GraphQL URLs from a hostname.
+// NewEndpoints computes REST and GraphQL URLs from a hostname.
 // Empty host means public github.com (zero-value endpoints).
-func NewGithubEndpoints(host string) GithubEndpoints {
+func NewEndpoints(host string) Endpoints {
 	if host == "" {
-		return GithubEndpoints{}
+		return Endpoints{}
 	}
-	return GithubEndpoints{
+	return Endpoints{
 		RestURL:    "https://" + host + "/api/v3",
 		GraphqlURL: "https://" + host + "/api/graphql",
 	}

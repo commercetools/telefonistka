@@ -39,7 +39,7 @@ func newEventConfig(t *testing.T) githubapi.EventConfig {
 	clients := githubapi.NewClientProvider(1,
 		githubapi.ClientConfig{OAuthToken: token},
 		githubapi.ClientConfig{OAuthToken: token},
-		githubapi.GithubEndpoints{},
+		githubapi.Endpoints{},
 	)
 	return githubapi.EventConfig{
 		Clients:           clients,

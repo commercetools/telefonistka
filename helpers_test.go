@@ -468,7 +468,7 @@ func startTelefonistka(t *testing.T, ghToken, argoServerAddr, argoToken, webhook
 	clients := githubapi.NewClientProvider(1,
 		githubapi.ClientConfig{OAuthToken: ghToken},
 		githubapi.ClientConfig{OAuthToken: ghToken},
-		githubapi.GithubEndpoints{},
+		githubapi.Endpoints{},
 	)
 
 	ac, err := argocd.NewArgoCDClients(argocd.ClientOptions{

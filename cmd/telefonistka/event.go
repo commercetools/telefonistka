@@ -44,7 +44,7 @@ func event(eventType string, eventFilePath string) {
 			AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
 		},
-		githubapi.NewGithubEndpoints(os.Getenv("GITHUB_HOST")),
+		githubapi.NewEndpoints(os.Getenv("GITHUB_HOST")),
 	)
 
 	var argoClients *argocd.ArgoCDClients

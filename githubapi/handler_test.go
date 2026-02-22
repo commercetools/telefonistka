@@ -22,7 +22,7 @@ func mustMarshal(t *testing.T, v any) []byte {
 // event dispatch without triggering real GitHub API calls.
 func failingClients() EventConfig {
 	return EventConfig{
-		Clients: NewClientProvider(1, ClientConfig{}, ClientConfig{}, GithubEndpoints{}),
+		Clients: NewClientProvider(1, ClientConfig{}, ClientConfig{}, Endpoints{}),
 	}
 }
 

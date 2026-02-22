@@ -14,22 +14,22 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// GhClient holds the REST and GraphQL clients for a single GitHub identity.
-type GhClient struct {
+// Client holds the REST and GraphQL clients for a single GitHub identity.
+type Client struct {
 	v3Client *github.Client
 	v4Client *githubv4.Client
 }
 
-// GhClients bundles the main and approver GitHub clients for one repo owner.
+// Clients bundles the main and approver GitHub clients for one repo owner.
 // The approver is a separate identity so that auto-approvals don't come from
 // the same user that opened the PR.
-type GhClients struct {
-	Main     GhClient
-	Approver GhClient
+type Clients struct {
+	Main     Client
+	Approver Client
 }
 
 // setServices populates all GitHub service fields on a Context.
-func (gc GhClients) setServices(c *Context) {
+func (gc Clients) setServices(c *Context) {
 	c.Repositories = gc.Main.v3Client.Repositories
 	c.PullRequests = gc.Main.v3Client.PullRequests
 	c.Issues = gc.Main.v3Client.Issues
@@ -41,15 +41,15 @@ func (gc GhClients) setServices(c *Context) {
 // ClientProvider creates and caches GitHub clients for repo owners.
 // Credentials and endpoints are immutable; the cache is populated lazily.
 type ClientProvider struct {
-	cache         *lru.Cache[string, GhClients]
+	cache         *lru.Cache[string, Clients]
 	mainCreds     ClientConfig
 	approverCreds ClientConfig
-	endpoints     GithubEndpoints
+	endpoints     Endpoints
 }
 
 // NewClientProvider creates a ClientProvider with an LRU cache of the given size.
-func NewClientProvider(size int, mainCreds, approverCreds ClientConfig, endpoints GithubEndpoints) *ClientProvider {
-	cache, _ := lru.New[string, GhClients](size) // size is always a positive literal
+func NewClientProvider(size int, mainCreds, approverCreds ClientConfig, endpoints Endpoints) *ClientProvider {
+	cache, _ := lru.New[string, Clients](size) // size is always a positive literal
 	return &ClientProvider{
 		cache:         cache,
 		mainCreds:     mainCreds,
@@ -60,7 +60,7 @@ func NewClientProvider(size int, mainCreds, approverCreds ClientConfig, endpoint
 
 // ForOwner returns cached clients for the owner, creating them on a cache miss.
 // App-auth clients are cached per owner; token-auth clients are cached globally.
-func (cp *ClientProvider) ForOwner(ctx context.Context, owner string) (GhClients, error) {
+func (cp *ClientProvider) ForOwner(ctx context.Context, owner string) (Clients, error) {
 	key := owner
 	if cp.mainCreds.AppID == 0 {
 		key = "global"
@@ -74,14 +74,14 @@ func (cp *ClientProvider) ForOwner(ctx context.Context, owner string) (GhClients
 
 	main, err := newClient(ctx, cp.mainCreds, cp.endpoints, owner)
 	if err != nil {
-		return GhClients{}, fmt.Errorf("creating main client: %w", err)
+		return Clients{}, fmt.Errorf("creating main client: %w", err)
 	}
 	approver, err := newClient(ctx, cp.approverCreds, cp.endpoints, owner)
 	if err != nil {
-		return GhClients{}, fmt.Errorf("creating approver client: %w", err)
+		return Clients{}, fmt.Errorf("creating approver client: %w", err)
 	}
 
-	clients := GhClients{Main: main, Approver: approver}
+	clients := Clients{Main: main, Approver: approver}
 	cp.cache.Add(key, clients)
 	return clients, nil
 }
@@ -99,8 +99,8 @@ func (cp *ClientProvider) CachedOwners() []string {
 	return cp.cache.Keys()
 }
 
-// CachedClients returns the cached GhClients for the given key, if present.
-func (cp *ClientProvider) CachedClients(key string) (GhClients, bool) {
+// CachedClients returns the cached Clients for the given key, if present.
+func (cp *ClientProvider) CachedClients(key string) (Clients, bool) {
 	return cp.cache.Get(key)
 }
 
@@ -140,15 +140,15 @@ func getAppInstallationId(ctx context.Context, keyPath string, appID int64, rest
 
 // newAppClient creates a REST+GraphQL client using GitHub App auth.
 // A single ghinstallation transport is shared by both clients.
-func newAppClient(ctx context.Context, appID int64, keyPath string, endpoints GithubEndpoints, owner string) (GhClient, error) {
+func newAppClient(ctx context.Context, appID int64, keyPath string, endpoints Endpoints, owner string) (Client, error) {
 	installID, err := getAppInstallationId(ctx, keyPath, appID, endpoints.RestURL, owner)
 	if err != nil {
-		return GhClient{}, fmt.Errorf("getting app installation ID for owner %s: %w", owner, err)
+		return Client{}, fmt.Errorf("getting app installation ID for owner %s: %w", owner, err)
 	}
 
 	itr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport, appID, installID, keyPath)
 	if err != nil {
-		return GhClient{}, fmt.Errorf("loading installation key: %w", err)
+		return Client{}, fmt.Errorf("loading installation key: %w", err)
 	}
 	if endpoints.RestURL != "" {
 		itr.BaseURL = endpoints.RestURL
@@ -160,7 +160,7 @@ func newAppClient(ctx context.Context, appID int64, keyPath string, endpoints Gi
 	if endpoints.RestURL != "" {
 		v3, err = v3.WithEnterpriseURLs(endpoints.RestURL, endpoints.RestURL)
 		if err != nil {
-			return GhClient{}, fmt.Errorf("configuring enterprise REST URL: %w", err)
+			return Client{}, fmt.Errorf("configuring enterprise REST URL: %w", err)
 		}
 	}
 
@@ -171,11 +171,11 @@ func newAppClient(ctx context.Context, appID int64, keyPath string, endpoints Gi
 		v4 = githubv4.NewClient(httpClient)
 	}
 
-	return GhClient{v3Client: v3, v4Client: v4}, nil
+	return Client{v3Client: v3, v4Client: v4}, nil
 }
 
 // newTokenClient creates a REST+GraphQL client using an OAuth token.
-func newTokenClient(ctx context.Context, token string, endpoints GithubEndpoints) (GhClient, error) {
+func newTokenClient(ctx context.Context, token string, endpoints Endpoints) (Client, error) {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	httpClient := oauth2.NewClient(ctx, ts)
 
@@ -184,7 +184,7 @@ func newTokenClient(ctx context.Context, token string, endpoints GithubEndpoints
 		var err error
 		v3, err = v3.WithEnterpriseURLs(endpoints.RestURL, endpoints.RestURL)
 		if err != nil {
-			return GhClient{}, fmt.Errorf("configuring enterprise URL: %w", err)
+			return Client{}, fmt.Errorf("configuring enterprise URL: %w", err)
 		}
 	}
 
@@ -195,16 +195,16 @@ func newTokenClient(ctx context.Context, token string, endpoints GithubEndpoints
 		v4 = githubv4.NewClient(httpClient)
 	}
 
-	return GhClient{v3Client: v3, v4Client: v4}, nil
+	return Client{v3Client: v3, v4Client: v4}, nil
 }
 
-// newClient creates a GhClient from credentials, dispatching to app or token auth.
-func newClient(ctx context.Context, creds ClientConfig, endpoints GithubEndpoints, owner string) (GhClient, error) {
+// newClient creates a Client from credentials, dispatching to app or token auth.
+func newClient(ctx context.Context, creds ClientConfig, endpoints Endpoints, owner string) (Client, error) {
 	if creds.AppID != 0 {
 		return newAppClient(ctx, creds.AppID, creds.AppKeyPath, endpoints, owner)
 	}
 	if creds.OAuthToken == "" {
-		return GhClient{}, fmt.Errorf("%w", ErrNoCredentials)
+		return Client{}, fmt.Errorf("%w", ErrNoCredentials)
 	}
 	return newTokenClient(ctx, creds.OAuthToken, endpoints)
 }

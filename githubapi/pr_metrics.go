@@ -14,7 +14,7 @@ const (
 	metricRefreshTime = 60 * time.Second
 )
 
-func MainGhMetricsLoop(cp *ClientProvider) {
+func MetricsLoop(cp *ClientProvider) {
 	if !cp.IsAppAuth() {
 		slog.Info("PR metrics collection disabled (requires GitHub App auth)")
 		return
@@ -25,7 +25,7 @@ func MainGhMetricsLoop(cp *ClientProvider) {
 	}
 }
 
-func getRepoPrMetrics(ctx context.Context, ghClient GhClient, repo *github.Repository) (pc prom.PrCounters, err error) {
+func getRepoPrMetrics(ctx context.Context, ghClient Client, repo *github.Repository) (pc prom.PrCounters, err error) {
 	slog.Debug("Checking repo", "repo", repo.GetName())
 	ghOwner := repo.GetOwner().GetLogin()
 	prListOpts := &github.PullRequestListOptions{
