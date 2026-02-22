@@ -17,7 +17,7 @@ $(VENDOR_DIR):
 
 .PHONY: build
 build: $(VENDOR_DIR)
-	GOOS=linux CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o telefonistka .
+	GOOS=linux CGO_ENABLED=0 go build -a -ldflags '-extldflags "-static"' -o telefonistka ./cmd/telefonistka
 
 .PHONY: clean
 clean:
