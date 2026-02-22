@@ -92,6 +92,7 @@ func TestTelefonistka(t *testing.T) {
 			portForward(t, cluster.Config, argoNamespace, o.Name, argoForwardAddr, argoForwardPorts)
 		}
 	})
+	waitForReady(t, clientset.CoreV1().RESTClient(), argoNamespace, "Pod", "app.kubernetes.io/name=argocd-repo-server", "", nil)
 
 	// Template a demo application, setting it to track the created repository.
 	var data struct{ RepoURL string }
@@ -185,6 +186,7 @@ func TestHelm(t *testing.T) {
 			portForward(t, cluster.Config, argoNamespace, o.Name, argoForwardAddr, argoForwardPorts)
 		}
 	})
+	waitForReady(t, clientset.CoreV1().RESTClient(), argoNamespace, "Pod", "app.kubernetes.io/name=argocd-repo-server", "", nil)
 
 	createNamespace(t, clientset.CoreV1().Namespaces(), "cert-manager")
 	releaseExternalChart(t, cluster.TemporaryConfigFile, "cert-manager", "https://charts.jetstack.io", "cert-manager", chartutil.Values{

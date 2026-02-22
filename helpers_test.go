@@ -84,6 +84,16 @@ func contextWithGracePeriod(ctx context.Context, d time.Duration) (_ context.Con
 	return context.WithDeadline(ctx, deadline.Add(-d))
 }
 
+func contextWithDeadlineBuffer(t *testing.T) (_ context.Context, cancel func()) {
+	deadline, ok := t.Deadline()
+	if !ok {
+		return context.WithCancel(t.Context())
+	}
+	// Cancel 10s before the test deadline so cleanup functions have
+	// time to run instead of the binary exiting abruptly.
+	return context.WithDeadline(t.Context(), deadline.Add(-10*time.Second))
+}
+
 func waitFor(ctx context.Context) {
 	<-ctx.Done()
 }
@@ -860,7 +870,10 @@ func waitForReady(t *testing.T, client rest.Interface, namespace, res, labelSele
 			o.LabelSelector = labelSelector
 		})
 
-	stop := make(chan struct{})
+	// Cancel before the test deadline so cleanup functions have time to run.
+	// Also cancelled when t.Context() is done (e.g. ^C via the top-level
+	// signal.NotifyContext in the test).
+	stopCtx, cancel := contextWithDeadlineBuffer(t)
 
 	// TODO: make configurable which type we are listening for. Might want to
 	// wait for creates or deletes too.
@@ -868,9 +881,11 @@ func waitForReady(t *testing.T, client rest.Interface, namespace, res, labelSele
 		UpdateFunc: func(_, new any) {
 			// TODO: make the check configurable
 			if isReady(new) {
-				callback(new)
+				if callback != nil {
+					callback(new)
+				}
 				t.Logf("Resource matching selector %q and labels %q is ready", selector, labelSelector)
-				close(stop)
+				cancel()
 			}
 		},
 	}
@@ -881,16 +896,8 @@ func waitForReady(t *testing.T, client rest.Interface, namespace, res, labelSele
 	informerOptions.Handler = eventHandler
 	_, controller := cache.NewInformerWithOptions(informerOptions)
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		t.Logf("Waiting for %q with labels %q and selector %q to be ready in %q", res, labelSelector, selector, namespace)
-		controller.Run(stop)
-	}()
-
-	wg.Wait()
-	t.Log("Done waiting for ready")
+	t.Logf("Waiting for %q with labels %q and selector %q to be ready in %q", res, labelSelector, selector, namespace)
+	controller.Run(stopCtx.Done())
 }
 
 func isReady(o any) bool {
