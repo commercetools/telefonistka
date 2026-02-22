@@ -328,34 +328,34 @@ func ensureApp(ctx context.Context, componentPath, repo, prBranch string, ac Arg
 	return app, false, noop, nil
 }
 
-func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig, logger *slog.Logger) (componentDiffResult DiffResult) {
-	logger.Debug("Generating diff for component", "component_path", componentPath, "pr_branch", prBranch, "comment_diff", commentDiff)
-	componentDiffResult.ComponentPath = componentPath
+func generateDiffOfAComponent(ctx context.Context, includeDiff bool, componentPath string, prBranch string, repo string, ac ArgoCDClients, argoSettings *settings.Settings, cfg DiffConfig, logger *slog.Logger) DiffResult {
+	logger.Debug("Generating diff for component", "component_path", componentPath, "pr_branch", prBranch, "include_diff", includeDiff)
+	r := DiffResult{ComponentPath: componentPath}
 
 	app, tempCreated, cleanup, err := ensureApp(ctx, componentPath, repo, prBranch, ac, cfg, logger)
 	if err != nil {
-		componentDiffResult.DiffError = err
-		return componentDiffResult
+		r.DiffError = err
+		return r
 	}
 	defer cleanup()
-	componentDiffResult.AppWasTemporarilyCreated = tempCreated
-	componentDiffResult.ArgoCdAppName = app.Name
-	componentDiffResult.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
-	componentDiffResult.ArgoCdAppHealthStatus = string(app.Status.Health.Status)
-	componentDiffResult.ArgoCdAppSyncStatus = string(app.Status.Sync.Status)
-	componentDiffResult.ArgoCdAppAutoSyncEnabled = app.Spec.SyncPolicy.Automated != nil
 
-	if app.Spec.Source.TargetRevision == prBranch && componentDiffResult.ArgoCdAppAutoSyncEnabled {
-		componentDiffResult.DiffError = nil
-		componentDiffResult.AppSyncedFromPRBranch = true
+	autoSync := app.Spec.SyncPolicy.Automated != nil
+	r.AppWasTemporarilyCreated = tempCreated
+	r.ArgoCdAppName = app.Name
+	r.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
+	r.ArgoCdAppHealthStatus = string(app.Status.Health.Status)
+	r.ArgoCdAppSyncStatus = string(app.Status.Sync.Status)
+	r.ArgoCdAppAutoSyncEnabled = autoSync
 
-		return componentDiffResult
+	if app.Spec.Source.TargetRevision == prBranch && autoSync {
+		r.AppSyncedFromPRBranch = true
+		return r
 	}
 
 	resources, err := ac.App.ManagedResources(ctx, &application.ResourcesQuery{ApplicationName: &app.Name, AppNamespace: &app.Namespace})
 	if err != nil {
-		componentDiffResult.DiffError = fmt.Errorf("fetching managed resources for %s: %w", app.Name, err)
-		return componentDiffResult
+		r.DiffError = fmt.Errorf("fetching managed resources for %s: %w", app.Name, err)
+		return r
 	}
 
 	manifests, err := ac.App.GetManifests(ctx, &application.ApplicationManifestQuery{
@@ -364,13 +364,12 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 		AppNamespace: &app.Namespace,
 	})
 	if err != nil {
-		componentDiffResult.DiffError = fmt.Errorf("fetching manifests for %s at %s: %w", app.Name, prBranch, err)
-		return componentDiffResult
+		r.DiffError = fmt.Errorf("fetching manifests for %s at %s: %w", app.Name, prBranch, err)
+		return r
 	}
 
-	componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(commentDiff, app, resources, argoSettings, manifests.Manifests, logger)
-
-	return componentDiffResult
+	r.DiffElements, r.DiffError = generateArgocdAppDiff(includeDiff, app, resources, argoSettings, manifests.Manifests, logger)
+	return r
 }
 
 // GenerateDiffOfChangedComponents generates diffs for each changed
