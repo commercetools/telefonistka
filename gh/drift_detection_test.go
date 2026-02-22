@@ -1,4 +1,4 @@
-package githubapi
+package gh
 
 import (
 	"log/slog"

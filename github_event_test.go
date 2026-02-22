@@ -14,7 +14,7 @@ import (
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
 	argoappv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
 	repoapiclient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
-	"github.com/commercetools/telefonistka/githubapi"
+	"github.com/commercetools/telefonistka/gh"
 	"github.com/commercetools/telefonistka/templates"
 	"github.com/google/go-github/v62/github"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,15 +33,15 @@ func checkGithubTokenDeleteRepoScope(t *testing.T) {
 	}
 }
 
-func newEventConfig(t *testing.T) githubapi.EventConfig {
+func newEventConfig(t *testing.T) gh.EventConfig {
 	t.Helper()
 	token := os.Getenv("GITHUB_TOKEN")
-	clients := githubapi.NewClientProvider(1,
-		githubapi.ClientConfig{OAuthToken: token},
-		githubapi.ClientConfig{OAuthToken: token},
-		githubapi.Endpoints{},
+	clients := gh.NewClientProvider(1,
+		gh.ClientConfig{OAuthToken: token},
+		gh.ClientConfig{OAuthToken: token},
+		gh.Endpoints{},
 	)
-	return githubapi.EventConfig{
+	return gh.EventConfig{
 		Clients:           clients,
 		TemplatesFS:       templates.FS,
 		HandleSelfComment: true,
@@ -73,27 +73,27 @@ func TestPromotionPRCreated(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
 	// Push initial state to main.
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
 	// Create branch and push the PR change.
-	createBranch(t, gh, repo, initial, "upgrade")
-	prCommit := createCommit(t, gh, repo, "heads/upgrade", "Upgrade demo",
+	createBranch(t, client, repo, initial, "upgrade")
+	prCommit := createCommit(t, client, repo, "heads/upgrade", "Upgrade demo",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
 	// Create and merge the PR.
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Upgrade demo",
 		Ref:   "upgrade",
 		Base:  "main",
 		Body:  "Upgrading to v1.1.0",
 	})
-	_, _, err := gh.PullRequests.Merge(t.Context(),
+	_, _, err := client.PullRequests.Merge(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		pr.GetNumber(), "Merge upgrade", nil)
 	checkErr(t, err)
@@ -111,10 +111,10 @@ func TestPromotionPRCreated(t *testing.T) {
 	payload := marshalPREvent(t, repo, mergedPR, "closed")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: a promotion PR was created.
-	prs, _, err := gh.PullRequests.List(t.Context(),
+	prs, _, err := client.PullRequests.List(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		&github.PullRequestListOptions{State: "open"})
 	checkErr(t, err)
@@ -132,7 +132,7 @@ func TestPromotionPRCreated(t *testing.T) {
 	}
 
 	// Assert: commit status set to success.
-	statuses, _, err := gh.Repositories.ListStatuses(t.Context(),
+	statuses, _, err := client.Repositories.ListStatuses(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		prCommit.GetSHA(), nil)
 	checkErr(t, err)
@@ -157,21 +157,21 @@ func TestChangedPRDriftDetection(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
 	// Push initial state with drift (workspace != live).
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state with drift",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state with drift",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
 	// Create branch and push a change to workspace.
-	createBranch(t, gh, repo, initial, "feature")
-	prCommit := createCommit(t, gh, repo, "heads/feature", "Update workspace",
+	createBranch(t, client, repo, initial, "feature")
+	prCommit := createCommit(t, client, repo, "heads/feature", "Update workspace",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
 	// Create PR (do not merge).
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Feature update",
 		Ref:   "feature",
 		Base:  "main",
@@ -190,10 +190,10 @@ func TestChangedPRDriftDetection(t *testing.T) {
 	payload := marshalPREvent(t, repo, openedPR, "opened")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: commit status set to success.
-	statuses, _, err := gh.Repositories.ListStatuses(t.Context(),
+	statuses, _, err := client.Repositories.ListStatuses(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		prCommit.GetSHA(), nil)
 	checkErr(t, err)
@@ -210,7 +210,7 @@ func TestChangedPRDriftDetection(t *testing.T) {
 	}
 
 	// Assert: drift comment exists on the PR.
-	comments, _, err := gh.Issues.ListComments(t.Context(),
+	comments, _, err := client.Issues.ListComments(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		pr.GetNumber(), nil)
 	checkErr(t, err)
@@ -235,21 +235,21 @@ func TestChangedPRArgoCDDiff(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
 	// Push initial state with drift and ArgoCD diff enabled.
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state with drift",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state with drift",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
 	// Create branch and push a change to workspace.
-	createBranch(t, gh, repo, initial, "feature")
-	prCommit := createCommit(t, gh, repo, "heads/feature", "Update workspace",
+	createBranch(t, client, repo, initial, "feature")
+	prCommit := createCommit(t, client, repo, "heads/feature", "Update workspace",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
 	// Create PR (do not merge).
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Feature update",
 		Ref:   "feature",
 		Base:  "main",
@@ -273,13 +273,13 @@ func TestChangedPRArgoCDDiff(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	owner := repo.GetOwner().GetLogin()
 	name := repo.GetName()
 
 	// Assert: commit status set to success.
-	statuses, _, err := gh.Repositories.ListStatuses(t.Context(), owner, name, prCommit.GetSHA(), nil)
+	statuses, _, err := client.Repositories.ListStatuses(t.Context(), owner, name, prCommit.GetSHA(), nil)
 	checkErr(t, err)
 
 	var statusOK bool
@@ -294,7 +294,7 @@ func TestChangedPRArgoCDDiff(t *testing.T) {
 	}
 
 	// Assert: drift comment exists on the PR.
-	comments, _, err := gh.Issues.ListComments(t.Context(), owner, name, pr.GetNumber(), nil)
+	comments, _, err := client.Issues.ListComments(t.Context(), owner, name, pr.GetNumber(), nil)
 	checkErr(t, err)
 
 	var driftCommented, argoDiffCommented bool
@@ -315,7 +315,7 @@ func TestChangedPRArgoCDDiff(t *testing.T) {
 	}
 
 	// Assert: PR labeled "noop" (empty diff).
-	prDetail, _, err := gh.PullRequests.Get(t.Context(), owner, name, pr.GetNumber())
+	prDetail, _, err := client.PullRequests.Get(t.Context(), owner, name, pr.GetNumber())
 	checkErr(t, err)
 
 	var hasNoop bool
@@ -338,27 +338,27 @@ func TestMergedPRArgoCDRevisionSync(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
 	// Push initial state to main (in sync).
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
 	// Create branch and push the PR change.
-	createBranch(t, gh, repo, initial, "upgrade")
-	prCommit := createCommit(t, gh, repo, "heads/upgrade", "Upgrade demo",
+	createBranch(t, client, repo, initial, "upgrade")
+	prCommit := createCommit(t, client, repo, "heads/upgrade", "Upgrade demo",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
 	// Create and merge the PR.
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Upgrade demo",
 		Ref:   "upgrade",
 		Base:  "main",
 		Body:  "Upgrading to v1.1.0",
 	})
-	_, _, err := gh.PullRequests.Merge(t.Context(),
+	_, _, err := client.PullRequests.Merge(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		pr.GetNumber(), "Merge upgrade", nil)
 	checkErr(t, err)
@@ -384,13 +384,13 @@ func TestMergedPRArgoCDRevisionSync(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	owner := repo.GetOwner().GetLogin()
 	name := repo.GetName()
 
 	// Assert: a promotion PR was created.
-	prs, _, err := gh.PullRequests.List(t.Context(), owner, name,
+	prs, _, err := client.PullRequests.List(t.Context(), owner, name,
 		&github.PullRequestListOptions{State: "open"})
 	checkErr(t, err)
 
@@ -407,7 +407,7 @@ func TestMergedPRArgoCDRevisionSync(t *testing.T) {
 	}
 
 	// Assert: commit status set to success.
-	statuses, _, err := gh.Repositories.ListStatuses(t.Context(), owner, name, prCommit.GetSHA(), nil)
+	statuses, _, err := client.Repositories.ListStatuses(t.Context(), owner, name, prCommit.GetSHA(), nil)
 	checkErr(t, err)
 
 	var statusOK bool
@@ -474,18 +474,18 @@ func TestNonEmptyDiff(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state with drift",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state with drift",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
-	createBranch(t, gh, repo, initial, "feature")
-	prCommit := createCommit(t, gh, repo, "heads/feature", "Update workspace",
+	createBranch(t, client, repo, initial, "feature")
+	prCommit := createCommit(t, client, repo, "heads/feature", "Update workspace",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Feature update",
 		Ref:   "feature",
 		Base:  "main",
@@ -527,13 +527,13 @@ func TestNonEmptyDiff(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	owner := repo.GetOwner().GetLogin()
 	name := repo.GetName()
 
 	// Assert: ArgoCD diff comment with actual diff content.
-	comments, _, err := gh.Issues.ListComments(t.Context(), owner, name, pr.GetNumber(), nil)
+	comments, _, err := client.Issues.ListComments(t.Context(), owner, name, pr.GetNumber(), nil)
 	checkErr(t, err)
 
 	var hasDiffContent bool
@@ -549,7 +549,7 @@ func TestNonEmptyDiff(t *testing.T) {
 	}
 
 	// Assert: PR should NOT have "noop" label.
-	prDetail, _, err := gh.PullRequests.Get(t.Context(), owner, name, pr.GetNumber())
+	prDetail, _, err := client.PullRequests.Get(t.Context(), owner, name, pr.GetNumber())
 	checkErr(t, err)
 
 	for _, l := range prDetail.Labels {
@@ -567,18 +567,18 @@ func TestTempAppCreation(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
-	createBranch(t, gh, repo, initial, "feature")
-	prCommit := createCommit(t, gh, repo, "heads/feature", "Update workspace",
+	createBranch(t, client, repo, initial, "feature")
+	prCommit := createCommit(t, client, repo, "heads/feature", "Update workspace",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Feature update",
 		Ref:   "feature",
 		Base:  "main",
@@ -635,7 +635,7 @@ func TestTempAppCreation(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	owner := repo.GetOwner().GetLogin()
 	name := repo.GetName()
@@ -654,7 +654,7 @@ func TestTempAppCreation(t *testing.T) {
 	}
 
 	// Assert: diff comment mentions temporary app.
-	comments, _, err := gh.Issues.ListComments(t.Context(), owner, name, pr.GetNumber(), nil)
+	comments, _, err := client.Issues.ListComments(t.Context(), owner, name, pr.GetNumber(), nil)
 	checkErr(t, err)
 
 	var mentionsTempApp bool
@@ -677,18 +677,18 @@ func TestCheckboxBranchSync(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
-	createBranch(t, gh, repo, initial, "feature")
-	createCommit(t, gh, repo, "heads/feature", "Update workspace",
+	createBranch(t, client, repo, initial, "feature")
+	createCommit(t, client, repo, "heads/feature", "Update workspace",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Feature update",
 		Ref:   "feature",
 		Base:  "main",
@@ -704,7 +704,7 @@ func TestCheckboxBranchSync(t *testing.T) {
 	unchecked := "- [ ] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `feature`"
 	checked := "- [x] <!-- telefonistka-argocd-branch-sync --> Set ArgoCD apps Target Revision to `feature`"
 
-	comment, _, err := gh.Issues.CreateComment(t.Context(),
+	comment, _, err := client.Issues.CreateComment(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		pr.GetNumber(), &github.IssueComment{Body: github.String(checked)})
 	checkErr(t, err)
@@ -713,7 +713,7 @@ func TestCheckboxBranchSync(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "issue_comment", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "issue_comment", nil, payload)
 
 	// Assert: ArgoCD app was patched to set targetRevision to the branch.
 	patches := fake.App.Patches()
@@ -740,18 +740,18 @@ func TestAutoMergeNoDiffPromotion(t *testing.T) {
 	checkGithubTokenDeleteRepoScope(t)
 	slog.SetDefault(newTestLogger(t))
 
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state with drift",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state with drift",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
-	createBranch(t, gh, repo, initial, "promo")
-	prCommit := createCommit(t, gh, repo, "heads/promo", "Update workspace",
+	createBranch(t, client, repo, initial, "promo")
+	prCommit := createCommit(t, client, repo, "heads/promo", "Update workspace",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Promotion: demo",
 		Ref:   "promo",
 		Base:  "main",
@@ -759,7 +759,7 @@ func TestAutoMergeNoDiffPromotion(t *testing.T) {
 	})
 
 	// Add the "promotion" label to the PR.
-	_, _, err := gh.Issues.AddLabelsToIssue(t.Context(),
+	_, _, err := client.Issues.AddLabelsToIssue(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		pr.GetNumber(), []string{"promotion"})
 	checkErr(t, err)
@@ -783,13 +783,13 @@ func TestAutoMergeNoDiffPromotion(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	owner := repo.GetOwner().GetLogin()
 	name := repo.GetName()
 
 	// Assert: PR was merged (auto-merge on no-diff promotion).
-	prDetail, _, err := gh.PullRequests.Get(t.Context(), owner, name, pr.GetNumber())
+	prDetail, _, err := client.PullRequests.Get(t.Context(), owner, name, pr.GetNumber())
 	checkErr(t, err)
 
 	if !prDetail.GetMerged() {
@@ -811,18 +811,18 @@ type openPRFixture struct {
 
 func setupOpenPR(t *testing.T) openPRFixture {
 	t.Helper()
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
-	createBranch(t, gh, repo, initial, "feature")
-	prCommit := createCommit(t, gh, repo, "heads/feature", "Update workspace",
+	createBranch(t, client, repo, initial, "feature")
+	prCommit := createCommit(t, client, repo, "heads/feature", "Update workspace",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Feature update",
 		Ref:   "feature",
 		Base:  "main",
@@ -830,7 +830,7 @@ func setupOpenPR(t *testing.T) openPRFixture {
 	})
 
 	return openPRFixture{
-		GH:       gh,
+		GH:       client,
 		Repo:     repo,
 		PR:       pr,
 		PRCommit: prCommit,
@@ -841,30 +841,30 @@ func setupOpenPR(t *testing.T) openPRFixture {
 
 func setupMergedPR(t *testing.T) openPRFixture {
 	t.Helper()
-	gh := newGithubClient(t)
-	repo := createRepository(t, gh)
+	client := newGithubClient(t)
+	repo := createRepository(t, client)
 
-	initial := createCommit(t, gh, repo, "heads/main", "Initial state",
+	initial := createCommit(t, client, repo, "heads/main", "Initial state",
 		os.DirFS(path.Join("testdata", t.Name(), "start")))
-	updateRef(t, gh, repo, "heads/main", initial.GetSHA())
+	updateRef(t, client, repo, "heads/main", initial.GetSHA())
 
-	createBranch(t, gh, repo, initial, "upgrade")
-	prCommit := createCommit(t, gh, repo, "heads/upgrade", "Upgrade demo",
+	createBranch(t, client, repo, initial, "upgrade")
+	prCommit := createCommit(t, client, repo, "heads/upgrade", "Upgrade demo",
 		os.DirFS(path.Join("testdata", t.Name(), "pr")))
 
-	pr := createPR(t, gh, repo, &TestPR{
+	pr := createPR(t, client, repo, &TestPR{
 		Title: "Upgrade demo",
 		Ref:   "upgrade",
 		Base:  "main",
 		Body:  "Upgrading to v1.1.0",
 	})
-	_, _, err := gh.PullRequests.Merge(t.Context(),
+	_, _, err := client.PullRequests.Merge(t.Context(),
 		repo.GetOwner().GetLogin(), repo.GetName(),
 		pr.GetNumber(), "Merge upgrade", nil)
 	checkErr(t, err)
 
 	return openPRFixture{
-		GH:       gh,
+		GH:       client,
 		Repo:     repo,
 		PR:       pr,
 		PRCommit: prCommit,
@@ -895,7 +895,7 @@ func TestDryRunMode(t *testing.T) {
 	payload := marshalPREvent(t, f.Repo, mergedPR, "closed")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: NO promotion PR created (dry-run mode).
 	prs, _, err := f.GH.PullRequests.List(t.Context(), f.Owner, f.Name,
@@ -947,7 +947,7 @@ func TestLabelConditionalPromotion(t *testing.T) {
 	payload := marshalPREvent(t, f.Repo, mergedPR, "closed")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: NO promotion PR created (label condition not met).
 	prs, _, err := f.GH.PullRequests.List(t.Context(), f.Owner, f.Name,
@@ -964,7 +964,7 @@ func TestLabelConditionalPromotion(t *testing.T) {
 	mergedPR.Labels = []*github.Label{{Name: github.String("approved-for-prod")}}
 	payload = marshalPREvent(t, f.Repo, mergedPR, "closed")
 
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	prs, _, err = f.GH.PullRequests.List(t.Context(), f.Owner, f.Name,
 		&github.PullRequestListOptions{State: "open"})
@@ -1005,7 +1005,7 @@ func TestShowPlanLabel(t *testing.T) {
 	payload := marshalPREvent(t, f.Repo, labeledPR, "labeled")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: plan comment posted on the PR.
 	comments, _, err := f.GH.Issues.ListComments(t.Context(), f.Owner, f.Name, f.PR.GetNumber(), nil)
@@ -1045,7 +1045,7 @@ func TestComponentBlockList(t *testing.T) {
 	payload := marshalPREvent(t, f.Repo, mergedPR, "closed")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: NO promotion PR created (target blocked by component config).
 	prs, _, err := f.GH.PullRequests.List(t.Context(), f.Owner, f.Name,
@@ -1081,7 +1081,7 @@ func TestMultiplePromotionTargets(t *testing.T) {
 	payload := marshalPREvent(t, f.Repo, mergedPR, "closed")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: promotion PR created with both targets in the title.
 	prs, _, err := f.GH.PullRequests.List(t.Context(), f.Owner, f.Name,
@@ -1127,7 +1127,7 @@ func TestToggleCommitStatus(t *testing.T) {
 	payload := marshalCommentEvent(t, f.Repo, f.PR, comment, "created", "")
 
 	cfg := newEventConfig(t)
-	githubapi.HandleEvent(t.Context(), cfg, "issue_comment", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "issue_comment", nil, payload)
 
 	// Assert: commit status "ci/build" was toggled.
 	statuses, _, err := f.GH.Repositories.ListStatuses(t.Context(), f.Owner, f.Name, f.PRCommit.GetSHA(), nil)
@@ -1168,7 +1168,7 @@ func TestRetriggerComment(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "issue_comment", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "issue_comment", nil, payload)
 
 	// Assert: commit status set to success (retrigger runs the changed PR path).
 	statuses, _, err := f.GH.Repositories.ListStatuses(t.Context(), f.Owner, f.Name, f.PRCommit.GetSHA(), nil)
@@ -1226,7 +1226,7 @@ func TestDisableArgoCDDiff(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: ArgoCD diff comment posted but with "Redacted" content.
 	comments, _, err := f.GH.Issues.ListComments(t.Context(), f.Owner, f.Name, f.PR.GetNumber(), nil)
@@ -1287,11 +1287,11 @@ func TestStaleCommentMinimization(t *testing.T) {
 
 	// Fire the event twice to trigger stale comment minimization on the
 	// second run.
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Second event: use "synchronize" to simulate a push to the branch.
 	payload2 := marshalPREvent(t, f.Repo, openedPR, "synchronize")
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload2)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload2)
 
 	// Assert: there should be comments on the PR (both runs produce comments).
 	comments, _, err := f.GH.Issues.ListComments(t.Context(), f.Owner, f.Name, f.PR.GetNumber(), nil)
@@ -1350,7 +1350,7 @@ func TestSHALabelAppDiscovery(t *testing.T) {
 
 	cfg := newEventConfig(t)
 	cfg.ArgoCD = argoClients
-	githubapi.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
+	gh.HandleEvent(t.Context(), cfg, "pull_request", nil, payload)
 
 	// Assert: ArgoCD diff comment posted (app found via SHA1 label).
 	comments, _, err := f.GH.Issues.ListComments(t.Context(), f.Owner, f.Name, f.PR.GetNumber(), nil)

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/commercetools/telefonistka/argocd"
-	"github.com/commercetools/telefonistka/githubapi"
+	"github.com/commercetools/telefonistka/gh"
 	"github.com/commercetools/telefonistka/templates"
 	"github.com/commercetools/telefonistka/webhook"
 	"github.com/spf13/cobra"
@@ -53,19 +53,19 @@ func init() { //nolint:gochecknoinits
 }
 
 func serve() {
-	clients := githubapi.NewClientProvider(
+	clients := gh.NewClientProvider(
 		128,
-		githubapi.ClientConfig{
+		gh.ClientConfig{
 			AppID:      parseOptionalInt64(os.Getenv("GITHUB_APP_ID")),
 			AppKeyPath: os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("GITHUB_OAUTH_TOKEN"),
 		},
-		githubapi.ClientConfig{
+		gh.ClientConfig{
 			AppID:      parseOptionalInt64(os.Getenv("APPROVER_GITHUB_APP_ID")),
 			AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
 		},
-		githubapi.NewEndpoints(os.Getenv("GITHUB_HOST")),
+		gh.NewEndpoints(os.Getenv("GITHUB_HOST")),
 	)
 
 	var argoClients *argocd.ArgoCDClients
@@ -92,7 +92,7 @@ func serve() {
 		)
 	}
 
-	cfg := githubapi.EventConfig{
+	cfg := gh.EventConfig{
 		Clients:             clients,
 		ArgoCD:              argoClients,
 		TemplatesFS:         resolveTemplatesFS(),
@@ -100,7 +100,7 @@ func serve() {
 		HandleSelfComment:   os.Getenv("HANDLE_SELF_COMMENT") == "true",
 	}
 
-	go githubapi.MetricsLoop(clients)
+	go gh.MetricsLoop(clients)
 
 	srv := &http.Server{
 		Handler: webhook.NewHandler(webhook.Config{

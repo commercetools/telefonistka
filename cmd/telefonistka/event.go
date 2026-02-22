@@ -9,7 +9,7 @@ import (
 	"text/template"
 
 	"github.com/commercetools/telefonistka/argocd"
-	"github.com/commercetools/telefonistka/githubapi"
+	"github.com/commercetools/telefonistka/gh"
 	"github.com/spf13/cobra"
 )
 
@@ -32,19 +32,19 @@ func init() { //nolint:gochecknoinits
 }
 
 func event(eventType string, eventFilePath string) {
-	clients := githubapi.NewClientProvider(
+	clients := gh.NewClientProvider(
 		128,
-		githubapi.ClientConfig{
+		gh.ClientConfig{
 			AppID:      parseOptionalInt64(os.Getenv("GITHUB_APP_ID")),
 			AppKeyPath: os.Getenv("GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("GITHUB_OAUTH_TOKEN"),
 		},
-		githubapi.ClientConfig{
+		gh.ClientConfig{
 			AppID:      parseOptionalInt64(os.Getenv("APPROVER_GITHUB_APP_ID")),
 			AppKeyPath: os.Getenv("APPROVER_GITHUB_APP_PRIVATE_KEY_PATH"),
 			OAuthToken: os.Getenv("APPROVER_GITHUB_OAUTH_TOKEN"),
 		},
-		githubapi.NewEndpoints(os.Getenv("GITHUB_HOST")),
+		gh.NewEndpoints(os.Getenv("GITHUB_HOST")),
 	)
 
 	var argoClients *argocd.ArgoCDClients
@@ -71,7 +71,7 @@ func event(eventType string, eventFilePath string) {
 		)
 	}
 
-	cfg := githubapi.EventConfig{
+	cfg := gh.EventConfig{
 		Clients:             clients,
 		ArgoCD:              argoClients,
 		TemplatesFS:         resolveTemplatesFS(),
@@ -84,7 +84,7 @@ func event(eventType string, eventFilePath string) {
 	if err != nil {
 		panic(err)
 	}
-	githubapi.HandleEvent(context.Background(), cfg, eventType, nil, payload)
+	gh.HandleEvent(context.Background(), cfg, eventType, nil, payload)
 }
 
 func getEnv(key, fallback string) string {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/alexliesenfeld/health"
-	"github.com/commercetools/telefonistka/githubapi"
+	"github.com/commercetools/telefonistka/gh"
 	prom "github.com/commercetools/telefonistka/prometheus"
 	"github.com/google/go-github/v62/github"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -14,14 +14,14 @@ import (
 
 // Config holds transport-layer configuration for the webhook HTTP server.
 type Config struct {
-	Event         githubapi.EventConfig
+	Event         gh.EventConfig
 	WebhookSecret []byte
 	Sync          bool // run HandleEvent synchronously (for testing)
 }
 
 // NewHandler returns an http.Handler that serves the webhook, health,
 // and metrics endpoints. The caller is responsible for starting the
-// server and any background goroutines (e.g. MainGhMetricsLoop).
+// server and any background goroutines (e.g. MetricsLoop).
 func NewHandler(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", webhookHandler(cfg))
@@ -43,9 +43,9 @@ func webhookHandler(cfg Config) http.HandlerFunc {
 
 		eventType := github.WebHookType(r)
 		if cfg.Sync {
-			githubapi.HandleEvent(r.Context(), cfg.Event, eventType, r.Header, payload)
+			gh.HandleEvent(r.Context(), cfg.Event, eventType, r.Header, payload)
 		} else {
-			go githubapi.HandleEvent(context.Background(), cfg.Event, eventType, r.Header, payload)
+			go gh.HandleEvent(context.Background(), cfg.Event, eventType, r.Header, payload)
 		}
 		w.WriteHeader(http.StatusOK)
 	}

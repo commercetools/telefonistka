@@ -24,7 +24,7 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient/session"
 	"github.com/commercetools/telefonistka/argocd"
-	"github.com/commercetools/telefonistka/githubapi"
+	"github.com/commercetools/telefonistka/gh"
 	"github.com/commercetools/telefonistka/templates"
 	"github.com/commercetools/telefonistka/webhook"
 	dockertypes "github.com/docker/docker/api/types"
@@ -465,10 +465,10 @@ func startTelefonistka(t *testing.T, ghToken, argoServerAddr, argoToken, webhook
 		},
 	})))
 
-	clients := githubapi.NewClientProvider(1,
-		githubapi.ClientConfig{OAuthToken: ghToken},
-		githubapi.ClientConfig{OAuthToken: ghToken},
-		githubapi.Endpoints{},
+	clients := gh.NewClientProvider(1,
+		gh.ClientConfig{OAuthToken: ghToken},
+		gh.ClientConfig{OAuthToken: ghToken},
+		gh.Endpoints{},
 	)
 
 	ac, err := argocd.NewArgoCDClients(argocd.ClientOptions{
@@ -479,7 +479,7 @@ func startTelefonistka(t *testing.T, ghToken, argoServerAddr, argoToken, webhook
 	checkErr(t, err)
 
 	handler := webhook.NewHandler(webhook.Config{
-		Event: githubapi.EventConfig{
+		Event: gh.EventConfig{
 			Clients:           clients,
 			ArgoCD:            &ac,
 			TemplatesFS:       templates.FS,

@@ -1,6 +1,6 @@
-package githubapi
+package gh
 
-// Error is a constant sentinel error type for the githubapi package.
+// Error is a constant sentinel error type for the gh package.
 type Error string
 
 func (e Error) Error() string { return string(e) }

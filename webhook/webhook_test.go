@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/commercetools/telefonistka/githubapi"
+	"github.com/commercetools/telefonistka/gh"
 	"github.com/google/go-github/v62/github"
 )
 
@@ -49,9 +49,9 @@ func postWebhook(t *testing.T, url string, eventType string, secret, payload []b
 	return resp
 }
 
-func newTestEventConfig() githubapi.EventConfig {
-	return githubapi.EventConfig{
-		Clients: githubapi.NewClientProvider(1, githubapi.ClientConfig{}, githubapi.ClientConfig{}, githubapi.Endpoints{}),
+func newTestEventConfig() gh.EventConfig {
+	return gh.EventConfig{
+		Clients: gh.NewClientProvider(1, gh.ClientConfig{}, gh.ClientConfig{}, gh.Endpoints{}),
 	}
 }
 
