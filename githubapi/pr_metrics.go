@@ -15,6 +15,10 @@ const (
 )
 
 func MainGhMetricsLoop(cp *ClientProvider) {
+	if !cp.IsAppAuth() {
+		slog.Info("PR metrics collection disabled (requires GitHub App auth)")
+		return
+	}
 	for t := range time.Tick(metricRefreshTime) {
 		slog.Debug("Updating pr metrics", "tick", t)
 		getPrMetrics(cp)

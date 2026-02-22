@@ -86,6 +86,13 @@ func (cp *ClientProvider) ForOwner(ctx context.Context, owner string) (GhClients
 	return clients, nil
 }
 
+// IsAppAuth reports whether the provider is configured with GitHub App
+// credentials. Some API endpoints (e.g. Apps.ListRepos) require
+// installation tokens and are unavailable under personal access tokens.
+func (cp *ClientProvider) IsAppAuth() bool {
+	return cp.mainCreds.AppID != 0
+}
+
 // CachedOwners returns the keys currently in the cache, for use by the
 // metrics loop.
 func (cp *ClientProvider) CachedOwners() []string {
