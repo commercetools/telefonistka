@@ -39,13 +39,13 @@ type DiffElement struct {
 	Diff            string
 }
 
-// DiffResult struct to store diff result
+// DiffResult holds the diff output for a single component.
+// A component has diffs when len(DiffElements) > 0.
 type DiffResult struct {
 	ComponentPath            string
 	ArgoCdAppName            string
 	ArgoCdAppURL             string
 	DiffElements             []DiffElement
-	HasDiff                  bool
 	DiffError                error
 	AppWasTemporarilyCreated bool
 	AppSyncedFromPRBranch    bool
@@ -57,7 +57,7 @@ type DiffResult struct {
 // generateArgocdAppDiff pairs live cluster state (from ManagedResources)
 // with target manifests (from GetManifests at the PR branch) and runs
 // ArgoCD's StateDiff to produce per-object diffs.
-func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, manifests []string, logger *slog.Logger) (foundDiffs bool, diffElements []DiffElement, err error) {
+func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, manifests []string, logger *slog.Logger) (diffElements []DiffElement, err error) {
 	logger.Debug("Generating ArgoCD app diff", "app", app.Name, "keep_diff_data", keepDiffData, "managed_resources", len(resources.Items))
 
 	// 1. Index live state from ManagedResources using NormalizedLiveState.
@@ -72,7 +72,7 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		}
 		live := &unstructured.Unstructured{}
 		if err := json.Unmarshal([]byte(res.NormalizedLiveState), live); err != nil {
-			return false, nil, fmt.Errorf("unmarshaling live state for %s/%s: %w", key.Kind, key.Name, err)
+			return nil, fmt.Errorf("unmarshaling live state for %s/%s: %w", key.Kind, key.Name, err)
 		}
 		liveByKey[key] = live
 	}
@@ -82,7 +82,7 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 	for _, mfst := range manifests {
 		obj, err := argoappv1.UnmarshalToUnstructured(mfst)
 		if err != nil {
-			return false, nil, fmt.Errorf("unmarshaling manifest: %w", err)
+			return nil, fmt.Errorf("unmarshaling manifest: %w", err)
 		}
 		if obj.GetNamespace() == "" {
 			obj.SetNamespace(app.Spec.Destination.Namespace)
@@ -109,7 +109,7 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		WithStructuredMergeDiff(true).
 		Build()
 	if err != nil {
-		return false, nil, fmt.Errorf("building diff config: %w", err)
+		return nil, fmt.Errorf("building diff config: %w", err)
 	}
 
 	const redactedDiff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
@@ -125,13 +125,12 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 
 		diffRes, err := argodiff.StateDiff(live, target, diffConfig)
 		if err != nil {
-			return false, nil, fmt.Errorf("diffing %s/%s: %w", key.Kind, key.Name, err)
+			return nil, fmt.Errorf("diffing %s/%s: %w", key.Kind, key.Name, err)
 		}
 
 		if !diffRes.Modified && live != nil {
 			continue
 		}
-		foundDiffs = true
 
 		de := DiffElement{
 			ObjectGroup:     key.Group,
@@ -143,14 +142,14 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 			if live != nil {
 				predicted := &unstructured.Unstructured{}
 				if err := json.Unmarshal(diffRes.PredictedLive, predicted); err != nil {
-					return false, nil, fmt.Errorf("unmarshaling predicted live for %s/%s: %w", key.Kind, key.Name, err)
+					return nil, fmt.Errorf("unmarshaling predicted live for %s/%s: %w", key.Kind, key.Name, err)
 				}
 				de.Diff, err = diffLiveVsTargetObject(live, predicted)
 			} else {
 				de.Diff, err = diffLiveVsTargetObject(nil, target)
 			}
 			if err != nil {
-				return false, nil, fmt.Errorf("formatting diff for %s/%s: %w", key.Kind, key.Name, err)
+				return nil, fmt.Errorf("formatting diff for %s/%s: %w", key.Kind, key.Name, err)
 			}
 		} else {
 			de.Diff = redactedDiff
@@ -163,7 +162,6 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		if live == nil || isHookOrIgnored(live) {
 			continue
 		}
-		foundDiffs = true
 
 		de := DiffElement{
 			ObjectGroup:     key.Group,
@@ -174,7 +172,7 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		if keepDiffData {
 			de.Diff, err = diffLiveVsTargetObject(live, nil)
 			if err != nil {
-				return false, nil, fmt.Errorf("formatting diff for deleted %s/%s: %w", key.Kind, key.Name, err)
+				return nil, fmt.Errorf("formatting diff for deleted %s/%s: %w", key.Kind, key.Name, err)
 			}
 		} else {
 			de.Diff = redactedDiff
@@ -182,7 +180,7 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		diffElements = append(diffElements, de)
 	}
 
-	return foundDiffs, diffElements, nil
+	return diffElements, nil
 }
 
 // isHookOrIgnored returns true if the object carries an ArgoCD sync
@@ -373,7 +371,7 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 		return componentDiffResult
 	}
 
-	componentDiffResult.HasDiff, componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(commentDiff, app, resources, argoSettings, manifests.Manifests, logger)
+	componentDiffResult.DiffElements, componentDiffResult.DiffError = generateArgocdAppDiff(commentDiff, app, resources, argoSettings, manifests.Manifests, logger)
 
 	return componentDiffResult
 }

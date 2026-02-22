@@ -77,7 +77,7 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClien
 
 	var hasComponentDiff, hasComponentDiffErrors bool
 	for _, r := range diffOfChangedComponents {
-		if r.HasDiff {
+		if len(r.DiffElements) > 0 {
 			hasComponentDiff = true
 		}
 		if r.DiffError != nil {
@@ -166,7 +166,7 @@ func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, par
 					md.Note("This ArgoCD app doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
 				}
 			}
-			if appDiffResult.HasDiff {
+			if len(appDiffResult.DiffElements) > 0 {
 				md.PlainText("\n<details><summary>ArgoCD Diff(Click to expand):</summary>\n\n```diff\n")
 				for _, objectDiff := range appDiffResult.DiffElements {
 					if objectDiff.Diff != "" {
