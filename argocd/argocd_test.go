@@ -572,8 +572,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 	// start timer
 	start := time.Now()
 
-	// TODO: Test all the return values, for now we will just ignore the linter.
-	_, _, diffResults, _ := GenerateDiffOfChangedComponents( //nolint:dogsled
+	diffResults, err := GenerateDiffOfChangedComponents(
 		context.TODO(),
 		makeComponents(numComponents),
 		"test-pr-branch",
@@ -582,6 +581,7 @@ func TestFetchArgoDiffConcurrently(t *testing.T) {
 		argoClients,
 		slog.Default(),
 	)
+	assert.NoError(t, err)
 
 	// stop timer
 	elapsed := time.Since(start)

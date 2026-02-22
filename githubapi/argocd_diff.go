@@ -66,7 +66,7 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClien
 		}
 	}
 
-	hasComponentDiff, hasComponentDiffErrors, diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, argocd.DiffConfig{
+	diffOfChangedComponents, err := argocd.GenerateDiffOfChangedComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, argocd.DiffConfig{
 		UseSHALabel:    c.Config.Argocd.UseSHALabelForAppDiscovery,
 		CreateTempApps: c.Config.Argocd.CreateTempAppObjectFroNewApps,
 	}, *argoClients, c.PrLogger)
@@ -74,6 +74,16 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.ArgoCDClien
 		return fmt.Errorf("getting diff information: %w", err)
 	}
 	c.PrLogger.Debug("Successfully got ArgoCD diff(comparing live objects against objects rendered form git ref)", "ref", c.Ref)
+
+	var hasComponentDiff, hasComponentDiffErrors bool
+	for _, r := range diffOfChangedComponents {
+		if r.HasDiff {
+			hasComponentDiff = true
+		}
+		if r.DiffError != nil {
+			hasComponentDiffErrors = true
+		}
+	}
 	if !hasComponentDiffErrors && !hasComponentDiff {
 		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state", "components_checked", len(componentsToDiff))
 		prLabels, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})

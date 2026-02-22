@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -379,36 +378,32 @@ func generateDiffOfAComponent(ctx context.Context, commentDiff bool, componentPa
 	return componentDiffResult
 }
 
-// GenerateDiffOfChangedComponents generates diff of changed components
-func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients ArgoCDClients, logger *slog.Logger) (hasComponentDiff bool, hasComponentDiffErrors bool, diffResults []DiffResult, err error) {
+// GenerateDiffOfChangedComponents generates diffs for each changed
+// component concurrently. Per-component errors are stored in
+// DiffResult.DiffError; the returned error is reserved for failures
+// that prevent any diff from being attempted (e.g. settings fetch).
+func GenerateDiffOfChangedComponents(ctx context.Context, componentsToDiff map[string]bool, prBranch string, repo string, cfg DiffConfig, argoClients ArgoCDClients, logger *slog.Logger) ([]DiffResult, error) {
 	logger.Debug("Generating diffs for changed components", "component_count", len(componentsToDiff), "pr_branch", prBranch)
-	hasComponentDiff = false
-	hasComponentDiffErrors = false
 
 	argoSettings, err := argoClients.Setting.Get(ctx, &settings.SettingsQuery{})
 	if err != nil {
-		return false, true, nil, fmt.Errorf("fetching ArgoCD settings: %w", err)
+		return nil, fmt.Errorf("fetching ArgoCD settings: %w", err)
 	}
 
-	diffResult := make(chan DiffResult, len(componentsToDiff))
+	ch := make(chan DiffResult, len(componentsToDiff))
 	for componentPath, shouldIDiff := range componentsToDiff {
 		go func(componentPath string, shouldDiff bool) {
-			diffResult <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, cfg, logger)
+			ch <- generateDiffOfAComponent(ctx, shouldIDiff, componentPath, prBranch, repo, argoClients, argoSettings, cfg, logger)
 		}(componentPath, shouldIDiff)
 	}
 
-	var errs []error
+	results := make([]DiffResult, 0, len(componentsToDiff))
 	for range componentsToDiff {
-		currentDiffResult := <-diffResult
-		if currentDiffResult.DiffError != nil {
-			logger.Error("generating diff", "component_path", currentDiffResult.ComponentPath, "err", currentDiffResult.DiffError)
-			hasComponentDiffErrors = true
-			errs = append(errs, currentDiffResult.DiffError)
+		r := <-ch
+		if r.DiffError != nil {
+			logger.Error("generating diff", "component_path", r.ComponentPath, "err", r.DiffError)
 		}
-		if currentDiffResult.HasDiff {
-			hasComponentDiff = true
-		}
-		diffResults = append(diffResults, currentDiffResult)
+		results = append(results, r)
 	}
-	return hasComponentDiff, hasComponentDiffErrors, diffResults, errors.Join(errs...)
+	return results, nil
 }
