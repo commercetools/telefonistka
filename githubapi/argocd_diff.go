@@ -144,25 +144,25 @@ func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, par
 	for _, appDiffResult := range diffCommentData.DiffOfChangedComponents {
 		if appDiffResult.DiffError != nil {
 			md.Cautionf("%s (%s) ", markdown.Bold("Error getting diff from ArgoCD"), markdown.Code(appDiffResult.ComponentPath))
-			md.PlainTextf("Please check the App Conditions of %s %s for more details.", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)))
+			md.PlainTextf("Please check the App Conditions of %s %s for more details.", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.AppName, appDiffResult.AppURL)))
 			if appDiffResult.AppWasTemporarilyCreated {
 				md.Note("A temporary ArgoCD application was created for this diff and has been cleaned up.")
 			}
 			md.CodeBlocks(markdown.SyntaxHighlightNone, appDiffResult.DiffError.Error())
 		} else {
-			md.PlainTextf("%s %s @ %s", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.ArgoCdAppName, appDiffResult.ArgoCdAppURL)), markdown.Code(appDiffResult.ComponentPath))
+			md.PlainTextf("%s %s @ %s", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.AppName, appDiffResult.AppURL)), markdown.Code(appDiffResult.ComponentPath))
 
 			// If the app was temporarily created, we should inform the user about it, if not we should inform about "unusual" health and sync status
 			if appDiffResult.AppWasTemporarilyCreated {
 				md.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \n> Please be aware:  \n> * The app will only appear in the ArgoCD UI for a few seconds.")
 			} else {
-				if appDiffResult.ArgoCdAppHealthStatus != "Healthy" {
-					md.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.ArgoCdAppHealthStatus)
+				if appDiffResult.HealthStatus != "Healthy" {
+					md.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.HealthStatus)
 				}
-				if appDiffResult.ArgoCdAppSyncStatus != "Synced" {
-					md.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.ArgoCdAppSyncStatus)
+				if appDiffResult.SyncStatus != "Synced" {
+					md.Warningf("The ArgoCD app sync status is currently %s", appDiffResult.SyncStatus)
 				}
-				if !appDiffResult.ArgoCdAppAutoSyncEnabled {
+				if !appDiffResult.AutoSyncEnabled {
 					md.Note("This ArgoCD app doesn't have `auto-sync` enabled, merging this PR will **not** apply changes to cluster without additional actions.")
 				}
 			}

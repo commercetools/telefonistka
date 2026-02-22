@@ -3,8 +3,8 @@
   "DiffOfChangedComponents": [
     {
       "ComponentPath": "clusters/playground/aws/eu-central-1/v1/special-delivery/ssllab-test/ssllab-test",
-      "ArgoCdAppName": "temp-ssllab-test-plg-aws-eu-central1-v1",
-      "ArgoCdAppURL": "https://argocd-lab.example.com/applications/temp-ssllab-test-plg-aws-eu-central1-v1",
+      "AppName": "temp-ssllab-test-plg-aws-eu-central1-v1",
+      "AppURL": "https://argocd-lab.example.com/applications/temp-ssllab-test-plg-aws-eu-central1-v1",
       "DiffElements": [
         {
           "ObjectGroup": "",
@@ -24,9 +24,9 @@
       "HasDiff": true,
       "DiffError": null,
       "AppWasTemporarilyCreated": false,
-      "ArgoCdAppHealthStatus": "Unhealthy",
-      "ArgoCdAppSyncStatus": "Synced",
-      "ArgoCdAppAutoSyncEnabled": true
+      "HealthStatus": "Unhealthy",
+      "SyncStatus": "Synced",
+      "AutoSyncEnabled": true
     }
   ],
   "DisplaySyncBranchCheckBox": false,

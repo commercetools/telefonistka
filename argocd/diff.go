@@ -42,15 +42,15 @@ type DiffElement struct {
 // A component has diffs when len(DiffElements) > 0.
 type DiffResult struct {
 	ComponentPath            string
-	ArgoCdAppName            string
-	ArgoCdAppURL             string
+	AppName            string
+	AppURL             string
 	DiffElements             []DiffElement
 	DiffError                error
 	AppWasTemporarilyCreated bool
 	AppSyncedFromPRBranch    bool
-	ArgoCdAppHealthStatus    string
-	ArgoCdAppSyncStatus      string
-	ArgoCdAppAutoSyncEnabled bool
+	HealthStatus    string
+	SyncStatus      string
+	AutoSyncEnabled bool
 }
 
 // generateArgocdAppDiff pairs live cluster state (from ManagedResources)
@@ -341,11 +341,11 @@ func generateDiffOfAComponent(ctx context.Context, includeDiff bool, componentPa
 
 	autoSync := app.Spec.SyncPolicy.Automated != nil
 	r.AppWasTemporarilyCreated = tempCreated
-	r.ArgoCdAppName = app.Name
-	r.ArgoCdAppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
-	r.ArgoCdAppHealthStatus = string(app.Status.Health.Status)
-	r.ArgoCdAppSyncStatus = string(app.Status.Sync.Status)
-	r.ArgoCdAppAutoSyncEnabled = autoSync
+	r.AppName = app.Name
+	r.AppURL = fmt.Sprintf("%s/applications/%s", argoSettings.URL, app.Name)
+	r.HealthStatus = string(app.Status.Health.Status)
+	r.SyncStatus = string(app.Status.Sync.Status)
+	r.AutoSyncEnabled = autoSync
 
 	if app.Spec.Source.TargetRevision == prBranch && autoSync {
 		r.AppSyncedFromPRBranch = true
