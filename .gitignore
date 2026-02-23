@@ -1,5 +1,2 @@
 /telefonistka
 vendor/
-mocks/argocd_settings.go
-mocks/argocd_project.go
-mocks/argocd_applicationset.go

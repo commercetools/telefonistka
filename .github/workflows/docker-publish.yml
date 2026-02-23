@@ -28,7 +28,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - run: go generate $(go list ./mocks/...)
       - run: go test -v -timeout 30s ./...
       - run: CGO_ENABLED=0 go build -trimpath -ldflags '-extldflags "-static"' -o telefonistka ./cmd/telefonistka
 
