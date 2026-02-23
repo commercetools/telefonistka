@@ -12,6 +12,50 @@ import (
 	"github.com/google/go-github/v62/github"
 )
 
+func TestSplitTitleAt250(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		input              string
+		expectedTitle      string
+		expectedBodyPrefix string
+	}{
+		"empty": {
+			input:              "",
+			expectedTitle:      "",
+			expectedBodyPrefix: "",
+		},
+		"short": {
+			input:              strings.Repeat("A", 10),
+			expectedTitle:      strings.Repeat("A", 10),
+			expectedBodyPrefix: "",
+		},
+		"long": {
+			input:              strings.Repeat("A", 260),
+			expectedTitle:      strings.Repeat("A", 250) + "...",
+			expectedBodyPrefix: "..." + strings.Repeat("A", 10) + "\n",
+		},
+		"very long": {
+			input:              strings.Repeat("A", 1000),
+			expectedTitle:      strings.Repeat("A", 250) + "...",
+			expectedBodyPrefix: "..." + strings.Repeat("A", 750) + "\n",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			safeTitle, bodyPrefix := splitTitleAt250(tc.input)
+			if safeTitle != tc.expectedTitle {
+				t.Errorf("title: got %q, want %q", safeTitle, tc.expectedTitle)
+			}
+			if bodyPrefix != tc.expectedBodyPrefix {
+				t.Errorf("body prefix: got %q, want %q", bodyPrefix, tc.expectedBodyPrefix)
+			}
+		})
+	}
+}
+
 func TestCommentOnPr(t *testing.T) {
 	t.Parallel()
 
