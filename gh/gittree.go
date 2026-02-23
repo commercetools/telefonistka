@@ -79,7 +79,8 @@ func generateDeletionTreeEntries(ctx context.Context, c *Context, path string, b
 		return err
 	}
 	for _, elementInDir := range directoryContent {
-		if elementInDir.GetType() == "file" {
+		switch elementInDir.GetType() {
+		case "file":
 			treeEntry := github.TreeEntry{ // https://docs.github.com/en/rest/git/trees?apiVersion=2022-11-28#create-a-tree
 				Path:    elementInDir.Path,
 				Mode:    github.String("100644"),
@@ -88,12 +89,12 @@ func generateDeletionTreeEntries(ctx context.Context, c *Context, path string, b
 				Content: nil,
 			}
 			*treeEntries = append(*treeEntries, &treeEntry)
-		} else if elementInDir.GetType() == "dir" {
+		case "dir":
 			err := generateDeletionTreeEntries(ctx, c, elementInDir.GetPath(), branch, treeEntries)
 			if err != nil {
 				return err
 			}
-		} else {
+		default:
 			c.PrLogger.Info("Ignoring type for path", "type", elementInDir.GetType(), "path", elementInDir.GetPath())
 		}
 	}
@@ -195,7 +196,7 @@ func generateSafePromotionBranchName(ctx context.Context, prNumber int, original
 	hasher := sha1.New() //nolint:gosec // G505: Blocklisted import crypto/sha1: weak cryptographic primitive (gosec), this is not a cryptographic use case
 	hasher.Write(targetPathsBa)
 	uniqBranchNameSuffix := firstN(hex.EncodeToString(hasher.Sum(nil)), 12)
-	safeOriginalBranchName := firstN(strings.Replace(originalBranchName, "/", "-", -1), 200)
+	safeOriginalBranchName := firstN(strings.ReplaceAll(originalBranchName, "/", "-"), 200)
 	return fmt.Sprintf("promotions/%v-%v-%v", prNumber, safeOriginalBranchName, uniqBranchNameSuffix)
 }
 

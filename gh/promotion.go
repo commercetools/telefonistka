@@ -273,7 +273,7 @@ func generateListOfRelevantComponents(ctx context.Context, c Context) (relevantC
 		perPagePrFiles, resp, err := c.PullRequests.ListFiles(ctx, c.Owner, c.Repo, c.PrNumber, opts)
 		prom.InstrumentGhCall(resp)
 		if err != nil {
-			c.PrLogger.Error("could not get file list from GH API", "err", err, "status_code", resp.Response.Status)
+			c.PrLogger.Error("could not get file list from GH API", "err", err, "status_code", resp.Status)
 			return nil, err
 		}
 		prFiles = append(prFiles, perPagePrFiles...)
