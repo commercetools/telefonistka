@@ -35,6 +35,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - run: go generate $(go list ./mocks/...)
+      - run: go test -v -timeout 30s ./...
+      - run: CGO_ENABLED=0 go build -ldflags '-extldflags "-static"' -o telefonistka ./cmd/telefonistka
+
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       # TODO enable once the repo goes public
@@ -52,14 +60,14 @@ jobs:
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into GH registry (ghcr.io)
-        if: github.event_name != 'pull_request'  
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@7ca345011ac4304463197fac0e56eab1bc7e6af0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Log into Docker Hub registry 
+      - name: Log into Docker Hub registry
         if: github.event_name != 'pull_request' && env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@7ca345011ac4304463197fac0e56eab1bc7e6af0
         with:
@@ -73,7 +81,7 @@ jobs:
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@906ecf0fc0a80f9110f79d9e6c04b1080f4a2621
-        with: 
+        with:
           images: |
             ${{ env.REGISTRY != '' && env.REGISTRY  || 'ghcr.io' }}/${{ env.IMAGE_NAME != '' && env.IMAGE_NAME || 'commercetools/telefonistka'}}
 
@@ -131,4 +139,3 @@ jobs:
         # This step uses the identity token to provision an ephemeral certificate
         # against the sigstore community Fulcio instance.
         # run: echo "${{ steps.meta.outputs.tags }}" | xargs -I {} cosign sign {}@${{ steps.build-and-push.outputs.digest }}
-
