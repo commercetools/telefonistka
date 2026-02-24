@@ -152,6 +152,12 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		} else {
 			de.Diff = redactedDiff
 		}
+		// Skip elements where the visual diff is empty. This happens
+		// when ArgoCD's StateDiff considers the resource modified but
+		// dyff finds the two representations semantically identical.
+		if de.Diff == "" {
+			continue
+		}
 		diffElements = append(diffElements, de)
 	}
 
@@ -260,6 +266,17 @@ func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, er
 	if err != nil {
 		return "", fmt.Errorf("failed to format a Dyff report: %w", err)
 	}
+	// dyff may find zero differences when ArgoCD's StateDiff reports
+	// Modified. This happens because ArgoCD uses structured-merge-diff
+	// which can flag changes in defaulted fields, metadata, or
+	// normalizer artefacts that dyff's Kubernetes-aware comparison
+	// considers semantically identical. Return an empty string so the
+	// caller can skip the element entirely rather than rendering a
+	// header-only diff block with no actual changes.
+	if len(dReport.Diffs) == 0 {
+		return "", nil
+	}
+
 	header := "apiVersion: " + apiVersion + "\nkind: " + kind + "\nmetadata:\n  name: " + name + "\n"
 	return header + out.String(), nil
 }

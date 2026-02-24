@@ -1,0 +1,17 @@
+{
+  "DiffOfChangedComponents": [
+    {
+      "ComponentPath": "clusters/production/aws/eu-central-1/v1/team/logging/vector-aggregator",
+      "AppName": "vector-aggregator-prd-aws-eu-central1-v1",
+      "AppURL": "https://argocd.example.com/applications/vector-aggregator-prd-aws-eu-central1-v1",
+      "DiffElements": [],
+      "DiffError": null,
+      "AppWasTemporarilyCreated": false,
+      "HealthStatus": "Healthy",
+      "SyncStatus": "Synced",
+      "AutoSyncEnabled": true
+    }
+  ],
+  "DisplaySyncBranchCheckBox": false,
+  "BranchName": "promotions/6952-staging-logs-abc123"
+}

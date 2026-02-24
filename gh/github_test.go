@@ -375,6 +375,11 @@ func TestMarkdownGenerator(t *testing.T) {
 			partNumber: 0,
 			totalParts: 0,
 		},
+		"Empty diff elements": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

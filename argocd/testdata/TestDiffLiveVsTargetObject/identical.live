@@ -1,0 +1,15 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "StatefulSet",
+  "metadata": {
+    "name": "vector-aggregator",
+    "namespace": "logging",
+    "labels": {
+      "app": "vector-aggregator"
+    }
+  },
+  "spec": {
+    "replicas": 3,
+    "serviceName": "vector-aggregator"
+  }
+}

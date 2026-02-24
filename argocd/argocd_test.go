@@ -98,6 +98,7 @@ func TestDiffLiveVsTargetObject(t *testing.T) {
 		name string
 	}{
 		{"1"},
+		{"identical"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -121,6 +122,29 @@ func TestDiffLiveVsTargetObject(t *testing.T) {
 			}
 		}()
 		diffLiveVsTargetObject(nil, nil) //nolint:errcheck // only interested in panic
+	})
+
+	// Verify that a new resource (nil live) always produces a non-empty
+	// diff, ensuring the empty-diff guard does not suppress real content.
+	t.Run("nil live produces diff", func(t *testing.T) {
+		t.Parallel()
+		target := &unstructured.Unstructured{}
+		target.SetAPIVersion("apps/v1")
+		target.SetKind("Deployment")
+		target.SetName("nginx")
+		target.SetNamespace("default")
+		_ = unstructured.SetNestedField(target.Object, int64(3), "spec", "replicas")
+
+		got, err := diffLiveVsTargetObject(nil, target)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got == "" {
+			t.Fatal("expected non-empty diff for new resource, got empty string")
+		}
+		if !strings.Contains(got, "Deployment") {
+			t.Errorf("expected diff to mention resource kind, got:\n%s", got)
+		}
 	})
 }
 
