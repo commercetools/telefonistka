@@ -1,57 +1,32 @@
 // Package diff formats Kubernetes resource diffs for human consumption.
 //
-// It is intentionally free of ArgoCD client dependencies. The
-// pairing of live vs target resources (which involves ArgoCD's
-// StateDiff algorithm) is handled by the argocd package, which
-// produces [ResourcePair] values that this package formats.
+// It is intentionally free of ArgoCD client dependencies.
 package diff
 
 import (
 	"bytes"
 	"fmt"
 
+	telefonistka "github.com/commercetools/telefonistka"
 	"github.com/gonvenience/ytbx"
 	"github.com/homeport/dyff/pkg/dyff"
 	yaml3 "gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// RedactedDiff is the placeholder shown when diff content is
-// suppressed by per-component configuration.
-const RedactedDiff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
-
-// Element represents a single diffed Kubernetes object.
-type Element struct {
-	ObjectName      string
-	ObjectKind      string
-	ObjectNamespace string
-	Diff            string
-}
-
-// ResourcePair holds the live and desired state of a single
-// Kubernetes resource, ready for formatting. Produced by
-// [argocd.PairResources], consumed by [FormatPairDiff].
-type ResourcePair struct {
-	Group     string
-	Kind      string
-	Namespace string
-	Name      string
-	Live      *unstructured.Unstructured // nil → new resource
-	Target    *unstructured.Unstructured // nil → deleted resource
-}
-
-// FormatPairDiff formats a resource pair into an [Element].
-// When keepDiffData is false a redacted placeholder is returned.
-// The caller should skip elements where Diff is empty — this
-// happens when dyff considers the two representations identical.
-func FormatPairDiff(pair ResourcePair, keepDiffData bool) (Element, error) {
-	el := Element{
+// FormatPairDiff formats a [telefonistka.ResourcePair] into a
+// [telefonistka.Element]. When keepDiffData is false a redacted
+// placeholder is returned. The caller should skip elements where
+// Diff is empty — this happens when dyff considers the two
+// representations identical.
+func FormatPairDiff(pair telefonistka.ResourcePair, keepDiffData bool) (telefonistka.Element, error) {
+	el := telefonistka.Element{
 		ObjectName:      pair.Name,
 		ObjectKind:      pair.Kind,
 		ObjectNamespace: pair.Namespace,
 	}
 	if !keepDiffData {
-		el.Diff = RedactedDiff
+		el.Diff = telefonistka.RedactedDiff
 		return el, nil
 	}
 	d, err := FormatDiff(pair.Live, pair.Target)
@@ -137,13 +112,3 @@ func FormatDiff(live, target *unstructured.Unstructured) (string, error) {
 	return header + out.String(), nil
 }
 
-// IsHookOrIgnored returns true if the object carries an ArgoCD
-// sync hook annotation or an explicit compare-options=ignore
-// annotation.
-func IsHookOrIgnored(obj *unstructured.Unstructured) bool {
-	annotations := obj.GetAnnotations()
-	if _, ok := annotations["argocd.argoproj.io/hook"]; ok {
-		return true
-	}
-	return annotations["argocd.argoproj.io/compare-options"] == "ignore"
-}

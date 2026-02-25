@@ -379,6 +379,11 @@ func TestMarkdownGenerator(t *testing.T) {
 			partNumber: 0,
 			totalParts: 0,
 		},
+		"Component removal": {
+			beConcise:  false,
+			partNumber: 0,
+			totalParts: 0,
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -499,6 +504,41 @@ func TestGhPrClientDetailsGetBlameURLPrefix(t *testing.T) {
 		c := &Context{RepoRef: RepoRef{RepoURL: tc.RepoURL}}
 		blameURLPrefix := c.getBlameURLPrefix()
 		assert.Equal(t, tc.ExpectURL, blameURLPrefix)
+	}
+}
+
+func TestIsComponentRemoval(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		statusCode int
+		want       bool
+	}{
+		"404 means removal": {
+			statusCode: 404,
+			want:       true,
+		},
+		"200 means exists": {
+			statusCode: 200,
+			want:       false,
+		},
+		"403 means exists": {
+			statusCode: 403,
+			want:       false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			repos := &mockRepoService{
+				getContentsFn: func(_ context.Context, _, _, _ string, _ *github.RepositoryContentGetOptions) (*github.RepositoryContent, []*github.RepositoryContent, *github.Response, error) {
+					return nil, nil, ghResp(tc.statusCode), nil
+				},
+			}
+			got := isComponentRemoval(t.Context(), repos, "owner", "repo", "clusters/test/app", "feature-branch")
+			if got != tc.want {
+				t.Errorf("isComponentRemoval (status %d) = %v, want %v", tc.statusCode, got, tc.want)
+			}
+		})
 	}
 }
 

@@ -1,0 +1,33 @@
+{
+  "DiffOfChangedComponents": [
+    {
+      "ComponentPath": "clusters/production/aws/eu-central-1/v1/team/my-service",
+      "AppName": "my-service-prd-aws-eu-central1-v1",
+      "AppURL": "https://argocd.example.com/applications/my-service-prd-aws-eu-central1-v1",
+      "DiffElements": [
+        {
+          "ObjectGroup": "apps",
+          "ObjectName": "my-service",
+          "ObjectKind": "Deployment",
+          "ObjectNamespace": "production",
+          "Diff": "- replicas: 2\n- image: my-service:v1.2.3"
+        },
+        {
+          "ObjectGroup": "",
+          "ObjectName": "my-service",
+          "ObjectKind": "Service",
+          "ObjectNamespace": "production",
+          "Diff": "- port: 8080\n- targetPort: 8080"
+        }
+      ],
+      "DiffError": null,
+      "AppWasTemporarilyCreated": false,
+      "HealthStatus": "Healthy",
+      "SyncStatus": "Synced",
+      "AutoSyncEnabled": true,
+      "IsRemoval": true
+    }
+  ],
+  "DisplaySyncBranchCheckBox": false,
+  "BranchName": "feature/remove-my-service"
+}

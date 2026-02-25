@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	telefonistka "github.com/commercetools/telefonistka"
 	"github.com/commercetools/telefonistka/argocd"
 	"github.com/commercetools/telefonistka/diff"
 	prom "github.com/commercetools/telefonistka/prometheus"
@@ -21,7 +22,7 @@ type componentDiffResult struct {
 	ComponentPath            string
 	AppName                  string
 	AppURL                   string
-	DiffElements             []diff.Element
+	DiffElements             []telefonistka.Element
 	DiffError                error
 	AppWasTemporarilyCreated bool
 	AppSyncedFromPRBranch    bool
@@ -73,69 +74,7 @@ func diffComponentsFull(ctx context.Context, reqs []componentDiffReq, repo, prBr
 	ch := make(chan componentDiffResult, len(reqs))
 	for _, req := range reqs {
 		go func(req componentDiffReq) {
-			r := componentDiffResult{
-				ComponentPath: req.path,
-				IsRemoval:     req.isRemoval,
-			}
-
-			info, err := argocd.EnsureApp(ctx, req.path, repo, prBranch, ac, cfg, logger)
-			if err != nil {
-				r.DiffError = err
-				ch <- r
-				return
-			}
-			defer info.Cleanup()
-
-			r.AppWasTemporarilyCreated = info.TempCreated
-			r.AppName = info.Name
-			r.AppURL = server.AppURL(info.Name)
-			r.HealthStatus = info.HealthStatus
-			r.SyncStatus = info.SyncStatus
-			r.AutoSyncEnabled = info.AutoSyncEnabled
-
-			if info.TargetRevision == prBranch && info.AutoSyncEnabled {
-				r.AppSyncedFromPRBranch = true
-				ch <- r
-				return
-			}
-
-			live, err := argocd.FetchLive(ctx, ac, info, logger)
-			if err != nil {
-				r.DiffError = err
-				ch <- r
-				return
-			}
-
-			var target argocd.ResourceSet
-			if !req.isRemoval {
-				target, err = argocd.FetchTarget(ctx, ac, info, prBranch, logger)
-				if err != nil {
-					r.DiffError = err
-					ch <- r
-					return
-				}
-			}
-
-			pairs, err := argocd.PairResources(live, target, info, server)
-			if err != nil {
-				r.DiffError = err
-				ch <- r
-				return
-			}
-
-			for _, pair := range pairs {
-				de, err := diff.FormatPairDiff(pair, req.includeDiff)
-				if err != nil {
-					r.DiffError = fmt.Errorf("formatting diff for %s/%s: %w", pair.Kind, pair.Name, err)
-					ch <- r
-					return
-				}
-				if de.Diff == "" {
-					continue
-				}
-				r.DiffElements = append(r.DiffElements, de)
-			}
-			ch <- r
+			ch <- diffOneComponent(ctx, req, repo, prBranch, ac, cfg, server, logger)
 		}(req)
 	}
 
@@ -148,6 +87,49 @@ func diffComponentsFull(ctx context.Context, reqs []componentDiffReq, repo, prBr
 		results = append(results, r)
 	}
 	return results, nil
+}
+
+// diffOneComponent diffs a single component against the live cluster
+// state. For removals (req.isRemoval) the target manifest fetch is
+// skipped, producing deletion pairs for every live resource.
+func diffOneComponent(ctx context.Context, req componentDiffReq, repo, prBranch string, ac argocd.Clients, cfg argocd.DiffConfig, server argocd.ServerInfo, logger *slog.Logger) componentDiffResult {
+	r := componentDiffResult{
+		ComponentPath: req.path,
+		IsRemoval:     req.isRemoval,
+	}
+
+	cd, err := argocd.DiffComponent(ctx, req.path, repo, prBranch, ac, cfg, server, req.isRemoval, logger)
+	if err != nil {
+		r.DiffError = err
+	}
+	r.AppWasTemporarilyCreated = cd.TempCreated
+	r.AppName = cd.Name
+	r.AppURL = server.AppURL(cd.Name)
+	r.HealthStatus = cd.HealthStatus
+	r.SyncStatus = cd.SyncStatus
+	r.AutoSyncEnabled = cd.AutoSyncEnabled
+
+	if cd.TargetRevision == prBranch && cd.AutoSyncEnabled {
+		r.AppSyncedFromPRBranch = true
+		return r
+	}
+
+	if err != nil {
+		return r
+	}
+
+	for _, pair := range cd.Pairs {
+		de, err := diff.FormatPairDiff(pair, req.includeDiff)
+		if err != nil {
+			r.DiffError = fmt.Errorf("formatting diff for %s/%s: %w", pair.Kind, pair.Name, err)
+			return r
+		}
+		if de.Diff == "" {
+			continue
+		}
+		r.DiffElements = append(r.DiffElements, de)
+	}
+	return r
 }
 
 // isComponentRemoval checks whether the component directory exists
@@ -306,7 +288,7 @@ func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, par
 				if appDiffResult.AppSyncedFromPRBranch {
 					md.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")
 				} else {
-					md.PlainText("No diff \U0001F937")
+					md.PlainText("No diff 🤷")
 				}
 			}
 		}

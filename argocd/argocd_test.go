@@ -10,12 +10,15 @@ import (
 
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
+	"github.com/argoproj/argo-cd/v3/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
+	"github.com/argoproj/gitops-engine/pkg/utils/kube"
 	"github.com/commercetools/telefonistka/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
@@ -267,6 +270,41 @@ func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 	}
 }
 
+func TestIsHookOrIgnored(t *testing.T) {
+	t.Parallel()
+	tests := map[string]struct {
+		annotations map[string]string
+		want        bool
+	}{
+		"hook annotation": {
+			annotations: map[string]string{"argocd.argoproj.io/hook": "PreSync"},
+			want:        true,
+		},
+		"ignore annotation": {
+			annotations: map[string]string{"argocd.argoproj.io/compare-options": "ignore"},
+			want:        true,
+		},
+		"no relevant annotations": {
+			annotations: map[string]string{"other": "value"},
+			want:        false,
+		},
+		"nil annotations": {
+			annotations: nil,
+			want:        false,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			obj := &unstructured.Unstructured{}
+			obj.SetAnnotations(tc.annotations)
+			if got := isHookOrIgnored(obj); got != tc.want {
+				t.Errorf("isHookOrIgnored() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestEnsureAppCleanup(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
@@ -355,12 +393,12 @@ func TestEnsureAppCleanup(t *testing.T) {
 		Create(gomock.Any(), gomock.Any()).
 		Return(tempApp, nil)
 
-	// 4. Delete MUST be called when Cleanup is invoked.
+	// 4. Delete MUST be called when cleanup runs.
 	mockAppClient.EXPECT().
 		Delete(gomock.Any(), gomock.Any()).
 		Return(&application.ApplicationResponse{}, nil)
 
-	info, err := EnsureApp(
+	app, tempCreated, cleanup, err := ensureApp(
 		context.Background(),
 		componentPath,
 		repo,
@@ -370,14 +408,14 @@ func TestEnsureAppCleanup(t *testing.T) {
 		slog.Default(),
 	)
 	if err != nil {
-		t.Fatalf("EnsureApp: %v", err)
+		t.Fatalf("ensureApp: %v", err)
 	}
 
-	assert.True(t, info.TempCreated, "expected temp app to be flagged as created")
-	assert.Equal(t, "temp-app", info.Name)
+	assert.True(t, tempCreated, "expected temp app to be flagged as created")
+	assert.Equal(t, "temp-app", app.Name)
 
-	// Cleanup must call Delete — gomock will fail the test if not.
-	info.Cleanup()
+	// cleanup must call Delete — gomock will fail the test if not.
+	cleanup()
 }
 
 func TestGenerateAppSetGitGeneratorParams(t *testing.T) {
@@ -493,6 +531,76 @@ func TestGetTempApplication(t *testing.T) {
 	}
 	if app.ResourceVersion != "" {
 		t.Errorf("ResourceVersion should be zero-valued, got %q", app.ResourceVersion)
+	}
+}
+
+func TestPairResourcesDeletion(t *testing.T) {
+	t.Parallel()
+
+	// Two live resources — a Deployment and a ConfigMap.
+	deploy := &unstructured.Unstructured{}
+	deploy.Object = map[string]interface{}{
+		"apiVersion": "apps/v1",
+		"kind":       "Deployment",
+		"metadata": map[string]interface{}{
+			"name":      "my-app",
+			"namespace": "production",
+		},
+		"spec": map[string]interface{}{
+			"replicas": int64(2),
+		},
+	}
+	cm := &unstructured.Unstructured{}
+	cm.Object = map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]interface{}{
+			"name":      "my-config",
+			"namespace": "production",
+		},
+		"data": map[string]interface{}{
+			"key": "value",
+		},
+	}
+
+	live := resourceSet{
+		byKey: map[kube.ResourceKey]*unstructured.Unstructured{
+			{Group: "apps", Kind: "Deployment", Namespace: "production", Name: "my-app"}: deploy,
+			{Group: "", Kind: "ConfigMap", Namespace: "production", Name: "my-config"}:   cm,
+		},
+	}
+
+	// Empty target — simulates component removal.
+	target := resourceSet{}
+
+	app := &argoappv1.Application{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-app"},
+		Spec:       argoappv1.ApplicationSpec{},
+	}
+	server := ServerInfo{
+		URL: "https://argocd.example.com",
+		settings: &settings.Settings{
+			AppLabelKey:    "app.kubernetes.io/instance",
+			TrackingMethod: "label",
+		},
+	}
+
+	pairs, err := pairResources(live, target, app, server)
+	if err != nil {
+		t.Fatalf("pairResources: %v", err)
+	}
+
+	if len(pairs) != 2 {
+		t.Fatalf("got %d pairs, want 2", len(pairs))
+	}
+
+	for _, p := range pairs {
+		if p.Live == nil {
+			t.Errorf("pair %s/%s: Live is nil, want non-nil (deletion pair)", p.Kind, p.Name)
+		}
+		if p.Target != nil {
+			t.Errorf("pair %s/%s: Target is non-nil, want nil (deletion pair)", p.Kind, p.Name)
+		}
 	}
 }
 

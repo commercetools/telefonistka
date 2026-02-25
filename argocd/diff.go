@@ -13,7 +13,7 @@ import (
 	argodiff "github.com/argoproj/argo-cd/v3/util/argo/diff"
 	"github.com/argoproj/argo-cd/v3/util/argo/normalizers"
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
-	"github.com/commercetools/telefonistka/diff"
+	telefonistka "github.com/commercetools/telefonistka"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -27,20 +27,6 @@ type DiffConfig struct {
 	CreateTempApps bool // create temporary ArgoCD app objects for new components
 }
 
-// AppInfo holds metadata about an ArgoCD application returned by
-// [EnsureApp]. Callers MUST defer Cleanup.
-type AppInfo struct {
-	Name            string
-	Namespace       string
-	HealthStatus    string
-	SyncStatus      string
-	AutoSyncEnabled bool
-	TargetRevision  string
-	TempCreated     bool
-	Cleanup         func() // MUST be deferred by caller
-	app             *argoappv1.Application
-}
-
 // ServerInfo holds ArgoCD server metadata returned by [FetchServerInfo].
 type ServerInfo struct {
 	URL      string // ArgoCD dashboard base URL
@@ -52,37 +38,6 @@ func (s ServerInfo) AppURL(appName string) string {
 	return s.URL + "/applications/" + appName
 }
 
-// ResourceSet is an opaque collection of Kubernetes resources
-// indexed by resource key. Produced by [FetchLive]/[FetchTarget],
-// consumed by [PairResources].
-type ResourceSet struct {
-	byKey     map[kube.ResourceKey]*unstructured.Unstructured
-	defaultNS string
-}
-
-// EnsureApp locates (or creates) the ArgoCD application for a
-// component. The returned AppInfo.Cleanup MUST be deferred by the
-// caller — it deletes temporary apps or is a no-op for pre-existing
-// ones.
-func EnsureApp(ctx context.Context, componentPath, repo, prBranch string, ac Clients, cfg DiffConfig, logger *slog.Logger) (AppInfo, error) {
-	noop := func() {}
-	app, tempCreated, cleanup, err := ensureApp(ctx, componentPath, repo, prBranch, ac, cfg, logger)
-	if err != nil {
-		return AppInfo{Cleanup: noop}, err
-	}
-	return AppInfo{
-		Name:            app.Name,
-		Namespace:       app.Namespace,
-		HealthStatus:    string(app.Status.Health.Status),
-		SyncStatus:      string(app.Status.Sync.Status),
-		AutoSyncEnabled: app.Spec.SyncPolicy.Automated != nil,
-		TargetRevision:  app.Spec.Source.TargetRevision,
-		TempCreated:     tempCreated,
-		Cleanup:         cleanup,
-		app:             app,
-	}, nil
-}
-
 // FetchServerInfo retrieves ArgoCD server settings.
 func FetchServerInfo(ctx context.Context, ac Clients) (ServerInfo, error) {
 	s, err := ac.Setting.Get(ctx, &settings.SettingsQuery{})
@@ -92,18 +47,70 @@ func FetchServerInfo(ctx context.Context, ac Clients) (ServerInfo, error) {
 	return ServerInfo{URL: s.URL, settings: s}, nil
 }
 
-// FetchLive returns the managed (live) resources for an application.
-// Secrets and empty NormalizedLiveState entries are filtered out.
-func FetchLive(ctx context.Context, ac Clients, info AppInfo, logger *slog.Logger) (ResourceSet, error) {
-	resources, err := ac.App.ManagedResources(ctx, &application.ResourcesQuery{
-		ApplicationName: &info.Name,
-		AppNamespace:    &info.Namespace,
-	})
+// DiffComponent locates (or creates) the ArgoCD application for a
+// component, fetches live and target state, runs ArgoCD's StateDiff,
+// and returns a [telefonistka.ComponentDiff] containing only changed
+// resources. Temporary apps are cleaned up before returning.
+//
+// When isRemoval is true the target manifest fetch is skipped,
+// producing deletion pairs for every live resource.
+func DiffComponent(ctx context.Context, componentPath, repo, revision string, ac Clients, cfg DiffConfig, server ServerInfo, isRemoval bool, logger *slog.Logger) (telefonistka.ComponentDiff, error) {
+	app, tempCreated, cleanup, err := ensureApp(ctx, componentPath, repo, revision, ac, cfg, logger)
 	if err != nil {
-		return ResourceSet{}, fmt.Errorf("fetching managed resources for %s: %w", info.Name, err)
+		return telefonistka.ComponentDiff{}, err
+	}
+	defer cleanup()
+
+	cd := telefonistka.ComponentDiff{
+		Name:            app.Name,
+		Namespace:       app.Namespace,
+		HealthStatus:    string(app.Status.Health.Status),
+		SyncStatus:      string(app.Status.Sync.Status),
+		AutoSyncEnabled: app.Spec.SyncPolicy.Automated != nil,
+		TargetRevision:  app.Spec.Source.TargetRevision,
+		TempCreated:     tempCreated,
 	}
 
-	rs := ResourceSet{byKey: make(map[kube.ResourceKey]*unstructured.Unstructured, len(resources.Items))}
+	if cd.TargetRevision == revision && cd.AutoSyncEnabled {
+		return cd, nil
+	}
+
+	live, err := fetchLive(ctx, ac, app, logger)
+	if err != nil {
+		return cd, err
+	}
+
+	var target resourceSet
+	if !isRemoval {
+		target, err = fetchTarget(ctx, ac, app, revision, logger)
+		if err != nil {
+			return cd, err
+		}
+	}
+
+	cd.Pairs, err = pairResources(live, target, app, server)
+	return cd, err
+}
+
+// resourceSet is an opaque collection of Kubernetes resources
+// indexed by resource key.
+type resourceSet struct {
+	byKey     map[kube.ResourceKey]*unstructured.Unstructured
+	defaultNS string
+}
+
+// fetchLive returns the managed (live) resources for an application.
+// Secrets and empty NormalizedLiveState entries are filtered out.
+func fetchLive(ctx context.Context, ac Clients, app *argoappv1.Application, logger *slog.Logger) (resourceSet, error) {
+	resources, err := ac.App.ManagedResources(ctx, &application.ResourcesQuery{
+		ApplicationName: &app.Name,
+		AppNamespace:    &app.Namespace,
+	})
+	if err != nil {
+		return resourceSet{}, fmt.Errorf("fetching managed resources for %s: %w", app.Name, err)
+	}
+
+	rs := resourceSet{byKey: make(map[kube.ResourceKey]*unstructured.Unstructured, len(resources.Items))}
 	for _, res := range resources.Items {
 		key := kube.ResourceKey{Group: res.Group, Kind: res.Kind, Namespace: res.Namespace, Name: res.Name}
 		if key.Kind == kube.SecretKind && key.Group == "" {
@@ -114,35 +121,35 @@ func FetchLive(ctx context.Context, ac Clients, info AppInfo, logger *slog.Logge
 		}
 		live := &unstructured.Unstructured{}
 		if err := json.Unmarshal([]byte(res.NormalizedLiveState), live); err != nil {
-			return ResourceSet{}, fmt.Errorf("unmarshaling live state for %s/%s: %w", key.Kind, key.Name, err)
+			return resourceSet{}, fmt.Errorf("unmarshaling live state for %s/%s: %w", key.Kind, key.Name, err)
 		}
 		rs.byKey[key] = live
 	}
 	return rs, nil
 }
 
-// FetchTarget returns target manifests at the given revision.
+// fetchTarget returns target manifests at the given revision.
 // Secrets and hook/ignored resources are filtered out. The default
 // namespace from the app's destination is applied to resources that
 // don't specify one.
-func FetchTarget(ctx context.Context, ac Clients, info AppInfo, revision string, logger *slog.Logger) (ResourceSet, error) {
+func fetchTarget(ctx context.Context, ac Clients, app *argoappv1.Application, revision string, logger *slog.Logger) (resourceSet, error) {
 	manifests, err := ac.App.GetManifests(ctx, &application.ApplicationManifestQuery{
-		Name:         &info.Name,
+		Name:         &app.Name,
 		Revision:     &revision,
-		AppNamespace: &info.Namespace,
+		AppNamespace: &app.Namespace,
 	})
 	if err != nil {
-		return ResourceSet{}, fmt.Errorf("fetching manifests for %s at %s: %w", info.Name, revision, err)
+		return resourceSet{}, fmt.Errorf("fetching manifests for %s at %s: %w", app.Name, revision, err)
 	}
 
-	rs := ResourceSet{
+	rs := resourceSet{
 		byKey:     make(map[kube.ResourceKey]*unstructured.Unstructured, len(manifests.Manifests)),
-		defaultNS: info.app.Spec.Destination.Namespace,
+		defaultNS: app.Spec.Destination.Namespace,
 	}
 	for _, mfst := range manifests.Manifests {
 		obj, err := argoappv1.UnmarshalToUnstructured(mfst)
 		if err != nil {
-			return ResourceSet{}, fmt.Errorf("unmarshaling manifest: %w", err)
+			return resourceSet{}, fmt.Errorf("unmarshaling manifest: %w", err)
 		}
 		if obj.GetNamespace() == "" {
 			obj.SetNamespace(rs.defaultNS)
@@ -151,7 +158,7 @@ func FetchTarget(ctx context.Context, ac Clients, info AppInfo, revision string,
 		if key.Kind == kube.SecretKind && key.Group == "" {
 			continue
 		}
-		if diff.IsHookOrIgnored(obj) {
+		if isHookOrIgnored(obj) {
 			continue
 		}
 		rs.byKey[key] = obj
@@ -159,17 +166,17 @@ func FetchTarget(ctx context.Context, ac Clients, info AppInfo, revision string,
 	return rs, nil
 }
 
-// PairResources runs ArgoCD's StateDiff on each live/target pair
-// and returns only changed resources as [diff.ResourcePair] values.
-// An empty target ResourceSet produces deletion pairs for every
+// pairResources runs ArgoCD's StateDiff on each live/target pair
+// and returns only changed resources as [telefonistka.ResourcePair] values.
+// An empty target resourceSet produces deletion pairs for every
 // live resource (component removal case).
-func PairResources(live, target ResourceSet, info AppInfo, server ServerInfo) ([]diff.ResourcePair, error) {
+func pairResources(live, target resourceSet, app *argoappv1.Application, server ServerInfo) ([]telefonistka.ResourcePair, error) {
 	overrides := make(map[string]argoappv1.ResourceOverride, len(server.settings.ResourceOverrides))
 	for k, v := range server.settings.ResourceOverrides {
 		overrides[k] = *v
 	}
 	diffCfg, err := argodiff.NewDiffConfigBuilder().
-		WithDiffSettings(info.app.Spec.IgnoreDifferences, overrides, false, normalizers.IgnoreNormalizerOpts{}).
+		WithDiffSettings(app.Spec.IgnoreDifferences, overrides, false, normalizers.IgnoreNormalizerOpts{}).
 		WithTracking(server.settings.AppLabelKey, server.settings.TrackingMethod).
 		WithNoCache().
 		WithStructuredMergeDiff(true).
@@ -184,13 +191,13 @@ func PairResources(live, target ResourceSet, info AppInfo, server ServerInfo) ([
 		remaining[k] = v
 	}
 
-	var pairs []diff.ResourcePair
+	var pairs []telefonistka.ResourcePair
 
 	for key, tgt := range target.byKey {
 		liveObj := remaining[key]
 		delete(remaining, key)
 
-		if liveObj != nil && diff.IsHookOrIgnored(liveObj) {
+		if liveObj != nil && isHookOrIgnored(liveObj) {
 			continue
 		}
 
@@ -203,7 +210,7 @@ func PairResources(live, target ResourceSet, info AppInfo, server ServerInfo) ([
 			continue
 		}
 
-		pair := diff.ResourcePair{
+		pair := telefonistka.ResourcePair{
 			Group:     key.Group,
 			Kind:      key.Kind,
 			Namespace: key.Namespace,
@@ -224,10 +231,10 @@ func PairResources(live, target ResourceSet, info AppInfo, server ServerInfo) ([
 
 	// Remaining live-only entries are deletions.
 	for key, liveObj := range remaining {
-		if liveObj == nil || diff.IsHookOrIgnored(liveObj) {
+		if liveObj == nil || isHookOrIgnored(liveObj) {
 			continue
 		}
-		pairs = append(pairs, diff.ResourcePair{
+		pairs = append(pairs, telefonistka.ResourcePair{
 			Group:     key.Group,
 			Kind:      key.Kind,
 			Namespace: key.Namespace,
@@ -237,6 +244,17 @@ func PairResources(live, target ResourceSet, info AppInfo, server ServerInfo) ([
 	}
 
 	return pairs, nil
+}
+
+// isHookOrIgnored returns true if the object carries an ArgoCD
+// sync hook annotation or an explicit compare-options=ignore
+// annotation.
+func isHookOrIgnored(obj *unstructured.Unstructured) bool {
+	annotations := obj.GetAnnotations()
+	if _, ok := annotations["argocd.argoproj.io/hook"]; ok {
+		return true
+	}
+	return annotations["argocd.argoproj.io/compare-options"] == "ignore"
 }
 
 // ensureApp locates (or creates) the ArgoCD application for a component.

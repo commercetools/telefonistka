@@ -8,6 +8,7 @@ import (
 	"testing"
 	"text/template"
 
+	telefonistka "github.com/commercetools/telefonistka"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -118,7 +119,7 @@ func TestFormatDiffDeletion(t *testing.T) {
 
 func TestFormatPairDiffRedacted(t *testing.T) {
 	t.Parallel()
-	pair := ResourcePair{
+	pair := telefonistka.ResourcePair{
 		Kind:      "Deployment",
 		Name:      "nginx",
 		Namespace: "default",
@@ -127,7 +128,7 @@ func TestFormatPairDiffRedacted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if el.Diff != RedactedDiff {
+	if el.Diff != telefonistka.RedactedDiff {
 		t.Errorf("expected redacted diff, got: %q", el.Diff)
 	}
 	if el.ObjectName != "nginx" {
@@ -158,41 +159,6 @@ func TestRenderDiff(t *testing.T) {
 		t.Errorf("got \n%q\n, want \n%q\n", got, want)
 	}
 	t.Logf("got: \n%s\n", rendered.String())
-}
-
-func TestIsHookOrIgnored(t *testing.T) {
-	t.Parallel()
-	tests := map[string]struct {
-		annotations map[string]string
-		want        bool
-	}{
-		"hook annotation": {
-			annotations: map[string]string{"argocd.argoproj.io/hook": "PreSync"},
-			want:        true,
-		},
-		"ignore annotation": {
-			annotations: map[string]string{"argocd.argoproj.io/compare-options": "ignore"},
-			want:        true,
-		},
-		"no relevant annotations": {
-			annotations: map[string]string{"other": "value"},
-			want:        false,
-		},
-		"nil annotations": {
-			annotations: nil,
-			want:        false,
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			obj := &unstructured.Unstructured{}
-			obj.SetAnnotations(tc.annotations)
-			if got := IsHookOrIgnored(obj); got != tc.want {
-				t.Errorf("IsHookOrIgnored() = %v, want %v", got, tc.want)
-			}
-		})
-	}
 }
 
 func renderTemplate(t *testing.T, tpl string, data any) *bytes.Buffer {
