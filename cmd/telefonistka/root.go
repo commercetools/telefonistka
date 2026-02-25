@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 
@@ -12,13 +13,29 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:     "telefonistka",
-	Version: "0.0.0",
+	Version: vcsVersion(),
 	Short:   "telefonistka - Safe and Controlled GitOps Promotion Across Environments/Failure-Domains",
 	Long: `Telefonistka is a Github webhook server/CLI tool that facilitates change promotion across environments/failure domains in Infrastructure as Code GitOps repos
 
 see https://github.com/commercetools/telefonistka`,
 	Run: func(cmd *cobra.Command, args []string) {
 	},
+}
+
+func vcsVersion() string {
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "devel"
+	}
+	for _, s := range bi.Settings {
+		if s.Key == "vcs.revision" {
+			if len(s.Value) > 12 {
+				return s.Value[:12]
+			}
+			return s.Value
+		}
+	}
+	return "devel"
 }
 
 const (
