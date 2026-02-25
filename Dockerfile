@@ -1,12 +1,11 @@
 FROM alpine:latest AS alpine-release
-WORKDIR /telefonistka
-COPY telefonistka /telefonistka/bin/telefonistka
+COPY telefonistka /usr/local/bin/telefonistka
 USER 1001
-ENTRYPOINT ["/telefonistka/bin/telefonistka"]
+ENTRYPOINT ["telefonistka"]
 CMD ["server"]
 
 FROM scratch
-COPY telefonistka /telefonistka/bin/telefonistka
+COPY telefonistka /usr/local/bin/telefonistka
 USER 1001
-ENTRYPOINT ["/telefonistka/bin/telefonistka"]
+ENTRYPOINT ["/usr/local/bin/telefonistka"]
 CMD ["server"]
