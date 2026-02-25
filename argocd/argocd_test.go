@@ -377,7 +377,7 @@ func TestTempAppDeletedOnDiffError(t *testing.T) {
 		prBranch,
 		repo,
 		ac,
-		&settings.Settings{URL: "https://argocd.test"},
+		ServerInfo{URL: "https://argocd.test", settings: &settings.Settings{URL: "https://argocd.test"}},
 		DiffConfig{UseSHALabel: true, CreateTempApps: true},
 		slog.Default(),
 	)
