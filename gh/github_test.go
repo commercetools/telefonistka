@@ -15,7 +15,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/commercetools/telefonistka/argocd"
 	"github.com/google/go-github/v62/github"
 	"github.com/stretchr/testify/assert"
 )
@@ -508,13 +507,13 @@ func TestShouldSyncBranchCheckBoxBeDisplayed(t *testing.T) {
 	tests := map[string]struct {
 		componentPathList            []string
 		allowSyncfromBranchPathRegex string
-		diffOfChangedComponents      []argocd.DiffResult
+		diffOfChangedComponents      []componentDiffResult
 		expected                     bool
 	}{
 		"New App": {
 			componentPathList:            []string{"workspace/app1"},
 			allowSyncfromBranchPathRegex: `^workspace/.*$`,
-			diffOfChangedComponents: []argocd.DiffResult{
+			diffOfChangedComponents: []componentDiffResult{
 				{
 					AppWasTemporarilyCreated: true,
 					ComponentPath:            "workspace/app1",
@@ -525,7 +524,7 @@ func TestShouldSyncBranchCheckBoxBeDisplayed(t *testing.T) {
 		"App synced from branch": {
 			componentPathList:            []string{"workspace/app1"},
 			allowSyncfromBranchPathRegex: `^workspace/.*$`,
-			diffOfChangedComponents: []argocd.DiffResult{
+			diffOfChangedComponents: []componentDiffResult{
 				{
 					AppSyncedFromPRBranch: true,
 					ComponentPath:         "workspace/app1",
@@ -536,7 +535,7 @@ func TestShouldSyncBranchCheckBoxBeDisplayed(t *testing.T) {
 		"Existing App": {
 			componentPathList:            []string{"workspace/app1"},
 			allowSyncfromBranchPathRegex: `^workspace/.*$`,
-			diffOfChangedComponents: []argocd.DiffResult{
+			diffOfChangedComponents: []componentDiffResult{
 				{
 					AppWasTemporarilyCreated: false,
 					ComponentPath:            "workspace/app1",
@@ -547,7 +546,7 @@ func TestShouldSyncBranchCheckBoxBeDisplayed(t *testing.T) {
 		"Mixed New and Existing Apps": {
 			componentPathList:            []string{"workspace/app1", "workspace/app2", "workspace/app3"},
 			allowSyncfromBranchPathRegex: `^workspace/.*$`,
-			diffOfChangedComponents: []argocd.DiffResult{
+			diffOfChangedComponents: []componentDiffResult{
 				{
 					AppWasTemporarilyCreated: false,
 					ComponentPath:            "workspace/app1",

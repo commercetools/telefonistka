@@ -5,33 +5,54 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/commercetools/telefonistka/argocd"
+	"github.com/commercetools/telefonistka/diff"
 	prom "github.com/commercetools/telefonistka/prometheus"
+	"github.com/google/go-github/v62/github"
 	"github.com/nao1215/markdown"
 )
 
 const githubCommentMaxSize = 65536
 
+// componentDiffResult holds the diff output for a single component.
+type componentDiffResult struct {
+	ComponentPath            string
+	AppName                  string
+	AppURL                   string
+	DiffElements             []diff.Element
+	DiffError                error
+	AppWasTemporarilyCreated bool
+	AppSyncedFromPRBranch    bool
+	HealthStatus             string
+	SyncStatus               string
+	AutoSyncEnabled          bool
+	IsRemoval                bool
+}
+
 type diffCommentData struct {
-	DiffOfChangedComponents   []argocd.DiffResult
+	DiffOfChangedComponents   []componentDiffResult
 	DisplaySyncBranchCheckBox bool
 	BranchName                string
+}
+
+// componentDiffReq describes one component to diff.
+type componentDiffReq struct {
+	path        string
+	includeDiff bool
+	isRemoval   bool
 }
 
 // shouldSyncBranchCheckBoxBeDisplayed checks if the sync branch checkbox should be displayed in the PR comment.
 // The checkbox should be displayed if:
 // - The component is allowed to be synced from a branch (based on Telefonistka configuration)
 // - The relevant app is not new, temporary app that was created just to generate the diff
-func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList []string, allowSyncfromBranchPathRegex string, diffOfChangedComponents []argocd.DiffResult) bool {
+func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList []string, allowSyncfromBranchPathRegex string, diffOfChangedComponents []componentDiffResult) bool {
 	for _, componentPath := range componentPathList {
-		// First we check if the component is allowed to be synced from a branch
 		if !isSyncFromBranchAllowedForThisPath(allowSyncfromBranchPathRegex, componentPath) {
 			continue
 		}
-
-		// Then we check the relevant app is not new, temporary app.
-		// We don't support syncing new apps from branches
 		for _, diffOfChangedComponent := range diffOfChangedComponents {
 			if diffOfChangedComponent.ComponentPath == componentPath && !diffOfChangedComponent.AppWasTemporarilyCreated && !diffOfChangedComponent.AppSyncedFromPRBranch {
 				return true
@@ -39,6 +60,102 @@ func shouldSyncBranchCheckBoxBeDisplayed(ctx context.Context, componentPathList 
 		}
 	}
 	return false
+}
+
+// diffComponentsFull orchestrates diffs for all components
+// concurrently, using the argocd building blocks directly.
+func diffComponentsFull(ctx context.Context, reqs []componentDiffReq, repo, prBranch string, ac argocd.Clients, cfg argocd.DiffConfig, logger *slog.Logger) ([]componentDiffResult, error) {
+	server, err := argocd.FetchServerInfo(ctx, ac)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan componentDiffResult, len(reqs))
+	for _, req := range reqs {
+		go func(req componentDiffReq) {
+			r := componentDiffResult{
+				ComponentPath: req.path,
+				IsRemoval:     req.isRemoval,
+			}
+
+			info, err := argocd.EnsureApp(ctx, req.path, repo, prBranch, ac, cfg, logger)
+			if err != nil {
+				r.DiffError = err
+				ch <- r
+				return
+			}
+			defer info.Cleanup()
+
+			r.AppWasTemporarilyCreated = info.TempCreated
+			r.AppName = info.Name
+			r.AppURL = server.AppURL(info.Name)
+			r.HealthStatus = info.HealthStatus
+			r.SyncStatus = info.SyncStatus
+			r.AutoSyncEnabled = info.AutoSyncEnabled
+
+			if info.TargetRevision == prBranch && info.AutoSyncEnabled {
+				r.AppSyncedFromPRBranch = true
+				ch <- r
+				return
+			}
+
+			live, err := argocd.FetchLive(ctx, ac, info, logger)
+			if err != nil {
+				r.DiffError = err
+				ch <- r
+				return
+			}
+
+			var target argocd.ResourceSet
+			if !req.isRemoval {
+				target, err = argocd.FetchTarget(ctx, ac, info, prBranch, logger)
+				if err != nil {
+					r.DiffError = err
+					ch <- r
+					return
+				}
+			}
+
+			pairs, err := argocd.PairResources(live, target, info, server)
+			if err != nil {
+				r.DiffError = err
+				ch <- r
+				return
+			}
+
+			for _, pair := range pairs {
+				de, err := diff.FormatPairDiff(pair, req.includeDiff)
+				if err != nil {
+					r.DiffError = fmt.Errorf("formatting diff for %s/%s: %w", pair.Kind, pair.Name, err)
+					ch <- r
+					return
+				}
+				if de.Diff == "" {
+					continue
+				}
+				r.DiffElements = append(r.DiffElements, de)
+			}
+			ch <- r
+		}(req)
+	}
+
+	results := make([]componentDiffResult, 0, len(reqs))
+	for range reqs {
+		r := <-ch
+		if r.DiffError != nil {
+			logger.Error("generating diff", "component_path", r.ComponentPath, "err", r.DiffError)
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
+// isComponentRemoval checks whether the component directory exists
+// at the PR branch ref. A 404 means the PR removes this component.
+func isComponentRemoval(ctx context.Context, repos repoService, owner, repo, componentPath, ref string) bool {
+	_, _, resp, _ := repos.GetContents(ctx, owner, repo, componentPath, &github.RepositoryContentGetOptions{Ref: ref})
+	prom.InstrumentGhCall(resp)
+	return resp != nil && resp.StatusCode == 404
 }
 
 func commentDiff(ctx context.Context, c Context, argoClients *argocd.Clients) error {
@@ -51,25 +168,31 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.Clients) er
 		return fmt.Errorf("generate list of changed components: %w", err)
 	}
 
-	// Building a map of component paths to a boolean indicating whether we should diff them.
-	// I'm avoiding doing this in the ArgoCD package to avoid circular dependencies and keep package scope clean
-	componentsToDiff := map[string]bool{}
+	var reqs []componentDiffReq
 	for _, componentPath := range componentPathList {
 		conf, err := getComponentConfig(ctx, c, componentPath, c.Ref)
 		if err != nil {
 			return fmt.Errorf("get component (%s) config:  %w", componentPath, err)
 		}
-		componentsToDiff[componentPath] = true
-		if conf.DisableArgoCDDiff {
-			componentsToDiff[componentPath] = false
+		includeDiff := !conf.DisableArgoCDDiff
+		if !includeDiff {
 			c.PrLogger.Debug("ArgoCD diff disabled for path", "path", componentPath)
 		}
+		removal := isComponentRemoval(ctx, c.Repositories, c.Owner, c.Repo, componentPath, c.Ref)
+		if removal {
+			c.PrLogger.Info("Component directory absent on PR branch, treating as removal", "path", componentPath)
+		}
+		reqs = append(reqs, componentDiffReq{
+			path:        componentPath,
+			includeDiff: includeDiff,
+			isRemoval:   removal,
+		})
 	}
 
-	diffOfChangedComponents, err := argocd.DiffComponents(ctx, componentsToDiff, c.Ref, c.RepoURL, argocd.DiffConfig{
+	diffOfChangedComponents, err := diffComponentsFull(ctx, reqs, c.RepoURL, c.Ref, *argoClients, argocd.DiffConfig{
 		UseSHALabel:    c.Config.Argocd.UseSHALabelForAppDiscovery,
 		CreateTempApps: c.Config.Argocd.CreateTempAppObjectFroNewApps,
-	}, *argoClients, c.PrLogger)
+	}, c.PrLogger)
 	if err != nil {
 		return fmt.Errorf("getting diff information: %w", err)
 	}
@@ -85,7 +208,7 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.Clients) er
 		}
 	}
 	if !hasComponentDiffErrors && !hasComponentDiff {
-		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state", "components_checked", len(componentsToDiff))
+		c.PrLogger.Debug("ArgoCD diff is empty, this PR will not change cluster state", "components_checked", len(reqs))
 		prLabels, resp, err := c.Issues.AddLabelsToIssue(ctx, c.Owner, c.Repo, c.PrNumber, []string{"noop"})
 		prom.InstrumentGhCall(resp)
 		if err != nil {
@@ -93,8 +216,6 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.Clients) er
 		} else {
 			c.PrLogger.Debug("PR labeled", "labels", prLabels)
 		}
-		// If the PR is a promotion PR and the diff is empty, we can auto-merge it
-		// "len(componentPathList) > 0"  validates we are not auto-merging a PR that we failed to understand which apps it affects
 		if doesPRHaveLabel(c.Labels, "promotion") && c.Config.Argocd.AutoMergeNoDiffPRs && len(componentPathList) > 0 {
 			c.PrLogger.Info("Auto-merging (no diff) PR")
 			err := mergePr(ctx, c)
@@ -105,15 +226,14 @@ func commentDiff(ctx context.Context, c Context, argoClients *argocd.Clients) er
 	}
 
 	if len(diffOfChangedComponents) > 0 {
-		diffCommentData := diffCommentData{
+		data := diffCommentData{
 			DiffOfChangedComponents: diffOfChangedComponents,
 			BranchName:              c.Ref,
 		}
-
-		diffCommentData.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(ctx, componentPathList, c.Config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
-		componentsToDiffJSON, _ := json.Marshal(componentsToDiff)
-		c.PrLogger.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(diffCommentData.DiffOfChangedComponents))
-		comments, err := generateArgoCdDiffComments(diffCommentData, githubCommentMaxSize)
+		data.DisplaySyncBranchCheckBox = shouldSyncBranchCheckBoxBeDisplayed(ctx, componentPathList, c.Config.Argocd.AllowSyncfromBranchPathRegex, diffOfChangedComponents)
+		componentsToDiffJSON, _ := json.Marshal(reqs)
+		c.PrLogger.Info("Generating ArgoCD Diff Comment for components", "components", string(componentsToDiffJSON), "diff_element_length", len(data.DiffOfChangedComponents))
+		comments, err := generateArgoCdDiffComments(data, githubCommentMaxSize)
 		if err != nil {
 			return fmt.Errorf("generate diff comment: %w", err)
 		}
@@ -152,10 +272,14 @@ func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, par
 		} else {
 			md.PlainTextf("%s %s @ %s", argoSmallLogo, markdown.Bold(markdown.Link(appDiffResult.AppName, appDiffResult.AppURL)), markdown.Code(appDiffResult.ComponentPath))
 
+			if appDiffResult.IsRemoval {
+				md.Warningf("This component is being **removed**. All resources below will be deleted from the cluster.")
+			}
+
 			// If the app was temporarily created, we should inform the user about it, if not we should inform about "unusual" health and sync status
 			if appDiffResult.AppWasTemporarilyCreated {
 				md.Note("Telefonistka has temporarily created an ArgoCD app object to render manifest previews.  \n> Please be aware:  \n> * The app will only appear in the ArgoCD UI for a few seconds.")
-			} else {
+			} else if !appDiffResult.IsRemoval {
 				if appDiffResult.HealthStatus != "Healthy" {
 					md.Cautionf("The ArgoCD app health status is currently %s", appDiffResult.HealthStatus)
 				}
@@ -182,7 +306,7 @@ func buildArgoCdDiffComment(diffCommentData diffCommentData, beConcise bool, par
 				if appDiffResult.AppSyncedFromPRBranch {
 					md.Note("The app already has this branch set as the source target revision, and autosync is enabled. Diff calculation was skipped.")
 				} else {
-					md.PlainText("No diff 🤷")
+					md.PlainText("No diff \U0001F937")
 				}
 			}
 		}
@@ -210,7 +334,7 @@ func generateArgoCdDiffComments(diffCommentData diffCommentData, githubCommentMa
 	totalComponents := len(diffCommentData.DiffOfChangedComponents)
 	for i, singleComponentDiff := range diffCommentData.DiffOfChangedComponents {
 		componentTemplateData := diffCommentData
-		componentTemplateData.DiffOfChangedComponents = []argocd.DiffResult{singleComponentDiff}
+		componentTemplateData.DiffOfChangedComponents = []componentDiffResult{singleComponentDiff}
 		commentBody, err := buildArgoCdDiffComment(componentTemplateData, false, i+1, totalComponents)
 		if err != nil {
 			return comments, fmt.Errorf("building diff comment for component %d/%d: %w", i+1, totalComponents, err)

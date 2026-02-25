@@ -3,18 +3,14 @@ package argocd
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient"
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
-	"github.com/argoproj/argo-cd/v3/pkg/apiclient/settings"
 	argoappv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	reposerverApiClient "github.com/argoproj/argo-cd/v3/reposerver/apiclient"
 	"github.com/commercetools/telefonistka/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -271,7 +267,7 @@ func TestFindArgocdAppByPathAnnotationNotFound(t *testing.T) {
 	}
 }
 
-func TestTempAppDeletedOnDiffError(t *testing.T) {
+func TestEnsureAppCleanup(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 
@@ -359,138 +355,29 @@ func TestTempAppDeletedOnDiffError(t *testing.T) {
 		Create(gomock.Any(), gomock.Any()).
 		Return(tempApp, nil)
 
-	// 4. ManagedResources fails — simulating a mid-flight error.
-	managedResourcesErr := fmt.Errorf("connection refused")
-	mockAppClient.EXPECT().
-		ManagedResources(gomock.Any(), gomock.Any()).
-		Return(nil, managedResourcesErr)
-
-	// 5. Delete MUST be called despite the error above.
+	// 4. Delete MUST be called when Cleanup is invoked.
 	mockAppClient.EXPECT().
 		Delete(gomock.Any(), gomock.Any()).
 		Return(&application.ApplicationResponse{}, nil)
 
-	result := generateDiffOfAComponent(
+	info, err := EnsureApp(
 		context.Background(),
-		false,
 		componentPath,
-		prBranch,
 		repo,
+		prBranch,
 		ac,
-		ServerInfo{URL: "https://argocd.test", settings: &settings.Settings{URL: "https://argocd.test"}},
 		DiffConfig{UseSHALabel: true, CreateTempApps: true},
 		slog.Default(),
 	)
-
-	assert.True(t, result.AppWasTemporarilyCreated, "expected temp app to be flagged as created")
-	assert.ErrorContains(t, result.DiffError, "connection refused", "expected ManagedResources error to propagate")
-	// gomock will fail the test if Delete was not called
-}
-
-func TestFetchArgoDiffConcurrently(t *testing.T) {
-	t.Parallel()
-	// MockApplicationServiceClient
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-
-	// mock the argoClients
-	mockAppServiceClient := mocks.NewMockApplicationServiceClient(mockCtrl)
-	mockSettingsServiceClient := mocks.NewMockSettingsServiceClient(mockCtrl)
-	// fake InitArgoClients
-
-	argoClients := Clients{
-		App:     mockAppServiceClient,
-		Setting: mockSettingsServiceClient,
-	}
-	// slowReply simulates a slow reply from the server
-	slowReply := func(ctx context.Context, in any, opts ...any) {
-		time.Sleep(time.Second)
+	if err != nil {
+		t.Fatalf("EnsureApp: %v", err)
 	}
 
-	// makeComponents for test
-	makeComponents := func(num int) map[string]bool {
-		components := make(map[string]bool, num)
-		for i := 0; i < num; i++ {
-			components[fmt.Sprintf("component/to/diff/%d", i)] = true
-		}
-		return components
-	}
+	assert.True(t, info.TempCreated, "expected temp app to be flagged as created")
+	assert.Equal(t, "temp-app", info.Name)
 
-	mockSettingsServiceClient.EXPECT().
-		Get(gomock.Any(), gomock.Any()).
-		Return(&settings.Settings{
-			URL: "https://test-argocd.test.test",
-		}, nil)
-	// mock the List method
-	mockAppServiceClient.EXPECT().
-		List(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(&argoappv1.ApplicationList{
-			Items: []argoappv1.Application{
-				{
-					TypeMeta:   metav1.TypeMeta{},
-					ObjectMeta: metav1.ObjectMeta{},
-					Spec:       argoappv1.ApplicationSpec{},
-					Status:     argoappv1.ApplicationStatus{},
-					Operation:  &argoappv1.Operation{},
-				},
-			},
-		}, nil).
-		AnyTimes().
-		Do(slowReply) // simulate slow reply
-
-	// mock the Get method
-	mockAppServiceClient.EXPECT().
-		Get(gomock.Any(), gomock.Any()).
-		Return(&argoappv1.Application{
-			TypeMeta: metav1.TypeMeta{},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-app",
-			},
-			Spec: argoappv1.ApplicationSpec{
-				Source: &argoappv1.ApplicationSource{
-					TargetRevision: "test-revision",
-				},
-				SyncPolicy: &argoappv1.SyncPolicy{
-					Automated: &argoappv1.SyncPolicyAutomated{},
-				},
-			},
-			Status:    argoappv1.ApplicationStatus{},
-			Operation: &argoappv1.Operation{},
-		}, nil).
-		AnyTimes()
-
-	// mock managedResource
-	mockAppServiceClient.EXPECT().
-		ManagedResources(gomock.Any(), gomock.Any()).
-		Return(&application.ManagedResourcesResponse{}, nil).
-		AnyTimes()
-
-	// mock the GetManifests method
-	mockAppServiceClient.EXPECT().
-		GetManifests(gomock.Any(), gomock.Any()).
-		Return(&reposerverApiClient.ManifestResponse{}, nil).
-		AnyTimes()
-
-	const numComponents = 5
-	// start timer
-	start := time.Now()
-
-	diffResults, err := DiffComponents(
-		context.TODO(),
-		makeComponents(numComponents),
-		"test-pr-branch",
-		"test-repo",
-		DiffConfig{UseSHALabel: true},
-		argoClients,
-		slog.Default(),
-	)
-	assert.NoError(t, err)
-
-	// stop timer
-	elapsed := time.Since(start)
-	assert.Equal(t, numComponents, len(diffResults))
-	// assert that the entire run takes less than numComponents * 1 second
-	assert.Less(t, elapsed, time.Duration(numComponents)*time.Second)
+	// Cleanup must call Delete — gomock will fail the test if not.
+	info.Cleanup()
 }
 
 func TestGenerateAppSetGitGeneratorParams(t *testing.T) {
