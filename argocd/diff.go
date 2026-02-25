@@ -1,7 +1,6 @@
 package argocd
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,9 +13,7 @@ import (
 	argodiff "github.com/argoproj/argo-cd/v3/util/argo/diff"
 	"github.com/argoproj/argo-cd/v3/util/argo/normalizers"
 	"github.com/argoproj/gitops-engine/pkg/utils/kube"
-	"github.com/gonvenience/ytbx"
-	"github.com/homeport/dyff/pkg/dyff"
-	yaml3 "gopkg.in/yaml.v3"
+	"github.com/commercetools/telefonistka/diff"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -30,21 +27,13 @@ type DiffConfig struct {
 	CreateTempApps bool // create temporary ArgoCD app objects for new components
 }
 
-// DiffElement represents a single diffed Kubernetes object.
-type DiffElement struct {
-	ObjectName      string
-	ObjectKind      string
-	ObjectNamespace string
-	Diff            string
-}
-
 // DiffResult holds the diff output for a single component.
 // A component has diffs when len(DiffElements) > 0.
 type DiffResult struct {
 	ComponentPath            string
 	AppName            string
 	AppURL             string
-	DiffElements             []DiffElement
+	DiffElements             []diff.Element
 	DiffError                error
 	AppWasTemporarilyCreated bool
 	AppSyncedFromPRBranch    bool
@@ -56,7 +45,7 @@ type DiffResult struct {
 // generateArgocdAppDiff pairs live cluster state (from ManagedResources)
 // with target manifests (from GetManifests at the PR branch) and runs
 // ArgoCD's StateDiff to produce per-object diffs.
-func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, manifests []string, logger *slog.Logger) (diffElements []DiffElement, err error) {
+func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resources *application.ManagedResourcesResponse, argoSettings *settings.Settings, manifests []string, logger *slog.Logger) (diffElements []diff.Element, err error) {
 	logger.Debug("Generating ArgoCD app diff", "app", app.Name, "keep_diff_data", keepDiffData, "managed_resources", len(resources.Items))
 
 	// 1. Index live state from ManagedResources using NormalizedLiveState.
@@ -90,7 +79,7 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		if key.Kind == kube.SecretKind && key.Group == "" {
 			continue
 		}
-		if isHookOrIgnored(obj) {
+		if diff.IsHookOrIgnored(obj) {
 			continue
 		}
 		targetByKey[key] = obj
@@ -111,14 +100,12 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 		return nil, fmt.Errorf("building diff config: %w", err)
 	}
 
-	const redactedDiff = "✂️ ✂️  Redacted ✂️ ✂️ \nUnset component-level configuration key `disableArgoCDDiff` to see diff content."
-
 	// 4. Pair targets with live and diff.
 	for key, target := range targetByKey {
 		live := liveByKey[key]
 		delete(liveByKey, key)
 
-		if live != nil && isHookOrIgnored(live) {
+		if live != nil && diff.IsHookOrIgnored(live) {
 			continue
 		}
 
@@ -131,10 +118,10 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 			continue
 		}
 
-		de := DiffElement{
-			ObjectKind:      key.Kind,
-			ObjectNamespace: key.Namespace,
-			ObjectName:      key.Name,
+		pair := diff.ResourcePair{
+			Kind:      key.Kind,
+			Namespace: key.Namespace,
+			Name:      key.Name,
 		}
 		if keepDiffData {
 			if live != nil {
@@ -142,15 +129,15 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 				if err := json.Unmarshal(diffRes.PredictedLive, predicted); err != nil {
 					return nil, fmt.Errorf("unmarshaling predicted live for %s/%s: %w", key.Kind, key.Name, err)
 				}
-				de.Diff, err = diffLiveVsTargetObject(live, predicted)
+				pair.Live = live
+				pair.Target = predicted
 			} else {
-				de.Diff, err = diffLiveVsTargetObject(nil, target)
+				pair.Target = target
 			}
-			if err != nil {
-				return nil, fmt.Errorf("formatting diff for %s/%s: %w", key.Kind, key.Name, err)
-			}
-		} else {
-			de.Diff = redactedDiff
+		}
+		de, err := diff.FormatPairDiff(pair, keepDiffData)
+		if err != nil {
+			return nil, fmt.Errorf("formatting diff for %s/%s: %w", key.Kind, key.Name, err)
 		}
 		// Skip elements where the visual diff is empty. This happens
 		// when ArgoCD's StateDiff considers the resource modified but
@@ -163,122 +150,24 @@ func generateArgocdAppDiff(keepDiffData bool, app *argoappv1.Application, resour
 
 	// 5. Remaining live-only entries are resources deleted by the PR.
 	for key, live := range liveByKey {
-		if live == nil || isHookOrIgnored(live) {
+		if live == nil || diff.IsHookOrIgnored(live) {
 			continue
 		}
 
-		de := DiffElement{
-			ObjectKind:      key.Kind,
-			ObjectNamespace: key.Namespace,
-			ObjectName:      key.Name,
+		pair := diff.ResourcePair{
+			Kind:      key.Kind,
+			Namespace: key.Namespace,
+			Name:      key.Name,
+			Live:      live,
 		}
-		if keepDiffData {
-			de.Diff, err = diffLiveVsTargetObject(live, nil)
-			if err != nil {
-				return nil, fmt.Errorf("formatting diff for deleted %s/%s: %w", key.Kind, key.Name, err)
-			}
-		} else {
-			de.Diff = redactedDiff
+		de, err := diff.FormatPairDiff(pair, keepDiffData)
+		if err != nil {
+			return nil, fmt.Errorf("formatting diff for deleted %s/%s: %w", key.Kind, key.Name, err)
 		}
 		diffElements = append(diffElements, de)
 	}
 
 	return diffElements, nil
-}
-
-// isHookOrIgnored returns true if the object carries an ArgoCD sync
-// hook annotation or an explicit compare-options=ignore annotation.
-func isHookOrIgnored(obj *unstructured.Unstructured) bool {
-	annotations := obj.GetAnnotations()
-	if _, ok := annotations["argocd.argoproj.io/hook"]; ok {
-		return true
-	}
-	return annotations["argocd.argoproj.io/compare-options"] == "ignore"
-}
-
-// diffLiveVsTargetObject returns the diff of live and target in a format that
-// is compatible with Github markdown diff highlighting.
-func diffLiveVsTargetObject(live, target *unstructured.Unstructured) (string, error) {
-	if live == nil {
-		live = &unstructured.Unstructured{}
-	}
-	if target == nil {
-		target = &unstructured.Unstructured{}
-	}
-	kind := target.GetKind()
-	name := target.GetName()
-	apiVersion := target.GetAPIVersion()
-
-	var liveNode yaml3.Node
-	var targetNode yaml3.Node
-
-	//  unstructured.Unstructured > Byte
-	marsheledLive, _ := live.MarshalJSON()
-	marsheledTarget, _ := target.MarshalJSON()
-
-	// Byte > YAML3
-	_ = yaml3.Unmarshal(marsheledLive, &liveNode)
-	_ = yaml3.Unmarshal(marsheledTarget, &targetNode)
-
-	liveIf := ytbx.InputFile{
-		Location: "live",
-		Documents: []*yaml3.Node{
-			&liveNode,
-		},
-	}
-
-	targetIf := ytbx.InputFile{
-		Location: "target",
-		Documents: []*yaml3.Node{
-			&targetNode,
-		},
-	}
-
-	cOptions := []dyff.CompareOption{
-		dyff.KubernetesEntityDetection(true),
-	}
-
-	dReport, err := dyff.CompareInputFiles(liveIf, targetIf, cOptions...)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate Dyff report: %w", err)
-	}
-
-	reportWriter := &dyff.DiffSyntaxReport{
-		PathPrefix:            "@@",
-		RootDescriptionPrefix: "#",
-		ChangeTypePrefix:      "!",
-		HumanReport: dyff.HumanReport{
-			Report:                dReport,
-			Indent:                0,
-			DoNotInspectCerts:     true,
-			NoTableStyle:          true,
-			OmitHeader:            false,
-			UseGoPatchPaths:       false,
-			MinorChangeThreshold:  0.1,
-			MultilineContextLines: 4,
-			PrefixMultiline:       true,
-		},
-	}
-
-	out := new(bytes.Buffer)
-
-	err = reportWriter.WriteReport(out)
-	if err != nil {
-		return "", fmt.Errorf("failed to format a Dyff report: %w", err)
-	}
-	// dyff may find zero differences when ArgoCD's StateDiff reports
-	// Modified. This happens because ArgoCD uses structured-merge-diff
-	// which can flag changes in defaulted fields, metadata, or
-	// normalizer artefacts that dyff's Kubernetes-aware comparison
-	// considers semantically identical. Return an empty string so the
-	// caller can skip the element entirely rather than rendering a
-	// header-only diff block with no actual changes.
-	if len(dReport.Diffs) == 0 {
-		return "", nil
-	}
-
-	header := "apiVersion: " + apiVersion + "\nkind: " + kind + "\nmetadata:\n  name: " + name + "\n"
-	return header + out.String(), nil
 }
 
 // ensureApp locates (or creates) the ArgoCD application for a component.

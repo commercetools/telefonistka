@@ -1,16 +1,13 @@
 package argocd
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"log/slog"
 	"os"
-	"strings"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient"
@@ -23,7 +20,6 @@ import (
 	"go.uber.org/mock/gomock"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
@@ -62,123 +58,6 @@ func TestFindRelevantAppSetByPathDoesNotExplode(t *testing.T) {
 	); err != nil {
 		t.Errorf("got unexpected error")
 	}
-}
-
-func readLiveTarget(t *testing.T) (live, target *unstructured.Unstructured, expected string) {
-	t.Helper()
-	live = readManifest(t, "testdata/"+t.Name()+".live")
-	target = readManifest(t, "testdata/"+t.Name()+".target")
-	expected = readFileString(t, "testdata/"+t.Name()+".want")
-	return live, target, expected
-}
-
-func readFileString(t *testing.T, path string) string {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
-}
-
-func readManifest(t *testing.T, path string) *unstructured.Unstructured {
-	t.Helper()
-
-	s := readFileString(t, path)
-	obj, err := argoappv1.UnmarshalToUnstructured(s)
-	if err != nil {
-		t.Fatalf("unmarshal %v: %v", path, err)
-	}
-	return obj
-}
-
-func TestDiffLiveVsTargetObject(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-	}{
-		{"1"},
-		{"identical"},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			live, target, want := readLiveTarget(t)
-			got, err := diffLiveVsTargetObject(live, target)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			if got != want {
-				t.Errorf("got \n%q\n, want \n%q\n", got, want)
-			}
-		})
-	}
-
-	t.Run("no panic on nil inputs", func(t *testing.T) {
-		defer func() {
-			if err := recover(); err != nil {
-				t.Errorf("got panic: %v", err)
-			}
-		}()
-		diffLiveVsTargetObject(nil, nil) //nolint:errcheck // only interested in panic
-	})
-
-	// Verify that a new resource (nil live) always produces a non-empty
-	// diff, ensuring the empty-diff guard does not suppress real content.
-	t.Run("nil live produces diff", func(t *testing.T) {
-		t.Parallel()
-		target := &unstructured.Unstructured{}
-		target.SetAPIVersion("apps/v1")
-		target.SetKind("Deployment")
-		target.SetName("nginx")
-		target.SetNamespace("default")
-		_ = unstructured.SetNestedField(target.Object, int64(3), "spec", "replicas")
-
-		got, err := diffLiveVsTargetObject(nil, target)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if got == "" {
-			t.Fatal("expected non-empty diff for new resource, got empty string")
-		}
-		if !strings.Contains(got, "Deployment") {
-			t.Errorf("expected diff to mention resource kind, got:\n%s", got)
-		}
-	})
-}
-
-func TestRenderDiff(t *testing.T) {
-	t.Parallel()
-	live := readManifest(t, "testdata/TestRenderDiff.live")
-	target := readManifest(t, "testdata/TestRenderDiff.target")
-	want := readFileString(t, "testdata/TestRenderDiff.md")
-	data, err := diffLiveVsTargetObject(live, target)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	// backticks are tricky https://github.com/golang/go/issues/24475
-	r := strings.NewReplacer("¬", "`")
-	tmpl := r.Replace("¬¬¬diff\n{{.}}¬¬¬\n")
-
-	rendered := renderTemplate(t, tmpl, data)
-
-	if got, want := rendered.String(), want; got != want {
-		t.Errorf("got \n%q\n, want \n%q\n", got, want)
-	}
-	t.Logf("got: \n%s\n", rendered.String())
-}
-
-func renderTemplate(t *testing.T, tpl string, data any) *bytes.Buffer {
-	t.Helper()
-	buf := bytes.NewBuffer(nil)
-	tmpl := template.New("")
-	tmpl = template.Must(tmpl.Parse(tpl))
-	if err := tmpl.Execute(buf, data); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	return buf
 }
 
 func TestFindArgocdAppBySHA1Label(t *testing.T) {
