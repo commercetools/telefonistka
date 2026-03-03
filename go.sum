@@ -59,8 +59,8 @@ github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be/go.mod h1:ySMOLuW
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/apparentlymart/go-textseg/v15 v15.0.0 h1:uYvfpb3DyLSCGWnctWKGj857c6ew1u1fNQOlOtuGxQY=
 github.com/apparentlymart/go-textseg/v15 v15.0.0/go.mod h1:K8XmNZdhEBkdlyDdvbmmsvpAG721bKi0joRfFdHIWJ4=
-github.com/argoproj/argo-cd/v2 v2.14.20 h1:qhV9BGNA2tyLWg2xd6ce0xlqC98OWBfXAzTc8kWug7U=
-github.com/argoproj/argo-cd/v2 v2.14.20/go.mod h1:CF9GX0CjKiszpAnvYNCLV5tLSVqgfOgn/tcOt2VHTQo=
+github.com/argoproj/argo-cd/v2 v2.14.21 h1:Ux50vfMUITW+Y+6GAYgQlZbr6WHE5ogiLg9OxxvP9EA=
+github.com/argoproj/argo-cd/v2 v2.14.21/go.mod h1:CF9GX0CjKiszpAnvYNCLV5tLSVqgfOgn/tcOt2VHTQo=
 github.com/argoproj/gitops-engine v0.7.1-0.20250521000818-c08b0a72c1f1 h1:Ze4U6kV49vSzlUBhH10HkO52bYKAIXS4tHr/MlNDfdU=
 github.com/argoproj/gitops-engine v0.7.1-0.20250521000818-c08b0a72c1f1/go.mod h1:WsnykM8idYRUnneeT31cM/Fq/ZsjkefCbjiD8ioCJkU=
 github.com/argoproj/pkg v0.13.7-0.20250305113207-cbc37dc61de5 h1:YBoLSjpoaJXaXAldVvBRKJuOPvIXz9UOv6S96gMJM/Q=
