@@ -127,6 +127,7 @@ Configuration keys:
 |`promotionPaths[0].promotionPrs`|  Array of structures, each element represent a PR that will be opened when files are changed under `sourcePath`. Multiple elements means multiple PR will be opened|
 |`promotionPaths[0].promotionPrs[0].targetPaths`| Array of strings, each element represent a directory to by synced from the changed component under  `sourcePath`. Multiple elements means multiple directories will be synced in a PR|
 |`promotionPaths[0].promotionPrs[0].targetDescription`| An optional string that describes the target paths, will be used in the promotion PR titles, for example "All Staging Clusters" or "Production Tier 2 Clusters". If this value is not provided Telefonistka will concatenate all `targetPaths` in the PR title which can make it very long and unreadable. Regardless of this configuration key, the PR titles will always start with the component name, e.g. `🚀 Promotion: nginx ➡️ Production Tier 2 Clusters` |
+|`promotionPaths[0].promotionPrs[0].labels`| An optional array of labels to apply to this specific promotion PR. These labels will be merged with the top-level `promotionPrLabels`. Use this to apply different labels to different promotion flows (e.g., `staging` label for staging promotions, `prod-us` for US production). Duplicate labels across top-level and PR-specific configurations are automatically deduplicated. |
 |`dryRunMode`| if true, the bot will just comment the planned promotion on the merged PR|
 |`autoApprovePromotionPrs`| if true the bot will auto-approve all promotion PRs, with the assumption the original PR was peer reviewed and is promoted verbatim. Required additional GH token via APPROVER_GITHUB_OAUTH_TOKEN env variable|
 |`toggleCommitStatus`| Map of strings, allow (non-repo-admin) users to change the [Github commit status](https://docs.github.com/en/rest/commits/statuses) state(from failure to success and back). This can be used to continue promotion of a change that doesn't pass repo checks. the keys are strings commented in the PRs, values are [Github commit status context](https://docs.github.com/en/rest/commits/statuses?apiVersion=2022-11-28#create-a-commit-status) to be overridden|
@@ -147,6 +148,8 @@ promotionPaths:
       autoMerge: true
     promotionPrs:
       - targetDescription: "All non-production clusters"
+        labels:
+          - "staging"
         targetPaths:
         - "clusters/dev/us-east4/c2"
         - "clusters/lab/europe-west4/c1"
@@ -159,9 +162,13 @@ promotionPaths:
         - "quick_promotion" # This flow will run only if PR has "quick_promotion" label, see targetPaths below
     promotionPrs:
       - targetDescription: "Production clusters tier 1"
+        labels:
+          - "prod-us"
         targetPaths:
         - "clusters/prod/us-west1/c2" # First PR for only a single cluster
       - targetDescription: "Production clusters tier 2"
+        labels:
+          - "prod-multi-region"
         targetPaths:
         - "clusters/prod/europe-west3/c2" # 2nd PR will sync all 4 remaining clusters
         - "clusters/prod/europe-west4/c2"
@@ -181,6 +188,8 @@ promotionPaths:
         - "clusters/prod/us-east4/c2"
 dryRunMode: true
 autoApprovePromotionPrs: true
+promotionPrLabels:
+  - "promotion"
 argocd:
   commentDiffonPR: true
   autoMergeNoDiffPRs: true
