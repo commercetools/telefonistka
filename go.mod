@@ -7,7 +7,7 @@ require github.com/alexliesenfeld/health v0.8.0
 require (
 	github.com/argoproj/argo-cd/v2 v2.14.21
 	github.com/argoproj/gitops-engine v0.7.1-0.20250521000818-c08b0a72c1f1
-	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
+	github.com/bradleyfalzon/ghinstallation/v2 v2.18.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/docker/docker v28.5.2+incompatible
 	github.com/go-test/deep v1.1.1
@@ -129,8 +129,8 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-github/v66 v66.0.0 // indirect
 	github.com/google/go-github/v71 v71.0.0 // indirect
-	github.com/google/go-github/v75 v75.0.0 // indirect
-	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/google/go-github/v84 v84.0.0 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
