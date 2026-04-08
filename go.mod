@@ -1,6 +1,6 @@
 module github.com/commercetools/telefonistka
 
-go 1.24.6
+go 1.25.0
 
 require github.com/alexliesenfeld/health v0.8.0
 
@@ -27,7 +27,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.6.0
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
-	golang.org/x/oauth2 v0.34.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/tools v0.41.0
 	google.golang.org/grpc v1.79.3
 	gopkg.in/yaml.v2 v2.4.0
