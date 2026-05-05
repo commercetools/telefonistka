@@ -57,6 +57,13 @@
         "targetDescription": {
           "type": "string",
           "description": "An optional string that describes the target paths, will be used in the promotion PR titles"
+        },
+        "labels": {
+          "type": "array",
+          "description": "An optional list of labels to apply to this promotion PR. These labels will be merged with the top-level promotionPrLabels.",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -86,7 +93,7 @@
         "$ref": "#/definitions/path"
       }
     },
-    "promtionPRlables": {
+    "promotionPrLabels": {
       "type": "array",
       "description": "List of labels to apply on PR",
       "items": {
