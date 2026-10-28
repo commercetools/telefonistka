@@ -1,0 +1,9 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:best-practices"],
+  "mode": "full",
+  "timezone": "Etc/UTC",
+  "schedule": ["* * * * 1"],
+  "labels": ["dependencies"],
+  "postUpdateOptions": ["gomodTidy"]
+}
