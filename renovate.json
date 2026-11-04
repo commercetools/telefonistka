@@ -5,5 +5,5 @@
   "timezone": "Etc/UTC",
   "schedule": ["* * * * 1"],
   "labels": ["dependencies"],
-  "postUpdateOptions": ["gomodTidy"]
+  "postUpdateOptions": ["gomodUpdateImportPaths", "gomodTidy"]
 }
