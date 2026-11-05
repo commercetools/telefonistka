@@ -21,7 +21,7 @@ require (
 	github.com/mikefarah/yq/v4 v4.52.4
 	github.com/nao1215/markdown v0.8.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
+	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
