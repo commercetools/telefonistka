@@ -279,4 +279,4 @@ require (
 )
 
 // temporarily replace github.com/cyphar/filepath-securejoin to avoid https://github.com/argoproj/argo-cd/issues/22007 should be removed after we move to ArgoCD 3.0
-replace github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.3.6
+replace github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.7.0
