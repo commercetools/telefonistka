@@ -10,7 +10,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.18.0
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/docker/docker v28.5.2+incompatible
-	github.com/go-test/deep v1.1.1
+	github.com/go-test/deep v1.1.2
 	github.com/gonvenience/ytbx v1.4.7
 	github.com/google/go-github/v62 v62.0.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
