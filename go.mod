@@ -2,7 +2,7 @@ module github.com/commercetools/telefonistka
 
 go 1.26.10
 
-require github.com/alexliesenfeld/health v0.8.0
+require github.com/alexliesenfeld/health v0.8.1
 
 require (
 	github.com/argoproj/argo-cd/v2 v2.14.21
