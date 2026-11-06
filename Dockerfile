@@ -1,4 +1,4 @@
-FROM alpine:latest AS alpine-release
+FROM alpine:latest@sha256:3f4d6b32e26703c6082839234f43769d5046b3ac7c910033911d1e71d8cd630a AS alpine-release
 WORKDIR /srv
 COPY templates/ /srv/templates/
 COPY telefonistka /usr/local/bin/

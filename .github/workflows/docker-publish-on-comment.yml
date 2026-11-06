@@ -34,14 +34,14 @@ jobs:
 
     steps:
       - name: Get PR branch
-        uses: xt0rted/pull-request-comment-branch@v3
+        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3
         id: comment-branch
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}         
       - name: Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@78fd333975b14e9c2833909b33ed29cbe12a4701 # master
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
 
       - run: echo epoch=$(date +%s) > $GITHUB_OUTPUT
         id: time
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cache/go-build
@@ -60,7 +60,7 @@ jobs:
             go-mod-v1-${{ github.ref_name }}-
             go-mod-v1-${{ github.event.repository.default_branch }}-${{ hashFiles('go.mod') }}
             go-mod-v1-${{ github.event.repository.default_branch }}-
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: go.mod
           cache: false
@@ -68,7 +68,7 @@ jobs:
       - run: go test -v ./...
       - run: go test -v -bench . -run "^$" ./...
       - run: go build -o telefonistka .
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           key: go-mod-v1-${{ github.ref_name }}-${{ hashFiles('go.mod') }}-${{ steps.time.outputs.epoch }}
           path: |
@@ -149,14 +149,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@master
+        uses: myrotvorets/set-commit-status-action@78fd333975b14e9c2833909b33ed29cbe12a4701 # master
         if: always()
         with:
           sha: ${{ steps.comment-branch.outputs.head_sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: ${{ job.status }}
       - name: Add comment to PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         if: always()
         with:
           script: |
