@@ -193,21 +193,25 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 		diffCommentDataTestDataFileName string
 		expectedNumberOfComments        int
 		maxCommentLength                int
+		expectConcise                   bool
 	}{
 		"All cluster diffs fit in one comment": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
 			expectedNumberOfComments:        1,
 			maxCommentLength:                65535,
+			expectConcise:                   false,
 		},
 		"Split diffs, one cluster per comment": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
 			expectedNumberOfComments:        3,
 			maxCommentLength:                4000,
+			expectConcise:                   false,
 		},
 		"Split diffs, but maxCommentLength is very small so need to use the concise template": {
 			diffCommentDataTestDataFileName: "./testdata/diff_comment_data_test.json",
 			expectedNumberOfComments:        3,
-			maxCommentLength:                2000,
+			maxCommentLength:                1500,
+			expectConcise:                   true,
 		},
 	}
 
@@ -232,6 +236,24 @@ func TestGenerateArgoCdDiffComments(t *testing.T) {
 			for _, comment := range result {
 				if len(comment) > tc.maxCommentLength {
 					t.Errorf("%s: Expected comment length to be less than %d, got %d", name, tc.maxCommentLength, len(comment))
+				}
+				isConcise := strings.Contains(comment, "concise view")
+				if isConcise != tc.expectConcise {
+					t.Errorf("%s: Expected concise view to be %v, got %v", name, tc.expectConcise, isConcise)
+				}
+			}
+			// When split, each comment should hold exactly one component, in order
+			if len(result) > 1 {
+				for i, comment := range result {
+					for j, component := range diffCommentData.DiffOfChangedComponents {
+						hasComponent := strings.Contains(comment, component.ComponentPath)
+						if i == j && !hasComponent {
+							t.Errorf("%s: Expected comment %d to contain component %s", name, i, component.ComponentPath)
+						}
+						if i != j && hasComponent {
+							t.Errorf("%s: Expected comment %d to not contain component %s", name, i, component.ComponentPath)
+						}
+					}
 				}
 			}
 		})
