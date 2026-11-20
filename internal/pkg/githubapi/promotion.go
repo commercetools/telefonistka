@@ -25,6 +25,7 @@ type PromotionInstanceMetaData struct {
 	PerComponentSkippedTargetPaths map[string][]string // ComponentName is the key,
 	ComponentNames                 []string
 	AutoMerge                      bool
+	Labels                         []string
 }
 
 func containMatchingRegex(patterns []string, str string) bool {
@@ -231,6 +232,7 @@ func generatePlanBasedOnChangeddComponent(ghPrClientDetails GhPrClientDetails, c
 								ComponentNames:                 []string{componentToPromote.ComponentName},
 								PerComponentSkippedTargetPaths: map[string][]string{},
 								AutoMerge:                      componentToPromote.AutoMerge,
+								Labels:                         ppr.Labels,
 							},
 							ComputedSyncPaths: map[string]string{},
 						}
